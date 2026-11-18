@@ -3,7 +3,7 @@ import { Menu, MapPin, Settings2, BookOpen, X } from 'lucide-react';
 import { COMPANY } from './data/seed.ts';
 import Home from './views/Home.tsx';
 import Dispatch from './views/Dispatch.tsx';
-import Receive, { ReceiveTab } from './views/Receive.tsx';
+import Receive, { ReceiveTab, CountBack } from './views/Receive.tsx';
 import Owner, { EvidenceView } from './views/Owner.tsx';
 import { useStore, receiptOverdue, countedByUs, atGate } from './store.tsx';
 import Reports from './views/Reports.tsx';
@@ -46,9 +46,9 @@ function useBadges() {
   } as Record<string, { n: number; cls: string } | null>;
 }
 
-// Links shared on WhatsApp open one screen directly: #/r/<truck>/<token> (receiver), #/e/<diff>/<token> (evidence)
+// Links shared on WhatsApp open one screen directly: #/r/<truck>/<token>/<load> (receiver), #/c/<truck>/<token>/<count> (count back to sender), #/e/<diff>/<token> (evidence)
 function useHashRoute() {
-  const read = () => { const m = window.location.hash.match(/^#\/(r|e)\/([^/]+)\/([^/?#]+)/); return m ? { kind: m[1], id: decodeURIComponent(m[2]), token: m[3] } : null; };
+  const read = () => { const m = window.location.hash.match(/^#\/(r|e|c)\/([^/]+)\/([^/?#]+)(?:\/([^/?#]+))?/); return m ? { kind: m[1], id: decodeURIComponent(m[2]), token: m[3], payload: m[4] || '' } : null; };
   const [r, setR] = useState(read);
   useEffect(() => { const on = () => setR(read()); window.addEventListener('hashchange', on); return () => window.removeEventListener('hashchange', on); }, []);
   return r;
@@ -127,7 +127,8 @@ export default function App() {
         )}
 
         <main className="flex-1 p-4 sm:p-6 md:p-8 max-w-full overflow-x-hidden">
-          {link?.kind === 'r' && <Receive id={link.id} token={link.token} key={link.id} />}
+          {link?.kind === 'r' && <Receive id={link.id} token={link.token} payload={link.payload} key={`${link.id}-${link.token}`} />}
+          {link?.kind === 'c' && <CountBack id={link.id} token={link.token} payload={link.payload} onOpen={(id) => go('dispatch', { id })} />}
           {link?.kind === 'e' && <EvidenceView id={link.id} token={link.token} />}
           {!link && <>
             {view === 'home' && <Home go={go} />}

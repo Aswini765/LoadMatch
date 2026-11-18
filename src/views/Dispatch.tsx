@@ -258,7 +258,7 @@ function TruckDetail({ lang, id, onBack }: { lang: string; id: string; onBack: (
   if (!s) return <Note>…</Note>;
   const st = shipmentStatus(state, s);
   const now = Date.now();
-  const link = s.token ? appLink(receiverPath(s)) : '';
+  const link = s.token ? appLink(receiverPath(s, state.settings)) : '';
   const msg = `${t('linkMessage', lang)} ${loadName(s.id)} · ${s.truckNo} · ${route(s)}${s.driver ? ` · ${s.driver}` : ''}${s.driverPhone ? ` ${s.driverPhone}` : ''}\n${link}`;
   const sendOrCount = () => {
     const token = newToken();
@@ -331,7 +331,7 @@ function TruckDetail({ lang, id, onBack }: { lang: string; id: string; onBack: (
         <div className="space-y-2">
           {receiptOverdue(state, s, now) && <Note tone="stop"><AlertTriangle className="w-4 h-4 inline mr-1" />{duration(now - s.sentAt)}</Note>}
           {atGate(s.flow)
-            ? <a id="btn-count" href={receiverPath(s)} className="w-full min-h-[52px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center cursor-pointer"><PackageCheck className="w-5 h-5 mr-2" />{t('countNow', lang)}</a>
+            ? <a id="btn-count" href={receiverPath(s, state.settings)} className="w-full min-h-[52px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center cursor-pointer"><PackageCheck className="w-5 h-5 mr-2" />{t('countNow', lang)}</a>
             : <>
               <div className="text-[11px] text-slate-500 break-all bg-slate-50 border border-slate-200 rounded-lg p-2 font-mono">{link}</div>
               <div className="grid grid-cols-2 gap-2">

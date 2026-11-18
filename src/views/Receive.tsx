@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Mic, MicOff, Camera, Lock, CheckCircle2, AlertTriangle, Minus, Plus, ChevronLeft, ChevronRight, MessageCircle, PackageCheck, Warehouse, ArrowRight, Wrench } from 'lucide-react';
-import { useStore, item, route, shipmentOf, diffsOf, shipmentStatus, receiverPath, countedByUs, jobworkOpen, loadName, FLOW_LABEL } from '../store.tsx';
+import { useStore, item, route, shipmentOf, diffsOf, shipmentStatus, receiverPath, countBackPath, unpackLoad, unpackCount, reducer, countedByUs, jobworkOpen, loadName, FLOW_LABEL } from '../store.tsx';
 import { t, fill, unitWord } from '../i18n.ts';
 import { useVoice, parseCount } from '../lib/voice.ts';
-import { PhoneFrame, Note, PhotoStrip, savedLang, saveLang, shareWhatsApp, newToken } from './ui.tsx';
+import { PhoneFrame, Note, PhotoStrip, savedLang, saveLang, shareWhatsApp, newToken, appLink } from './ui.tsx';
 import { NewList, Chain } from './Dispatch.tsx';
 import { when } from '../lib/format.ts';
 
@@ -18,7 +18,7 @@ export function ReceiveTab() {
     .filter((s: any) => !s.receipt && !s.cancelledAt && countedByUs(s) && (s.flow !== 'transfer' || s.sentAt))
     .sort((a: any, b: any) => (a.sentAt || a.createdAt) - (b.sentAt || b.createdAt));
   const start = (s: any) => {
-    if (s.sentAt) { window.location.hash = receiverPath(s); return; }
+    if (s.sentAt) { window.location.hash = receiverPath(s, state.settings); return; }
     const token = newToken();
     dispatch({ type: 'SEND_TO_RECEIVER', id: s.id, token, actor: 'Gate' });
     window.location.hash = `#/r/${s.id}/${token}`;
@@ -62,13 +62,35 @@ const loadDraft = (id: string) => { try { return JSON.parse(localStorage.getItem
 const saveDraft = (id: string, v: any) => { try { localStorage.setItem(draftKey(id), JSON.stringify(v)); } catch { /* ignore */ } };
 const clearDraft = (id: string) => { try { localStorage.removeItem(draftKey(id)); } catch { /* ignore */ } };
 
-export default function Receive({ id, token }: { id: string; token: string }) {
-  const { state, dispatch } = useStore();
+// The receiver's own finished count of a load from another phone (kept so reopening the link shows it again)
+const remoteKey = (id: string, token: string) => `loadmatch-remote-${id}-${token}`;
+
+export default function Receive({ id, token, payload }: { id: string; token: string; payload?: string }) {
+  const store = useStore();
   const [lang, setLangState] = useState(savedLang);
   const setLang = (l: string) => { setLangState(l); saveLang(l); };
-  const s = shipmentOf(state, id);
+  // This phone made the load (same truck and ref): its own record decides. Otherwise the load comes from the link.
+  const mine = shipmentOf(store.state, id);
+  const fromLink = payload ? unpackLoad(id, token, payload) : null;
+  const sameLoad = mine && (!fromLink || mine.token === token);
+  const remote = !sameLoad && fromLink ? fromLink : null;
+  const [remoteDone, setRemoteDone] = useState<any>(() => { try { return JSON.parse(localStorage.getItem(remoteKey(id, token)) || 'null'); } catch { return null; } });
+  // For a load from another phone, work on a scratch copy: nothing is added to this phone's own records.
+  const state = React.useMemo(() => {
+    if (!remote) return store.state;
+    const scratch = { ...store.state, settings: { ...store.state.settings, ...remote.settings }, shipments: [remote.shipment], diffs: [], drafts: [] };
+    return remoteDone ? reducer(scratch, remoteDone) : scratch;
+  }, [store.state, payload, remoteDone]);
+  const dispatch = (a: any) => {
+    if (!remote) return store.dispatch(a);
+    if (a.type !== 'SUBMIT_RECEIPT') return;
+    const stamped = { ...a, at: Date.now() };
+    try { localStorage.setItem(remoteKey(id, token), JSON.stringify(stamped)); } catch { /* ignore */ }
+    setRemoteDone(stamped);
+  };
+  const s = sameLoad ? mine : remote ? shipmentOf(state, id) : null;
   const ok = s && s.token && s.token === token && !s.cancelledAt;
-  const saved = loadDraft(id);
+  const saved = loadDraft(`${id}-${token}`);
   const [by, setBy] = useState(() => saved?.by || (() => { try { return localStorage.getItem('loadmatch-name') || ''; } catch { return ''; } })());
   const [counts, setCounts] = useState<Record<string, Count>>(saved?.counts || {});
   const [photos, setPhotos] = useState<any[]>(saved?.photos || []);
@@ -79,7 +101,7 @@ export default function Receive({ id, token }: { id: string; token: string }) {
   const stepRef = useRef(step);
   stepRef.current = step;
 
-  useEffect(() => { if (ok && !s.receipt) saveDraft(id, { by, counts, photos, note, step }); }, [ok, s?.receipt, id, by, counts, photos, note, step]);
+  useEffect(() => { if (ok && !s.receipt) saveDraft(`${id}-${token}`, { by, counts, photos, note, step }); }, [ok, s?.receipt, id, by, counts, photos, note, step]);
 
   const lineIds: string[] = ok ? s.lines.map((l: any) => l.id) : [];
   const onText = useCallback((alts: string[]) => {
@@ -111,7 +133,7 @@ export default function Receive({ id, token }: { id: string; token: string }) {
     </div>
   );
 
-  if (s.receipt) return <Done s={s} lang={lang} setLang={setLang} head={head} />;
+  if (s.receipt) return <Done s={s} state={state} remote={Boolean(remote)} lang={lang} setLang={setLang} head={head} />;
 
   const n = s.lines.length;
   const get = (lineId: string): Count => counts[lineId] || { counted: '', damaged: '0' };
@@ -126,7 +148,7 @@ export default function Receive({ id, token }: { id: string; token: string }) {
     try { localStorage.setItem('loadmatch-name', by.trim()); } catch { /* ignore */ }
     const lines = Object.fromEntries(s.lines.map((l: any) => [l.id, { counted: Number(get(l.id).counted), damaged: Number(get(l.id).damaged || 0) }]));
     dispatch({ type: 'SUBMIT_RECEIPT', id: s.id, token, by: by.trim(), lines, photos, note: note.trim(), actor: 'Receiver' });
-    clearDraft(s.id);
+    clearDraft(`${s.id}-${token}`);
     setConfirming(false);
   };
 
@@ -249,14 +271,17 @@ export function resultText(state: any, s: any, lang: string) {
 }
 
 // After submitting: the count is locked; now the sent quantity is shown next to the count.
-function Done({ s, lang, setLang, head }: { s: any; lang: string; setLang: (l: string) => void; head: React.ReactNode }) {
-  const { state, dispatch } = useStore();
+function Done({ s, state, remote, lang, setLang, head }: { s: any; state: any; remote: boolean; lang: string; setLang: (l: string) => void; head: React.ReactNode }) {
+  const { dispatch } = useStore();
+  // From another phone: the message to the sender carries a link that records this count on their phone.
+  // Always: the receiver may be on a different phone even when this phone has a load with the same number.
+  const message = `${resultText(state, s, lang)}\n\n${t('saveCountLink', lang)}:\n${appLink(countBackPath(s, s.receipt))}`;
   const matched = shipmentStatus(state, s) === 'MATCHED';
   const showLines = state.settings.differencesTo !== 'owner';
   return (
     <PhoneFrame title="LoadMatch · Receive" sub={loadName(s.id)} lang={lang} setLang={setLang}>
       {head}
-      <Note tone="go"><CheckCircle2 className="w-4 h-4 inline mr-1" />{t('submitted', lang)}</Note>
+      <Note tone="go"><CheckCircle2 className="w-4 h-4 inline mr-1" />{t(remote ? 'savedSendNow' : 'submitted', lang)}</Note>
       <Note tone={matched ? 'go' : 'warn'}>{matched ? t('resultMatched', lang) : t('resultDiff', lang)}</Note>
       {showLines && <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">{t('compare', lang)}</div>}
       {showLines && <div className="rounded-xl border border-slate-200 divide-y divide-slate-100">
@@ -275,9 +300,39 @@ function Done({ s, lang, setLang, head }: { s: any; lang: string; setLang: (l: s
         })}
       </div>}
       {!matched && s.flow !== 'outbound' && <Note tone="warn">{t('lrTip', lang)}</Note>}
-      {!matched && <PhotoStrip photos={(s.docs || []).filter((d: any) => d.by === 'Receiver')} onAdd={(r) => dispatch({ type: 'ATTACH_DOC', id: s.id, docs: r, actor: 'Receiver' })} label={t('addPhoto', lang)} lang={lang} kinds={['signed lorry receipt (bilty)', 'damage']} />}
-      <a id="btn-tell-sender" href={shareWhatsApp(resultText(state, s, lang))} target="_blank" rel="noreferrer" className="w-full min-h-[48px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center"><MessageCircle className="w-5 h-5 mr-2" />{t('tellSender', lang)}</a>
+      <div id="r-send-back"><Note tone="warn">{t('sendBackNote', lang)}</Note></div>
+      {!matched && !remote && <PhotoStrip photos={(s.docs || []).filter((d: any) => d.by === 'Receiver')} onAdd={(r) => dispatch({ type: 'ATTACH_DOC', id: s.id, docs: r, actor: 'Receiver' })} label={t('addPhoto', lang)} lang={lang} kinds={['signed lorry receipt (bilty)', 'damage']} />}
+      <a id="btn-tell-sender" href={shareWhatsApp(message)} target="_blank" rel="noreferrer" className="w-full min-h-[48px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center"><MessageCircle className="w-5 h-5 mr-2" />{t('sendCountToSender', lang)}</a>
       <Note><Lock className="w-4 h-4 inline mr-1" />{t('locked', lang)} {s.receipt.by}, {when(s.receipt.at)}</Note>
     </PhoneFrame>
   );
+}
+
+// ---------- the count comes back: the sender opens #/c/<truck>/<token>/<count> on the phone that made the load ----------
+export function CountBack({ id, token, payload, onOpen }: { id: string; token: string; payload: string; onOpen: (id: string) => void }) {
+  const { state, dispatch } = useStore();
+  const [lang, setLangState] = useState(savedLang);
+  const setLang = (l: string) => { setLangState(l); saveLang(l); };
+  const s = shipmentOf(state, id);
+  const r = unpackCount(payload);
+  const valid = Boolean(s && r && s.token === token && !s.cancelledAt);
+  const tried = useRef(false);
+  useEffect(() => {
+    if (tried.current || !valid || s.receipt) return;
+    tried.current = true;
+    dispatch({ type: 'SUBMIT_RECEIPT', id: s.id, token, by: r!.by, lines: r!.lines, photos: [], note: r!.note, at: r!.at, actor: 'Receiver' });
+  }, [valid]);
+  let body: React.ReactNode;
+  if (!s || !r) body = <Note tone="stop"><AlertTriangle className="w-4 h-4 inline mr-1" />{t('countOtherPhone', lang)}</Note>;
+  else if (s.cancelledAt) body = <Note tone="stop">{t('countCancelled', lang)}</Note>;
+  else if (s.token !== token) body = <Note tone="stop">{t('invalidLink', lang)}</Note>;
+  else if (!s.receipt) body = <Note tone="stop">{t('countBad', lang)}</Note>;
+  else body = (
+    <>
+      <Note tone="go"><CheckCircle2 className="w-4 h-4 inline mr-1" />{fill(t('countSaved', lang), { by: s.receipt.by })}</Note>
+      <div id="cb-result" className="rounded-xl border border-slate-200 bg-white p-3 text-xs whitespace-pre-line text-slate-800">{resultText(state, s, lang)}</div>
+      <button id="btn-open-load" onClick={() => onOpen(s.id)} className="w-full min-h-[48px] rounded-xl bg-slate-900 text-white text-sm font-bold flex items-center justify-center cursor-pointer">{t('openLoad', lang)}<ArrowRight className="w-4 h-4 ml-1" /></button>
+    </>
+  );
+  return <PhoneFrame title="LoadMatch" sub={s ? `${loadName(s.id)} · ${s.truckNo}` : id} lang={lang} setLang={setLang}><div className="space-y-3">{body}</div></PhoneFrame>;
 }

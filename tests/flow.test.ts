@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {
   OPTIONS, jobworkBalance, jobworkDueAt, jobworkOpen, childrenOf, parentOf, JOBWORK_DAYS,
-  reducer, buildInitialState, shipmentOf, diffsOf, diffOf, shipmentStatus, receiptOverdue, diffOverdue, truckSummary, evidenceText, importOrder,
+  reducer, buildInitialState, shipmentOf, packLoad, unpackLoad, packCount, unpackCount, diffsOf, diffOf, shipmentStatus, receiptOverdue, diffOverdue, truckSummary, evidenceText, importOrder,
 } from '../src/core.ts';
 import { voucherXml } from '../src/lib/tally.ts';
 import { taxLines } from '../src/lib/tax.ts';
@@ -392,6 +392,33 @@ test('owner can correct a wrong count before deciding anything', () => {
   // not after a decision
   const decided = run(s, { type: 'DECIDE', diffId: diffsOf(s, id as string)[0].id, action: 'investigate' });
   assert.equal(run(decided, { type: 'REOPEN_COUNT', id, note: 'x', actor: 'Owner' }), decided);
+});
+
+test('two phones, no database: the link carries the load, the count comes back by link', () => {
+  // sender's phone
+  let [sender, id] = sentTransfer(buildInitialState());
+  const sent = shipmentOf(sender, id as string);
+  const link = packLoad(sent, { blindCount: true, differencesTo: 'all' });
+  // receiver's phone has its own, different records under the same load number
+  const other = run(buildInitialState(), { type: 'CREATE_SHIPMENT', flow: 'outbound', fromUnit: 'MYS', party: Object.keys(PARTIES).find((k) => PARTIES[k].kind === 'customer'), truckNo: 'KA 09 Z 9', ref: 'X-1', lines: [{ item: 'BRP-1148', qty: 1 }] });
+  const got = unpackLoad(id as string, 'tok123', link)!;
+  assert.ok(got, 'link decodes');
+  assert.notEqual(shipmentOf(other, id as string)?.truckNo, got.shipment.truckNo, 'not mistaken for the local load');
+  assert.equal(got.settings.blindCount, true);
+  assert.deepEqual(got.shipment.lines.map((l: any) => [l.id, l.item, l.qty]), sent.lines.map((l: any) => [l.id, l.item, l.qty]));
+  // receiver counts on a scratch copy
+  const scratch = { ...other, shipments: [got.shipment], diffs: [], drafts: [] };
+  const counted = reducer(scratch, { type: 'SUBMIT_RECEIPT', id, token: 'tok123', by: 'ರವಿ', lines: { L1: { counted: 97, damaged: 1 }, L2: { counted: 50, damaged: 0 } }, at: 5 });
+  assert.equal(diffsOf(counted, id as string).length, 2);
+  // the count goes back by link, and the sender's phone records it
+  const back = unpackCount(packCount(shipmentOf(counted, id as string).receipt))!;
+  assert.equal(back.by, 'ರವಿ');
+  sender = run(sender, { type: 'SUBMIT_RECEIPT', id, token: 'tok123', by: back.by, lines: back.lines, at: back.at });
+  assert.deepEqual(diffsOf(sender, id as string).map((d: any) => [d.kind, d.qty]), [['damaged', 1], ['short', 3]]);
+  // a second tap does nothing; a wrong token does nothing; a damaged link is refused
+  assert.equal(run(sender, { type: 'SUBMIT_RECEIPT', id, token: 'tok123', by: back.by, lines: back.lines }), sender);
+  assert.equal(unpackLoad(id as string, 'tok123', link.slice(0, 10)), null);
+  assert.equal(unpackCount('garbage'), null);
 });
 
 console.log(`\n${passed} tests passed`);

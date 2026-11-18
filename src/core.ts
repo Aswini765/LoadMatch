@@ -135,7 +135,30 @@ export const parentOf = (state: any, s: any) => (s.parentId ? shipmentOf(state, 
 export const childrenOf = (state: any, s: any) => state.shipments.filter((x: any) => x.parentId === s.id && !x.cancelledAt);
 
 // The receiver's link: opens one truck, no login
-export const receiverPath = (s: any) => `#/r/${s.id}/${s.token}`;
+// Until the shared database is on, each phone keeps its own records. So the link itself carries the load
+// (items and quantities, as codes), and the receiver's count comes back to the sender the same way.
+const toB64 = (v: any) => { const b = new TextEncoder().encode(JSON.stringify(v)); let s = ''; b.forEach((x) => { s += String.fromCharCode(x); }); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+const fromB64 = (p: string) => { try { const s = atob(p.replace(/-/g, '+').replace(/_/g, '/')); return JSON.parse(new TextDecoder().decode(Uint8Array.from(s, (ch) => ch.charCodeAt(0)))); } catch { return null; } };
+export const packLoad = (s: any, settings: any = {}) => toB64({ f: s.flow, fu: s.fromUnit, tu: s.toUnit, p: s.party, tn: s.truckNo, r: s.ref, d: s.driver || '', dp: s.driverPhone || '', s: s.sentAt, l: s.lines.map((l: any) => [l.item, l.qty]), bl: settings.blindCount ? 1 : 0, dt: settings.differencesTo || 'all' });
+// The load as the receiver's phone sees it, rebuilt from the link. null if the link is damaged.
+export function unpackLoad(id: string, token: string, payload: string) {
+  const v = fromB64(payload || '');
+  if (!v || !FLOW_LABEL[v.f] || !Array.isArray(v.l) || !v.l.length || !v.l.every((x: any) => ITEMS[x[0]] && Number.isInteger(x[1]) && x[1] > 0)) return null;
+  if ((v.fu && !UNITS[v.fu]) || (v.tu && !UNITS[v.tu]) || (v.p && !PARTIES[v.p])) return null;
+  return {
+    shipment: { id, flow: v.f, fromUnit: v.fu || null, toUnit: v.tu || null, party: v.p || null, truckNo: String(v.tn || ''), ref: String(v.r || ''), driver: String(v.d || ''), driverPhone: String(v.dp || ''),
+      lines: v.l.map((x: any, i: number) => ({ id: `L${i + 1}`, item: x[0], qty: x[1] })), createdAt: v.s, sentAt: v.s || Date.now(), token, receipt: null, cancelledAt: null, loading: null, docs: [], audit: [], fulfils: [], parentId: null, billing: 'none', remote: true },
+    settings: { blindCount: Boolean(v.bl), differencesTo: v.dt === 'owner' ? 'owner' : 'all' },
+  };
+}
+export const packCount = (r: { by: string; note?: string; at: number; lines: Record<string, { counted: number; damaged: number }> }) => toB64({ b: r.by, n: r.note || '', a: r.at, l: Object.fromEntries(Object.entries(r.lines).map(([k, x]) => [k, [x.counted, x.damaged]])) });
+export function unpackCount(payload: string) {
+  const v = fromB64(payload || '');
+  if (!v || !String(v.b || '').trim() || !v.l || typeof v.l !== 'object') return null;
+  return { by: String(v.b), note: String(v.n || ''), at: Number(v.a) || Date.now(), lines: Object.fromEntries(Object.entries(v.l).map(([k, x]: any) => [k, { counted: Number(x[0]), damaged: Number(x[1]) }])) };
+}
+export const receiverPath = (s: any, settings?: any) => `#/r/${s.id}/${s.token}/${packLoad(s, settings)}`;
+export const countBackPath = (s: any, r: any) => `#/c/${s.id}/${s.token}/${packCount(r)}`;
 export const evidencePath = (d: any) => `#/e/${d.id}/${d.evidenceToken}`;
 
 // One WhatsApp-ready summary per truck for the owner

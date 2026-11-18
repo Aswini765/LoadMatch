@@ -66,7 +66,7 @@ export default function Owner({ go, initialId }: { go: Go; initialId?: string | 
                     <div className="font-bold text-slate-900 truncate">{s.truckNo} · {route(s)}</div>
                     <div className="text-slate-500">{loadName(s.id)} · left {when(s.sentAt, now)} · {late ? <span className="text-rose-700 font-bold">{duration(now - s.sentAt)} ago, later than {state.settings.receiptHours} hours</span> : `${duration(now - s.sentAt)} ago`}</div>
                   </div>
-                  <a href={shareWhatsApp(`Reminder: please count ${loadName(s.id)} (truck ${s.truckNo}, ${route(s)}) and submit:\n${appLink(receiverPath(s))}`)} target="_blank" rel="noreferrer" className="shrink-0 px-2.5 py-1.5 rounded-md bg-emerald-600 text-white font-bold flex items-center"><MessageCircle className="w-3.5 h-3.5 mr-1" />Remind</a>
+                  <a href={shareWhatsApp(`Reminder: please count ${loadName(s.id)} (truck ${s.truckNo}, ${route(s)}) and submit:\n${appLink(receiverPath(s, state.settings))}`)} target="_blank" rel="noreferrer" className="shrink-0 px-2.5 py-1.5 rounded-md bg-emerald-600 text-white font-bold flex items-center"><MessageCircle className="w-3.5 h-3.5 mr-1" />Remind</a>
                 </div>
               );
             })}
@@ -124,7 +124,7 @@ function TruckHead({ s }: { s: any }) {
             <div className="font-semibold text-slate-800">Reopen the count. The receiver's link will work again for a fresh count.</div>
             <input id={`fix-why-${s.id}`} value={why} onChange={(e) => setWhy(e.target.value)} placeholder="Why? e.g. typed 10 instead of 100" className="w-full p-1.5 rounded border border-slate-300" />
             <div className="flex gap-2">
-              <button id={`fix-ok-${s.id}`} disabled={!why.trim()} onClick={() => { dispatch({ type: 'REOPEN_COUNT', id: s.id, note: why.trim(), actor: 'Owner' }); window.open(shareWhatsApp(`Please count ${loadName(s.id)} (truck ${s.truckNo}, ${route(s)}) again and submit. Reason: ${why.trim()}\n${appLink(receiverPath(s))}`), '_blank'); setFixing(false); }} className="px-2.5 py-1 rounded-md bg-slate-900 disabled:opacity-40 text-white font-bold cursor-pointer">Reopen and send link</button>
+              <button id={`fix-ok-${s.id}`} disabled={!why.trim()} onClick={() => { dispatch({ type: 'REOPEN_COUNT', id: s.id, note: why.trim(), actor: 'Owner' }); window.open(shareWhatsApp(`Please count ${loadName(s.id)} (truck ${s.truckNo}, ${route(s)}) again and submit. Reason: ${why.trim()}\n${appLink(receiverPath(s, state.settings))}`), '_blank'); setFixing(false); }} className="px-2.5 py-1 rounded-md bg-slate-900 disabled:opacity-40 text-white font-bold cursor-pointer">Reopen and send link</button>
               <button onClick={() => setFixing(false)} className="px-2.5 py-1 rounded-md border border-slate-300 cursor-pointer">Keep</button>
             </div>
             {!why.trim() && <div className="text-[10px] text-slate-500">Write why first.</div>}
