@@ -34,7 +34,7 @@ function voucherBody(d: any) {
         <NARRATION>${esc(d.narration)}</NARRATION>${out}${inn}
       </VOUCHER>`;
   } else if (d.type === 'receipt_note') {
-    const p = PARTIES[d.party];
+    const p = d.partyInfo || PARTIES[d.party];
     const inv = d.lines.map((l: any) => `
         <ALLINVENTORYENTRIES.LIST>
           <STOCKITEMNAME>${esc(ITEMS[l.item].name)}</STOCKITEMNAME>
@@ -55,10 +55,10 @@ function voucherBody(d: any) {
       </VOUCHER>`;
   } else {
     // party vouchers with GST: debit note to a supplier, credit note or sales invoice to a customer
-    const p = PARTIES[d.party];
-    const t = taxLines(d.lines, p);
+    const p = d.partyInfo || PARTIES[d.party];
+    const t = taxLines(d.lines, p, d.fromState);
     const vch = d.type === 'debit_note' ? 'Debit Note' : d.type === 'credit_note' ? 'Credit Note' : 'Sales';
-    const itemLedger = d.type === 'debit_note' ? 'Purchase' : 'Sales';
+    const itemLedger = d.type === 'debit_note' ? 'Purchase' : d.partyInfo ? 'Branch Transfer' : 'Sales';
     const taxPrefix = d.type === 'debit_note' ? 'Input' : 'Output';
     // party side: Dr on a debit note and a sales invoice, Cr on a credit note
     const partyDr = d.type !== 'credit_note';
@@ -82,7 +82,7 @@ function voucherBody(d: any) {
         <VOUCHERTYPENAME>${vch}</VOUCHERTYPENAME>
         <PARTYLEDGERNAME>${esc(p.name)}</PARTYLEDGERNAME>
         <PARTYGSTIN>${esc(p.gstin)}</PARTYGSTIN>
-        <PLACEOFSUPPLY>${esc(d.type === 'debit_note' ? COMPANY.state : p.state)}</PLACEOFSUPPLY>
+        <PLACEOFSUPPLY>${esc(d.type === 'debit_note' ? (d.fromState || COMPANY.state) : p.state)}</PLACEOFSUPPLY>
         <ISINVOICE>Yes</ISINVOICE>
         <REFERENCE>${esc(d.ref)}</REFERENCE>
         <NARRATION>${esc(d.narration)}</NARRATION>

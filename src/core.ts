@@ -4,7 +4,7 @@
 // A shipment (one truck) is listed by the sender, counted by the receiver through a link, and
 // compared line by line. Each difference stays open until the owner settles it. Settled
 // differences, and normal dispatches and receipts, become Tally drafts for the accountant.
-import { UNITS, GODOWNS, ITEMS, PARTIES, DEFAULT_SETTINGS, makeSeed } from './data/seed.ts';
+import { COMPANY, UNITS, GODOWNS, ITEMS, PARTIES, DEFAULT_SETTINGS, makeSeed } from './data/seed.ts';
 import { inr } from './lib/format.ts';
 
 export const VERSION = 1;
@@ -42,6 +42,7 @@ export const OPTIONS: Record<string, Record<string, string[]>> = {
 
 export const DRAFT_LABEL: Record<string, string> = {
   stock_journal: 'Stock Journal',
+  branch_invoice: 'Branch Transfer Invoice',
   receipt_note: 'Receipt Note',
   debit_note: 'Debit Note',
   credit_note: 'Credit Note',
@@ -112,6 +113,7 @@ export function evidenceText(state: any, d: any) {
   ];
   if (s.loading?.startAt) parts.push(`Loading: ${s.loading.point}, ${fmtTime(s.loading.startAt)}–${fmtTime(s.loading.endAt)} on ${fmtDate(s.loading.startAt)} (check CCTV for this window)`);
   parts.push(`Counted by ${s.receipt.by}, ${fmtDate(s.receipt.at)} ${fmtTime(s.receipt.at)}${s.receipt.photos?.length ? ` · ${s.receipt.photos.length} photo(s)` : ''}`);
+  if (s.docs?.length) parts.push(`Papers: ${s.docs.map((x: any) => x.kind).join(', ')} (${s.docs.length} photo${s.docs.length > 1 ? 's' : ''})`);
   if (d.evidence.clips.length) parts.push(`CCTV: ${d.evidence.clips.map((c: any) => c.link || c.name).join(', ')}`);
   return parts.join('\n');
 }
@@ -125,6 +127,12 @@ const putShipment = (state: any, s: any) => ({ ...state, shipments: state.shipme
 const putDiff = (state: any, d: any) => ({ ...state, diffs: state.diffs.map((x: any) => (x.id === d.id ? d : x)) });
 const isInt = (n: any) => Number.isInteger(n) && n >= 0;
 const godownOf = (unitId: string) => UNITS[unitId].godown;
+const unitTax = (state: any, unitId: string) => state.settings.units?.[unitId] || { gstin: COMPANY.gstin, state: COMPANY.state };
+// Two units are one registration unless the owner gave them different GSTINs (used to suggest the paperwork)
+export const sameGstin = (state: any, a: string, b: string) => unitTax(state, a).gstin === unitTax(state, b).gstin;
+// A unit as the "party" on a branch transfer voucher
+export const isInvoiced = (s: any) => s.flow !== 'transfer' || s.billing === 'invoice';
+const branchParty = (state: any, unitId: string) => ({ name: `Branch: ${UNITS[unitId].name.split(' (')[0]}`, gstin: unitTax(state, unitId).gstin, state: unitTax(state, unitId).state });
 
 function addDraft(state: any, d: any) {
   const id = `D-${pad(state.counters.draft + 1)}`;
@@ -133,9 +141,16 @@ function addDraft(state: any, d: any) {
 const priced = (code: string, qty: number) => ({ item: code, qty, rate: ITEMS[code].rate, gst: ITEMS[code].gst });
 
 // Drafts made from a decision on a difference (null = nothing to enter in Tally)
-function decisionDraft(s: any, d: any, action: string, at: number) {
+function decisionDraft(state: any, s: any, d: any, action: string, at: number) {
   const it = ITEMS[d.item];
   const base = { createdAt: at, shipmentId: s.id, diffId: d.id, purpose: 'decision' };
+  // Transfer sent with an invoice: the goods were invoiced to the receiving branch, so a loss is a credit note
+  // from the sending branch and extra goods are invoiced too. Same flow, different paperwork.
+  if (s.flow === 'transfer' && s.billing === 'invoice') {
+    const branch = { partyInfo: branchParty(state, s.toUnit), fromState: unitTax(state, s.fromUnit).state, ref: s.ref, lines: [priced(d.item, d.qty)] };
+    if (action === 'write_off') return { ...base, ...branch, type: 'credit_note', narration: `${s.id} (${s.ref}): ${d.qty} ${it.unit} ${it.name} ${d.kind === 'damaged' ? 'damaged' : 'lost'} in transit, ${route(s)}. Written off by the owner against the branch transfer invoice.` };
+    if (action === 'correct_list') return { ...base, ...branch, type: 'branch_invoice', narration: `${s.id} (${s.ref}): ${d.qty} ${it.unit} ${it.name} loaded but not on the list; invoiced to the branch as sent.` };
+  }
   if (action === 'write_off' && s.flow === 'transfer') {
     const from = d.kind === 'damaged' ? GODOWNS.damaged : GODOWNS.transit;
     return { ...base, type: 'stock_journal', moves: [{ item: d.item, qty: d.qty, from, to: GODOWNS.loss }], narration: `${s.id} (${s.ref}): ${d.qty} ${it.unit} ${it.name} ${d.kind === 'damaged' ? 'damaged' : 'lost'} in transit, ${route(s)}. Written off by the owner.` };
@@ -186,9 +201,22 @@ export function reducer(state: any, action: any): any {
         truckNo: String(action.truckNo).trim().toUpperCase(), ref: String(action.ref).trim(),
         lines: lines.map((l: any, i: number) => ({ id: `L${i + 1}`, item: l.item, qty: l.qty })),
         createdAt: at, createdBy: actor, loading: null, sentAt: null, token: null, receipt: null, cancelledAt: null, audit: [],
+        // between own units the sender chooses: 'none' = stock transfer, no money; 'invoice' = branch invoice with GST.
+        // Default follows the units' GSTINs as set by the owner.
+        docs: (action.docs || []).filter((d: any) => d && d.id).map((d: any) => ({ id: d.id, name: String(d.name || 'photo'), kind: d.kind || 'document', by: actor, at })),
+        billing: flow === 'transfer' ? (['none', 'invoice'].includes(action.billing) ? action.billing : (sameGstin(state, action.fromUnit, action.toUnit) ? 'none' : 'invoice')) : 'invoice',
       };
       s = audit(s, at, actor, 'LISTED', `${lines.length} line(s), ${lines.reduce((a: number, l: any) => a + l.qty, 0)} units, ${FLOW_LABEL[flow].toLowerCase()}, ref ${s.ref}.`);
       return { ...state, counters: { ...state.counters, trk: Math.max(state.counters.trk, Number(id.slice(4)) - 1000) }, shipments: [...state.shipments, s] };
+    }
+
+    // A photo of the challan, order, supplier bill or damage, added to a truck at any time
+    case 'ATTACH_DOC': {
+      const s = shipmentOf(state, action.id);
+      const docs = (action.docs || []).filter((d: any) => d && d.id);
+      if (!s || !docs.length || s.cancelledAt) return state;
+      const add = docs.map((d: any) => ({ id: d.id, name: String(d.name || 'photo'), kind: d.kind || 'document', by: actor, at }));
+      return putShipment(state, audit({ ...s, docs: [...(s.docs || []), ...add] }, at, actor, 'DOCUMENT', `${add.length} photo(s) added: ${add.map((d: any) => d.kind).join(', ')}.`));
     }
 
     case 'CANCEL_SHIPMENT': {
@@ -217,7 +245,14 @@ export function reducer(state: any, action: any): any {
       if (s.flow !== 'inbound' && !s.loading?.endAt) return state; // the loading window is the CCTV evidence
       if (!action.token || String(action.token).length < 6) return state;
       let next = putShipment(state, audit({ ...s, sentAt: at, token: action.token }, at, actor, s.flow === 'inbound' ? 'COUNT_STARTED' : 'SENT', s.flow === 'inbound' ? 'Gate count opened.' : 'Truck left; receiver link shared.'));
-      if (s.flow === 'transfer') {
+      if (s.flow === 'transfer' && s.billing === 'invoice') {
+        next = addDraft(next, {
+          type: 'branch_invoice', purpose: 'dispatch', createdAt: at, shipmentId: s.id, ref: s.ref,
+          partyInfo: branchParty(state, s.toUnit), fromState: unitTax(state, s.fromUnit).state,
+          lines: s.lines.map((l: any) => priced(l.item, l.qty)),
+          narration: `${s.id} (${s.ref}), truck ${s.truckNo}: branch transfer ${route(s)}, invoiced with GST.`,
+        });
+      } else if (s.flow === 'transfer') {
         next = addDraft(next, {
           type: 'stock_journal', purpose: 'dispatch', createdAt: at, shipmentId: s.id,
           moves: s.lines.map((l: any) => ({ item: l.item, qty: l.qty, from: godownOf(s.fromUnit), to: GODOWNS.transit })),
@@ -253,7 +288,10 @@ export function reducer(state: any, action: any): any {
       }
       next = { ...next, diffs: [...next.diffs, ...diffs], counters: { ...next.counters, dif: dn } };
       // the normal Tally entry for what arrived
-      if (s.flow === 'transfer') {
+      if (s.flow === 'transfer' && s.billing === 'invoice') {
+        const lines = s.lines.map((l: any) => ({ ...priced(l.item, Math.min(counts[l.id].counted - counts[l.id].damaged, l.qty)), godown: godownOf(s.toUnit) })).filter((l: any) => l.qty > 0);
+        if (lines.length) next = addDraft(next, { type: 'receipt_note', purpose: 'receipt', createdAt: at, shipmentId: s.id, partyInfo: branchParty(state, s.fromUnit), ref: s.ref, lines, narration: `${s.id}: received from ${UNITS[s.fromUnit].name.split(' (')[0]} against branch transfer invoice ${s.ref}; good units only, counted by ${receipt.by}.` });
+      } else if (s.flow === 'transfer') {
         const moves: any[] = [];
         for (const l of s.lines) {
           const { counted, damaged } = counts[l.id];
@@ -282,7 +320,7 @@ export function reducer(state: any, action: any): any {
       const decision = { action: action.action, dueAt: a.due ? Number(action.dueAt) : null, note: action.note || '', at, by: actor };
       const status = a.settles ? 'settled' : a.due ? 'waiting' : 'investigating';
       let next = putDiff(state, { ...d, decision, status, settledAt: a.settles ? at : null, history: [...d.history, { at, by: actor, text: `${a.label}${decision.note ? `: ${decision.note}` : ''}` }] });
-      const draft = decisionDraft(s, d, action.action, at);
+      const draft = decisionDraft(state, s, d, action.action, at);
       if (draft) next = addDraft(next, draft);
       return putShipment(next, audit(s, at, actor, 'DECIDED', `${d.id} ${KIND_LABEL[d.kind].toLowerCase()} ${d.qty}: ${a.label}.`));
     }
@@ -307,15 +345,17 @@ export function reducer(state: any, action: any): any {
       return putDiff(state, { ...d, evidenceToken: token, evidence: { ...d.evidence, shares: [...d.evidence.shares, { to: String(action.to).trim(), at }] }, history: [...d.history, { at, by: actor, text: `Evidence pack shared with ${String(action.to).trim()}` }] });
     }
 
-    case 'APPROVE_DRAFTS': {
-      const ids = new Set(action.ids || []);
-      return { ...state, drafts: state.drafts.map((x: any) => (ids.has(x.id) && x.status === 'pending' ? { ...x, status: 'approved', approvedAt: at, approvedBy: actor } : x)) };
-    }
-
-    // The accountant downloaded these for Tally: the next batch leaves them out, so nothing is imported twice
-    case 'EXPORT_DRAFTS': {
-      const ids = new Set(action.ids || []);
-      return { ...state, drafts: state.drafts.map((x: any) => (ids.has(x.id) && x.status === 'approved' && !x.exportedAt ? { ...x, exportedAt: at } : x)) };
+    // The owner sends the ready entries to the accountant (printable report + Tally file). The owner's decision
+    // is the approval; a sent entry is kept with the pack it went in.
+    case 'SEND_TO_ACCOUNTANT': {
+      const ids = new Set((action.ids || []).filter((id: string) => state.drafts.some((x: any) => x.id === id && x.status === 'pending')));
+      if (!ids.size) return state;
+      const packId = `P-${pad((state.packs || []).length + 1)}`;
+      return {
+        ...state,
+        packs: [...(state.packs || []), { id: packId, at, by: actor, ids: [...ids] }],
+        drafts: state.drafts.map((x: any) => (ids.has(x.id) ? { ...x, status: 'sent', sentAt: at, packId } : x)),
+      };
     }
 
     case 'REJECT_DRAFT': {
@@ -323,10 +363,10 @@ export function reducer(state: any, action: any): any {
       const note = String(action.note || '').trim().replace(/\.+$/, '');
       if (!x || x.status !== 'pending' || !note) return state;
       let next = { ...state, drafts: state.drafts.map((y: any) => (y.id === x.id ? { ...y, status: 'rejected', rejectedAt: at, rejectedBy: actor, rejectNote: note } : y)) };
-      // a rejected decision goes back to the owner
+      // an undone decision goes back to the owner's list
       if (x.diffId) {
         const d = diffOf(next, x.diffId);
-        next = putDiff(next, { ...d, status: 'open', decision: null, settledAt: null, history: [...d.history, { at, by: actor, text: `${DRAFT_LABEL[x.type]} ${x.id} rejected: ${note}. Back to the owner.` }] });
+        next = putDiff(next, { ...d, status: 'open', decision: null, settledAt: null, history: [...d.history, { at, by: actor, text: `${DRAFT_LABEL[x.type]} ${x.id} withdrawn: ${note}. Decide again.` }] });
       }
       return next;
     }
@@ -337,14 +377,14 @@ export function reducer(state: any, action: any): any {
 }
 
 // Tally import order: stock journals first, then receipt notes, then party vouchers
-const TYPE_ORDER: Record<string, number> = { stock_journal: 0, receipt_note: 1, debit_note: 2, credit_note: 2, sales_invoice: 2 };
+const TYPE_ORDER: Record<string, number> = { stock_journal: 0, branch_invoice: 1, receipt_note: 1, debit_note: 2, credit_note: 2, sales_invoice: 2 };
 export const importOrder = (a: any, b: any) => TYPE_ORDER[a.type] - TYPE_ORDER[b.type] || a.createdAt - b.createdAt;
 
 export function buildInitialState(anchor = Date.now()): any {
   const base = {
     version: VERSION, anchor,
-    settings: { ...DEFAULT_SETTINGS, languages: { ...DEFAULT_SETTINGS.languages } },
-    settingsLog: [], shipments: [], diffs: [], drafts: [],
+    settings: { ...DEFAULT_SETTINGS, languages: { ...DEFAULT_SETTINGS.languages }, units: JSON.parse(JSON.stringify(DEFAULT_SETTINGS.units)) },
+    settingsLog: [], shipments: [], diffs: [], drafts: [], packs: [],
     counters: { trk: 0, dif: 0, draft: 0 },
   };
   return makeSeed(anchor).reduce((s: any, a: any) => reducer(s, a), base);

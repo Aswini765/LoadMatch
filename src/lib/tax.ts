@@ -3,8 +3,8 @@ import { COMPANY } from '../data/seed.ts';
 const round2 = (n) => Math.round(n * 100) / 100;
 
 // GST split: same state -> CGST + SGST, different state -> IGST
-export function taxLines(lines, party) {
-  const intra = party.state === COMPANY.state;
+export function taxLines(lines, party, fromState = COMPANY.state) {
+  const intra = party.state === fromState;
   let taxable = 0, cgst = 0, sgst = 0, igst = 0;
   const rows = lines.map((l) => {
     const value = round2(l.qty * l.rate);

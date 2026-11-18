@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { X, Settings2, RotateCcw } from 'lucide-react';
 import { inr0, dateTime } from '../lib/format.ts';
 import { useStore } from '../store.tsx';
+import { UNITS } from '../data/seed.ts';
 import { LANGS } from '../i18n.ts';
 
-const fmt = (k: string, v: any) => (k === 'writeOffLimit' ? `loss limit ${inr0(v)}` : k === 'receiptHours' ? `count within ${v}h` : k === 'languages' ? 'phone languages' : k);
+const fmt = (k: string, v: any) => (k === 'writeOffLimit' ? `loss limit ${inr0(v)}` : k === 'receiptHours' ? `count within ${v}h` : k === 'languages' ? 'phone languages' : k === 'blindCount' ? `blind count ${v ? 'on' : 'off'}` : k === 'differencesTo' ? `differences to ${v === 'owner' ? 'owner only' : 'owner and sender'}` : k === 'units' ? 'unit GSTINs' : k);
 
 export default function SettingsModal({ onClose }: { onClose: () => void }) {
   const { state, dispatch, sync } = useStore();
@@ -32,6 +33,25 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
             <input id="setting-hours" type="range" min="2" max="72" step="2" value={s.receiptHours} onChange={(e) => set({ receiptHours: Number(e.target.value) })} className="w-full accent-slate-900 cursor-pointer" />
             <div className="text-[10px] text-slate-400">After this, the truck is flagged late for the owner and the dispatch staff.</div>
           </div>
+          <label className="bg-slate-50 p-3 rounded-lg border border-slate-200 flex items-center justify-between gap-3 cursor-pointer">
+            <div>
+              <div className="text-slate-700 font-semibold">Receiver counts without seeing the sent quantity</div>
+              <div className="text-[10px] text-slate-400">Recommended: people count instead of copying. Sent vs counted is shown after they submit.</div>
+            </div>
+            <input id="setting-blind" type="checkbox" checked={s.blindCount} onChange={(e) => set({ blindCount: e.target.checked })} className="accent-slate-900 w-4 h-4" />
+          </label>
+          <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1.5">
+            <div className="text-slate-700 font-semibold">Who sees the details of a difference</div>
+            <select id="setting-diffs" value={s.differencesTo} onChange={(e) => set({ differencesTo: e.target.value })} className="w-full p-1.5 rounded border border-slate-300 bg-white">
+              <option value="owner_sender">Owner and sender (sender and receiver see which lines differ)</option>
+              <option value="owner">Owner only (others see just "difference found")</option>
+            </select>
+          </div>
+          <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1.5">
+            <div className="text-slate-700 font-semibold">Your units' GSTINs</div>
+            <div className="text-[10px] text-slate-400">Used only to suggest the paperwork for moves between units. The sender still chooses "no money" or "with invoice" on every load.</div>
+            {Object.values(UNITS).map((u) => <UnitTax key={u.id} id={u.id} name={u.name} value={s.units[u.id]} onSave={(v) => set({ units: { ...s.units, [u.id]: v } })} />)}
+          </div>
           <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1.5">
             <div className="text-slate-700 font-semibold">Languages on the phone screens</div>
             <div className="flex flex-wrap gap-3">{Object.keys(LANGS).map((l) => (
@@ -51,6 +71,20 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function UnitTax({ id, name, value, onSave }: { id: string; name: string; value: { gstin: string; state: string }; onSave: (v: { gstin: string; state: string }) => void }) {
+  const [gstin, setGstin] = useState(value.gstin);
+  const [st, setSt] = useState(value.state);
+  const valid = /^[0-9]{2}[A-Z0-9]{13}$/.test(gstin.trim().toUpperCase()) && st.trim().length > 1;
+  const save = () => { if (valid && (gstin.trim().toUpperCase() !== value.gstin || st.trim() !== value.state)) onSave({ gstin: gstin.trim().toUpperCase(), state: st.trim() }); };
+  return (
+    <div className="grid grid-cols-3 gap-1.5 items-center">
+      <span className="text-slate-700 truncate">{name}</span>
+      <input id={`gstin-${id}`} value={gstin} onChange={(e) => setGstin(e.target.value)} onBlur={save} className={`p-1 rounded border font-mono ${valid ? 'border-slate-300' : 'border-rose-400'}`} />
+      <input id={`gststate-${id}`} value={st} onChange={(e) => setSt(e.target.value)} onBlur={save} className="p-1 rounded border border-slate-300" />
     </div>
   );
 }

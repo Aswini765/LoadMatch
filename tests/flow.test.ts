@@ -6,7 +6,7 @@ import {
 import { voucherXml } from '../src/lib/tally.ts';
 import { taxLines } from '../src/lib/tax.ts';
 import { PARTIES } from '../src/data/seed.ts';
-import { findNumber } from '../src/lib/voice.ts';
+import { findNumber, parseCount } from '../src/lib/voice.ts';
 
 let passed = 0;
 const test = (name: string, fn: () => void) => { fn(); passed++; console.log(`  ✓ ${name}`); };
@@ -35,14 +35,17 @@ test('seed: one truck to decide, one promise waiting, one in transit, one loadin
   assert.equal(status(s, 'TRK-1016'), 'IN_TRANSIT');
   assert.equal(status(s, 'TRK-1017'), 'LOADING');
   assert.ok(s.shipments.filter((x: any) => status(s, x.id) === 'MATCHED').length >= 12);
-  // last month's entries are already approved; only this week's trucks wait for the accountant
+  // last month's entries already went to the accountant; only this week's trucks are waiting
   const pending = s.drafts.filter((d: any) => d.status === 'pending');
   assert.deepEqual([...new Set(pending.map((d: any) => d.shipmentId))].sort(), ['TRK-1013', 'TRK-1014', 'TRK-1016']);
-  assert.ok(s.drafts.filter((d: any) => d.status === 'approved' && d.exportedAt).length === 13);
-  // downloading for Tally marks entries so the next batch never repeats them
+  assert.equal(s.drafts.filter((d: any) => d.status === 'sent').length, 13);
+  assert.equal(s.packs.length, 1);
+  // sending marks entries so the next pack never repeats them
   const ids = pending.map((d: any) => d.id);
-  const t = run(s, { type: 'APPROVE_DRAFTS', ids, actor: 'Accountant' }, { type: 'EXPORT_DRAFTS', ids: ids.slice(0, 2), actor: 'Accountant' });
-  assert.equal(t.drafts.filter((d: any) => d.status === 'approved' && !d.exportedAt).length, ids.length - 2);
+  const t = run(s, { type: 'SEND_TO_ACCOUNTANT', ids: ids.slice(0, 2) });
+  assert.equal(t.drafts.filter((d: any) => d.status === 'pending').length, ids.length - 2);
+  assert.equal(t.packs.at(-1).ids.length, 2);
+  assert.equal(run(t, { type: 'SEND_TO_ACCOUNTANT', ids: ids.slice(0, 2) }), t, 'already sent');
 });
 
 test('a truck cannot be sent without its loading window (the CCTV evidence)', () => {
@@ -184,7 +187,7 @@ test('a rejected decision goes back to the owner', () => {
   s = run(s, { type: 'DECIDE', diffId: ex.id, action: 'bill_extra' });
   const si = s.drafts.find((d: any) => d.diffId === ex.id);
   assert.equal(run(s, { type: 'REJECT_DRAFT', id: si.id, note: '' }), s, 'a reason is required');
-  s = run(s, { type: 'REJECT_DRAFT', id: si.id, note: 'Customer says it will return them.', actor: 'Accountant' });
+  s = run(s, { type: 'REJECT_DRAFT', id: si.id, note: 'Customer says it will return them.', actor: 'Owner' });
   assert.equal(diffOf(s, ex.id).status, 'open');
   assert.equal(status(s, 'TRK-1015'), 'TO_DECIDE');
 });
@@ -220,6 +223,69 @@ test('replaying the same events gives the same state on every device', () => {
   const a = events.reduce(reducer, buildInitialState());
   const b = events.reduce(reducer, buildInitialState(A + 99999));
   assert.deepEqual(a, b);
+});
+
+test('units with different GSTINs: same internal flow, branch invoice paperwork', () => {
+  let s = buildInitialState();
+  s = run(s, { type: 'UPDATE_SETTINGS', settings: { units: { ...s.settings.units, BLR: { gstin: '33ZZZZZ9999Z1Z1', state: 'Tamil Nadu' } } } });
+  const [s1, id] = sentTransfer(s, [{ item: 'BRP-1148', qty: 100 }]);
+  s = s1 as any;
+  const inv = draftsFor(s, id as string).find((d: any) => d.purpose === 'dispatch');
+  assert.equal(inv.type, 'branch_invoice');
+  assert.match(voucherXml(inv), /IGST/);
+  assert.match(voucherXml(inv), /Branch: Bengaluru unit/);
+  s = run(s, { type: 'SUBMIT_RECEIPT', id, token: 'tok123', by: 'Ravi', lines: { L1: { counted: 96, damaged: 0 } } });
+  assert.equal(status(s, id as string), 'TO_DECIDE', 'still an internal move: owner decides, no customer');
+  const rn = draftsFor(s, id as string).find((d: any) => d.purpose === 'receipt');
+  assert.equal(rn.type, 'receipt_note');
+  assert.equal(rn.lines[0].qty, 96);
+  const d = diffsOf(s, id as string)[0];
+  s = run(s, { type: 'DECIDE', diffId: d.id, action: 'write_off' });
+  const cn = draftsFor(s, id as string).find((x: any) => x.diffId === d.id);
+  assert.equal(cn.type, 'credit_note');
+  assert.match(voucherXml(cn), /IGST/);
+  // same GSTIN suggests a stock transfer with no money
+  const [s2, id2] = sentTransfer(buildInitialState());
+  assert.equal(draftsFor(s2, id2 as string).find((x: any) => x.purpose === 'dispatch').type, 'stock_journal');
+});
+
+test('the sender decides whether a move between units involves money', () => {
+  let s = buildInitialState();
+  // same GSTIN, but the sender chooses an invoice
+  s = run(s, { type: 'CREATE_SHIPMENT', flow: 'transfer', billing: 'invoice', fromUnit: 'MYS', toUnit: 'BLR', truckNo: 'KA 1', ref: 'BT-1', lines: [{ item: 'PLY-12', qty: 10 }] });
+  let id = lastShip(s).id;
+  s = run(s, { type: 'LOADING', id, phase: 'start' }, { type: 'LOADING', id, phase: 'end' }, { type: 'SEND_TO_RECEIVER', id, token: 'tok999' });
+  const inv = draftsFor(s, id).find((d: any) => d.purpose === 'dispatch');
+  assert.equal(inv.type, 'branch_invoice');
+  assert.match(voucherXml(inv), /CGST/, 'same state: CGST + SGST');
+  // different GSTIN, but the sender chooses no money
+  s = run(s, { type: 'UPDATE_SETTINGS', settings: { units: { ...s.settings.units, BLR: { gstin: '33ZZZZZ9999Z1Z1', state: 'Tamil Nadu' } } } });
+  s = run(s, { type: 'CREATE_SHIPMENT', flow: 'transfer', billing: 'none', fromUnit: 'MYS', toUnit: 'BLR', truckNo: 'KA 2', ref: 'DC-2', lines: [{ item: 'PLY-12', qty: 10 }] });
+  id = lastShip(s).id;
+  assert.equal(lastShip(s).billing, 'none');
+  s = run(s, { type: 'LOADING', id, phase: 'start' }, { type: 'LOADING', id, phase: 'end' }, { type: 'SEND_TO_RECEIVER', id, token: 'tok998' });
+  assert.equal(draftsFor(s, id).find((d: any) => d.purpose === 'dispatch').type, 'stock_journal');
+});
+
+test('voice: count and damaged in one sentence, in any of the four languages', () => {
+  assert.deepEqual(parseCount('48, 2 damaged'), { counted: 48, damaged: 2 });
+  assert.deepEqual(parseCount('अड़तालीस, दो खराब'), { counted: 48, damaged: 2 });
+  assert.deepEqual(parseCount('48 ಹಾಳಾದವು 2'), { counted: 48, damaged: 2 });
+  assert.deepEqual(parseCount('నలభై ఎనిమిది, రెండు పాడైనవి'), { counted: 48, damaged: 2 });
+  assert.deepEqual(parseCount('120'), { counted: 120, damaged: null });
+  assert.deepEqual(parseCount('nothing'), { counted: null, damaged: null });
+});
+
+test('photos of challans and bills stay with the truck and show in the evidence', () => {
+  let s = buildInitialState();
+  s = run(s, { type: 'CREATE_SHIPMENT', flow: 'inbound', toUnit: 'MYS', party: 'coastal', truckNo: 'KA 3', ref: 'SB-1', lines: [{ item: 'BRP-1148', qty: 50 }], docs: [{ id: 'ph-1', name: 'bill.jpg', kind: 'supplier bill' }], actor: 'Gate' });
+  const id = lastShip(s).id;
+  assert.equal(lastShip(s).docs.length, 1);
+  s = run(s, { type: 'ATTACH_DOC', id, docs: [{ id: 'ph-2', name: 'po.jpg', kind: 'order' }], actor: 'Gate' });
+  assert.deepEqual(shipmentOf(s, id).docs.map((d: any) => d.kind), ['supplier bill', 'order']);
+  assert.equal(run(s, { type: 'ATTACH_DOC', id, docs: [] }), s, 'nothing to add');
+  s = run(s, { type: 'SEND_TO_RECEIVER', id, token: 'tok777', actor: 'Gate' }, { type: 'SUBMIT_RECEIPT', id, token: 'tok777', by: 'Gate', lines: { L1: { counted: 45, damaged: 0 } } });
+  assert.match(evidenceText(s, diffsOf(s, id)[0]), /Papers: supplier bill, order \(2 photos\)/);
 });
 
 console.log(`\n${passed} tests passed`);

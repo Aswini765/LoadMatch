@@ -59,6 +59,44 @@ export function findNumber(text: string): number | null {
   return null;
 }
 
+// Every number in the text, in order, with the token position where it starts
+export function findNumbers(text: string): { value: number; at: number }[] {
+  const s = normalizeDigits(text.toLowerCase()).replace(/(\d)([^\d\s])/g, '$1 $2').replace(/([^\d\s])(\d)/g, '$1 $2');
+  const toks = s.split(/[\s,.;:-]+/).filter(Boolean);
+  const out: { value: number; at: number }[] = [];
+  for (let i = 0; i < toks.length; i++) {
+    if (/^\d+$/.test(toks[i])) { out.push({ value: Number(toks[i]), at: i }); continue; }
+    let v = WORDS[toks[i]] ?? kannadaFused(toks[i]);
+    if (v == null) continue;
+    const next = toks[i + 1] != null ? (WORDS[toks[i + 1]] ?? null) : null;
+    if (next != null && ((v >= 20 && v % 10 === 0 && v < 100 && next < 10) || (next === 100 && v < 10))) {
+      v = next === 100 ? v * 100 : v + next;
+      out.push({ value: v, at: i }); i += 1; continue;
+    }
+    out.push({ value: v, at: i });
+  }
+  return out;
+}
+
+const DAMAGE = /damag|broken|kharab|haala|toot|खराब|टूट|ಹಾಳ|ಮುರಿ|పాడ|విరిగ/;
+
+// "48", "48, 2 damaged", "अड़तालीस, दो खराब", "48 ಹಾಳಾದವು 2": what was counted and how many of them are damaged.
+// null = not said (leave as it is).
+export function parseCount(text: string): { counted: number | null; damaged: number | null } {
+  const s = normalizeDigits(text.toLowerCase()).replace(/(\d)([^\d\s])/g, '$1 $2').replace(/([^\d\s])(\d)/g, '$1 $2');
+  const toks = s.split(/[\s,.;:-]+/).filter(Boolean);
+  const nums = findNumbers(text);
+  const dmgAt = toks.findIndex((t) => DAMAGE.test(t));
+  if (!nums.length) return { counted: null, damaged: null };
+  if (dmgAt < 0) return { counted: nums[0].value, damaged: null };
+  // the damaged number is the one said right next to the damage word (before it, else after it)
+  const before = nums.filter((n) => n.at < dmgAt).at(-1);
+  const after = nums.find((n) => n.at > dmgAt);
+  const dmg = before && (nums.length === 1 || before !== nums[0] || !after) ? before : after || before;
+  const rest = nums.filter((n) => n !== dmg);
+  return { counted: rest.length ? rest[0].value : null, damaged: dmg ? dmg.value : null };
+}
+
 // ---------- commands ----------
 const has = (s: string, re: RegExp) => re.test(s);
 const NEG = /not here|nahi|nahin|नहीं|ನಹಿ|ಇಲ್ಲ|illa|లేదు|ledu|missing/;

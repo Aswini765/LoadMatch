@@ -3,10 +3,9 @@ import { Menu, MapPin, Settings2, BookOpen, X } from 'lucide-react';
 import { COMPANY } from './data/seed.ts';
 import Home from './views/Home.tsx';
 import Dispatch from './views/Dispatch.tsx';
-import Receive from './views/Receive.tsx';
+import Receive, { ReceiveTab } from './views/Receive.tsx';
 import Owner, { EvidenceView } from './views/Owner.tsx';
 import { useStore, receiptOverdue } from './store.tsx';
-import Accountant from './views/Accountant.tsx';
 import Reports from './views/Reports.tsx';
 import SopModal from './views/SopModal.tsx';
 import SettingsModal from './views/SettingsModal.tsx';
@@ -15,8 +14,8 @@ import type { Go } from './views/ui.tsx';
 const ROLES = [
   ['home', 'Home'],
   ['dispatch', 'Dispatch'],
+  ['receive', 'Receive'],
   ['owner', 'Owner'],
-  ['accountant', 'Accountant'],
   ['reports', 'Reports'],
 ];
 
@@ -25,7 +24,7 @@ function SyncChip() {
   const label = !sync.shared ? 'This device only' : !sync.online ? `Offline • ${sync.pending} waiting` : sync.pending ? `Syncing ${sync.pending}` : 'Shared • live';
   const dot = !sync.shared ? 'bg-slate-400' : !sync.online ? 'bg-amber-500' : 'bg-emerald-500';
   return (
-    <span id="sync-chip" title={sync.shared ? 'Dispatch, receiver, owner and accountant see the same data' : 'Data is saved in this browser only. Connect Supabase to share across phones.'}
+    <span id="sync-chip" title={sync.shared ? 'Dispatch, receivers and the owner see the same data' : 'Data is saved in this browser only. Connect Supabase to share across phones.'}
       className="hidden md:inline-flex items-center space-x-1.5 text-slate-600 bg-slate-50 border border-slate-200/80 px-2 py-1 rounded-md">
       <span className={`w-1.5 h-1.5 rounded-full ${dot}`}></span><span>{label}</span>
     </span>
@@ -38,12 +37,12 @@ function useBadges() {
   const now = Date.now();
   const owner = state.diffs.filter((d: any) => d.status === 'open' || d.status === 'investigating').length;
   const late = state.shipments.filter((s: any) => receiptOverdue(state, s, now)).length;
-  const drafts = state.drafts.filter((d: any) => d.status === 'pending').length;
-  const loading = state.shipments.filter((s: any) => !s.sentAt && !s.cancelledAt).length;
+  const loading = state.shipments.filter((s: any) => !s.sentAt && !s.cancelledAt && s.flow !== 'inbound').length;
+  const toCount = state.shipments.filter((s: any) => !s.receipt && !s.cancelledAt && (s.flow === 'inbound' || (s.flow === 'transfer' && s.sentAt))).length;
   return {
     dispatch: late ? { n: late, cls: 'bg-rose-600' } : loading ? { n: loading, cls: 'bg-slate-400' } : null,
+    receive: toCount ? { n: toCount, cls: 'bg-sky-600' } : null,
     owner: owner ? { n: owner, cls: 'bg-amber-500' } : null,
-    accountant: drafts ? { n: drafts, cls: 'bg-slate-400' } : null,
   } as Record<string, { n: number; cls: string } | null>;
 }
 
@@ -107,7 +106,7 @@ export default function App() {
               <span className="text-slate-500 font-normal">Demo Environment</span>
             </div>
             <SyncChip />
-            {!link && view !== 'dispatch' && <button id="btn-open-settings" onClick={() => setSettingsOpen(true)} className="text-slate-600 hover:text-slate-950 font-medium px-2 py-1 rounded hover:bg-slate-100 transition-colors cursor-pointer hidden md:inline-flex items-center space-x-1">
+            {!link && !['dispatch', 'receive'].includes(view) && <button id="btn-open-settings" onClick={() => setSettingsOpen(true)} className="text-slate-600 hover:text-slate-950 font-medium px-2 py-1 rounded hover:bg-slate-100 transition-colors cursor-pointer hidden md:inline-flex items-center space-x-1">
               <Settings2 className="w-3.5 h-3.5 text-slate-400" />
               <span>Settings</span>
             </button>}
@@ -123,7 +122,7 @@ export default function App() {
             {ROLES.map(([id, label]) => (
               <button key={id} id={`m-role-${id}`} onClick={() => go(id)} className={`block w-full text-left px-3 py-2 text-xs font-semibold rounded-md cursor-pointer ${view === id ? 'text-slate-950 bg-slate-100 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>{label}{badges[id] && <span className={`ml-1.5 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full text-[10px] font-bold text-white ${badges[id]!.cls}`}>{badges[id]!.n}</span>}</button>
             ))}
-            {view !== 'dispatch' && <button onClick={() => { setSettingsOpen(true); setMobileOpen(false); }} className="block w-full text-left px-3 py-2 text-xs font-semibold rounded-md text-slate-600 hover:bg-slate-50 cursor-pointer">Settings</button>}
+            {!['dispatch', 'receive'].includes(view) && <button onClick={() => { setSettingsOpen(true); setMobileOpen(false); }} className="block w-full text-left px-3 py-2 text-xs font-semibold rounded-md text-slate-600 hover:bg-slate-50 cursor-pointer">Settings</button>}
           </div>
         )}
 
@@ -134,7 +133,7 @@ export default function App() {
             {view === 'home' && <Home go={go} />}
             {view === 'dispatch' && <Dispatch go={go} initialId={openId} key={nav} />}
             {view === 'owner' && <Owner go={go} initialId={openId} key={`${openId || 'list'}-${nav}`} />}
-            {view === 'accountant' && <Accountant go={go} key={nav} />}
+            {view === 'receive' && <ReceiveTab key={nav} />}
             {view === 'reports' && <Reports go={go} />}
           </>}
         </main>

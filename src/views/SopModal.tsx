@@ -2,29 +2,26 @@ import React from 'react';
 import { X, BookOpen } from 'lucide-react';
 
 const SOPS: [string, string[]][] = [
-  ['1 · Loading (dispatch staff)', [
-    'Make the list before loading: type it or paste it from Excel. Item names come from the Tally item list.',
-    'Tap "Loading started" when the first item goes on the truck and "Loading finished" when the last one does. Choose the loading point. This time window is how the owner finds the CCTV footage later.',
-    'When the truck leaves, send the receiver link on WhatsApp. For a customer, send it to the person who receives the goods.',
+  ['1 · Dispatch (sender)', [
+    'Make the list before loading: type it, speak the quantities, or paste from Excel. Add a photo of the dispatch list, challan or order.',
+    'Between your own units, choose "No money (stock transfer)" or "With invoice and GST". The app suggests one from the units\' GSTINs; you decide. For no money, print the delivery challan from the app.',
+    'Tap "Loading started" and "Loading finished" and pick the dock or gate. This time window is how the owner finds the CCTV footage.',
+    'When the truck leaves, send the receiver link on WhatsApp. You will see the result here when they submit.',
   ]],
-  ['2 · Supplier deliveries (gate)', [
-    'Enter the quantities on the supplier bill, then tap "Count now" and count what is on the truck. Do not look at the bill while counting.',
+  ['2 · Receive (floor staff)', [
+    'Open the link, or the Receive tab for trucks coming to your unit and supplier deliveries at the gate.',
+    'Count one line at a time. Tap the mic and say the number, e.g. "48" or "48, 2 damaged", in your language. Check what was heard; fix with + and −.',
+    'The sent quantity is hidden while you count. Your count is saved on the phone as you go.',
+    'Add photos of damage or the delivery note, then submit once. The count locks; you then see sent vs counted and can tell the sender on WhatsApp.',
   ]],
-  ['3 · Receiving (anyone with the link)', [
-    'Count every line. The sent quantity is hidden on purpose.',
-    'Damaged units are counted too, then entered again under Damaged.',
-    'Take photos of damage. Submit once: the count locks and goes to the owner.',
+  ['3 · Owner', [
+    'You see only differences, already compared. Decide each one: write off, replacement, debit or credit note, bill the extra, or investigate first.',
+    'Ask the sender to explain with one tap. Attach the CCTV clip and share the evidence pack only with the people who need it.',
+    'Losses above your limit need a tick to confirm. Promises get a due date; mark them done when they happen.',
   ]],
-  ['4 · Owner', [
-    'Decide each difference: write off, debit or credit note, replacement, bill the extra, or investigate first.',
-    'Losses above your limit need a tick to confirm.',
-    'Promises (replacement, returns) get a due date. Mark them done when they happen.',
-    'Attach the CCTV clip and share the evidence pack only with the people who need it.',
-  ]],
-  ['5 · Accountant', [
-    'Approve entries once a day. Reject with a reason if something is wrong: a rejected decision goes back to the owner.',
-    'Download the approved entries as one file. It is already in import order: stock journals, then receipt notes, then debit and credit notes and invoices.',
-    'Ledger and godown names must match your Tally masters (Goods in Transit, Damaged Goods, Transit Loss). Try the file on a test company first.',
+  ['4 · Accountant (no login)', [
+    'The owner sends the ready entries as a printable report and one Tally file, already in import order. Until they are sent, the owner can undo a decision.',
+    'Ledger and godown names must match your Tally masters (Goods in Transit, Damaged Goods, Transit Loss, Branch Transfer). Try the file on a test company first. Invoices themselves are still made in Tally.',
   ]],
 ];
 

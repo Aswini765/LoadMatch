@@ -1,6 +1,8 @@
 import React from 'react';
 import { STATUS_META, useStore } from '../store.tsx';
 import { LANGS } from '../i18n.ts';
+import { savePhotos, photoData, openPhoto, type PhotoRef } from '../lib/photos.ts';
+import { Camera as CameraIcon, FileImage } from 'lucide-react';
 
 export type Go = (v: string, opts?: { id?: string | null }) => void;
 
@@ -101,3 +103,40 @@ export function Note({ tone = 'info', children }: { tone?: string; children?: Re
 export const shareWhatsApp = (text: string) => `https://wa.me/?text=${encodeURIComponent(text)}`;
 export const appLink = (path: string) => `${window.location.origin}${window.location.pathname}${path}`;
 export const newToken = () => { const a = new Uint8Array(9); crypto.getRandomValues(a); return Array.from(a, (b) => b.toString(36).padStart(2, '0')).join('').slice(0, 14); };
+
+// ---------- photos of papers and damage ----------
+
+export function PhotoStrip({ photos, onAdd, kinds, label, lang = 'en' }: { photos: PhotoRef[]; onAdd?: (refs: PhotoRef[]) => void; kinds?: string[]; label?: string; lang?: string }) {
+  const [kind, setKind] = React.useState(kinds?.[0] || 'document');
+  const [busy, setBusy] = React.useState(false);
+  return (
+    <div className="space-y-1.5">
+      {onAdd && (
+        <div className="flex items-center gap-2">
+          {kinds && kinds.length > 1 && (
+            <select value={kind} onChange={(e) => setKind(e.target.value)} className="p-2 rounded-lg border border-slate-300 bg-white text-xs">{kinds.map((k) => <option key={k}>{k}</option>)}</select>
+          )}
+          <label className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-slate-300 text-xs font-bold text-slate-700 cursor-pointer">
+            <CameraIcon className="w-4 h-4" />{busy ? '…' : label || 'Add photo'}
+            <input type="file" accept="image/*" capture="environment" multiple className="hidden"
+              onChange={async (e) => { setBusy(true); const refs = await savePhotos(e.target.files, kind); setBusy(false); e.target.value = ''; if (refs.length) onAdd(refs); }} />
+          </label>
+        </div>
+      )}
+      {photos.length > 0 && (
+        <div className="flex gap-2 flex-wrap">
+          {photos.map((p) => {
+            const data = photoData(p.id);
+            return (
+              <button key={p.id} type="button" onClick={() => openPhoto(p.id)} title={`${p.kind}: ${p.name}`} className="w-16 text-left cursor-pointer">
+                {data ? <img src={data} alt={p.kind} className="w-16 h-16 object-cover rounded-lg border border-slate-200" />
+                  : <span className="w-16 h-16 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center"><FileImage className="w-5 h-5 text-slate-400" /></span>}
+                <span className="block text-[9px] text-slate-500 truncate mt-0.5">{p.kind}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

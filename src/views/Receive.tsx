@@ -1,32 +1,93 @@
-import React, { useCallback, useRef, useState } from 'react';
-import { Mic, MicOff, Camera, Lock, CheckCircle2, AlertTriangle, Minus, Plus } from 'lucide-react';
-import { useStore, item, route, shipmentOf } from '../store.tsx';
-import { t, unitWord } from '../i18n.ts';
-import { useVoice, findNumber } from '../lib/voice.ts';
-import { PhoneFrame, Note, savedLang, saveLang } from './ui.tsx';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Mic, MicOff, Camera, Lock, CheckCircle2, AlertTriangle, Minus, Plus, ChevronLeft, ChevronRight, MessageCircle, PackageCheck, Warehouse, ArrowRight } from 'lucide-react';
+import { useStore, item, route, shipmentOf, diffsOf, shipmentStatus, receiverPath, FLOW_LABEL } from '../store.tsx';
+import { t, fill, unitWord } from '../i18n.ts';
+import { useVoice, parseCount } from '../lib/voice.ts';
+import { PhoneFrame, Note, PhotoStrip, savedLang, saveLang, shareWhatsApp, newToken } from './ui.tsx';
+import { NewList } from './Dispatch.tsx';
 import { when } from '../lib/format.ts';
 
-// Opened from the WhatsApp link: #/r/<truck>/<token>. No login. Blind count: the sent quantity is not shown.
+// ---------- the Receive tab: your own floor staff ----------
+// Trucks heading to your units, and supplier deliveries at the gate.
+export function ReceiveTab() {
+  const { state, dispatch } = useStore();
+  const [lang, setLangState] = useState(savedLang);
+  const setLang = (l: string) => { setLangState(l); saveLang(l); };
+  const [adding, setAdding] = useState(false);
+  const open = state.shipments
+    .filter((s: any) => !s.receipt && !s.cancelledAt && (s.flow === 'inbound' ? true : s.flow === 'transfer' && s.sentAt))
+    .sort((a: any, b: any) => (a.sentAt || a.createdAt) - (b.sentAt || b.createdAt));
+  const start = (s: any) => {
+    if (s.sentAt) { window.location.hash = receiverPath(s); return; }
+    const token = newToken();
+    dispatch({ type: 'SEND_TO_RECEIVER', id: s.id, token, actor: 'Gate' });
+    window.location.hash = `#/r/${s.id}/${token}`;
+  };
+  return (
+    <PhoneFrame title={`LoadMatch · ${t('receive', lang)}`} sub={adding ? t('supplierDelivery', lang) : t('toCount', lang)} lang={lang} setLang={setLang}>
+      {adding ? (
+        <NewList lang={lang} flow="inbound" onBack={() => setAdding(false)} onSaved={(id) => { setAdding(false); const s = state.shipments.find((x: any) => x.id === id); start(s || { id, sentAt: null }); }} />
+      ) : (
+        <div className="space-y-3">
+          <button id="btn-new-inbound" onClick={() => setAdding(true)} className="w-full py-3 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-left text-sm font-bold text-slate-900 flex items-center justify-between cursor-pointer shadow-2xs">
+            <span className="flex items-center"><Warehouse className="w-4 h-4 mr-2 text-emerald-700" />{t('supplierDelivery', lang)}</span><Plus className="w-4 h-4 text-slate-400" />
+          </button>
+          <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wide pt-1">{t('toCount', lang)}</div>
+          {!open.length && <Note>{t('nothingToCount', lang)}</Note>}
+          {open.map((s: any) => (
+            <button key={s.id} id={`count-${s.id}`} onClick={() => start(s)} className="w-full text-left bg-white hover:bg-slate-50 border border-slate-200 rounded-xl p-3 shadow-2xs cursor-pointer flex items-center justify-between">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2"><span className="font-mono text-xs font-bold text-slate-900">{s.id}</span><span className="text-[10px] text-slate-500">{FLOW_LABEL[s.flow]}</span></div>
+                <div className="text-[11px] text-slate-600 mt-0.5 truncate">{route(s)}</div>
+                <div className="text-[11px] text-slate-500">{s.truckNo} • {s.lines.length} • {s.sentAt ? when(s.sentAt) : when(s.createdAt)}</div>
+              </div>
+              <span className="text-xs font-bold text-emerald-800 flex items-center shrink-0"><PackageCheck className="w-4 h-4 mr-1" />{t('countThis', lang)}<ArrowRight className="w-3.5 h-3.5 ml-0.5" /></span>
+            </button>
+          ))}
+        </div>
+      )}
+    </PhoneFrame>
+  );
+}
+
+// ---------- counting: opened from the WhatsApp link #/r/<truck>/<token>, no login ----------
+type Count = { counted: string; damaged: string };
+const draftKey = (id: string) => `loadmatch-count-${id}`;
+const loadDraft = (id: string) => { try { return JSON.parse(localStorage.getItem(draftKey(id)) || 'null'); } catch { return null; } };
+const saveDraft = (id: string, v: any) => { try { localStorage.setItem(draftKey(id), JSON.stringify(v)); } catch { /* ignore */ } };
+const clearDraft = (id: string) => { try { localStorage.removeItem(draftKey(id)); } catch { /* ignore */ } };
+
 export default function Receive({ id, token }: { id: string; token: string }) {
   const { state, dispatch } = useStore();
   const [lang, setLangState] = useState(savedLang);
   const setLang = (l: string) => { setLangState(l); saveLang(l); };
   const s = shipmentOf(state, id);
   const ok = s && s.token && s.token === token && !s.cancelledAt;
-  const [by, setBy] = useState(() => { try { return localStorage.getItem('loadmatch-name') || ''; } catch { return ''; } });
-  const [counts, setCounts] = useState<Record<string, { counted: string; damaged: string }>>({});
-  const [photos, setPhotos] = useState<string[]>([]);
-  const [note, setNote] = useState('');
+  const saved = loadDraft(id);
+  const [by, setBy] = useState(() => saved?.by || (() => { try { return localStorage.getItem('loadmatch-name') || ''; } catch { return ''; } })());
+  const [counts, setCounts] = useState<Record<string, Count>>(saved?.counts || {});
+  const [photos, setPhotos] = useState<any[]>(saved?.photos || []);
+  const [note, setNote] = useState(saved?.note || '');
+  const [step, setStep] = useState<number>(saved?.step ?? 0); // 0..n-1 lines, n = review
   const [confirming, setConfirming] = useState(false);
-  const [micLine, setMicLine] = useState<string | null>(null);
-  const micLineRef = useRef<string | null>(null);
+  const [heard, setHeard] = useState<{ text: string; ok: boolean } | null>(null);
+  const stepRef = useRef(step);
+  stepRef.current = step;
 
+  useEffect(() => { if (ok && !s.receipt) saveDraft(id, { by, counts, photos, note, step }); }, [ok, s?.receipt, id, by, counts, photos, note, step]);
+
+  const lineIds: string[] = ok ? s.lines.map((l: any) => l.id) : [];
   const onText = useCallback((alts: string[]) => {
-    const lineId = micLineRef.current;
+    const lineId = lineIds[stepRef.current];
     if (!lineId) return;
-    const n = alts.map((a) => findNumber(a)).find((x) => x != null);
-    if (n != null) setCounts((c) => ({ ...c, [lineId]: { counted: String(n), damaged: c[lineId]?.damaged || '0' } }));
-  }, []);
+    const parsed = alts.map(parseCount).find((p) => p.counted != null || p.damaged != null);
+    if (!parsed) { setHeard({ text: alts[0] || '', ok: false }); return; }
+    setHeard({ text: alts[0], ok: true });
+    setCounts((c) => {
+      const cur = c[lineId] || { counted: '', damaged: '0' };
+      return { ...c, [lineId]: { counted: parsed.counted != null ? String(parsed.counted) : cur.counted, damaged: parsed.damaged != null ? String(parsed.damaged) : cur.damaged || '0' } };
+    });
+  }, [lineIds.join(',')]);
   const voice = useVoice(lang, onText);
 
   if (!ok) {
@@ -44,103 +105,113 @@ export default function Receive({ id, token }: { id: string; token: string }) {
     </div>
   );
 
-  if (s.receipt) {
-    return (
-      <PhoneFrame title="LoadMatch · Receive" sub={s.id} lang={lang} setLang={setLang}>
-        {head}
-        <Note tone="go"><CheckCircle2 className="w-4 h-4 inline mr-1" />{t('submitted', lang)}</Note>
-        <Note><Lock className="w-4 h-4 inline mr-1" />{t('locked', lang)} {s.receipt.by}, {when(s.receipt.at)}</Note>
-        <div className="rounded-xl border border-slate-200 divide-y divide-slate-100">
-          {s.lines.map((l: any) => {
-            const r = s.receipt.lines[l.id];
-            return (
-              <div key={l.id} className="px-3 py-2 flex items-center justify-between text-xs">
-                <span className="pr-2">{item(l.item).name}</span>
-                <span className="font-mono font-bold whitespace-nowrap">{r.counted}{r.damaged ? ` (${r.damaged} ✗)` : ''}</span>
-              </div>
-            );
-          })}
-        </div>
-      </PhoneFrame>
-    );
-  }
+  if (s.receipt) return <Done s={s} lang={lang} setLang={setLang} head={head} />;
 
-  const get = (lineId: string) => counts[lineId] || { counted: '', damaged: '0' };
-  const set = (lineId: string, k: 'counted' | 'damaged', v: string) => setCounts((c) => ({ ...c, [lineId]: { ...get(lineId), ...c[lineId], [k]: v.replace(/[^0-9]/g, '') } }));
-  const bump = (lineId: string, k: 'counted' | 'damaged', by: number) => set(lineId, k, String(Math.max(0, Number(get(lineId)[k] || 0) + by)));
+  const n = s.lines.length;
+  const get = (lineId: string): Count => counts[lineId] || { counted: '', damaged: '0' };
+  const set = (lineId: string, k: keyof Count, v: string) => setCounts((c) => ({ ...c, [lineId]: { ...get(lineId), ...c[lineId], [k]: v.replace(/[^0-9]/g, '') } }));
+  const bump = (lineId: string, k: keyof Count, d: number) => set(lineId, k, String(Math.max(0, Number(get(lineId)[k] || 0) + d)));
   const lineValid = (lineId: string) => { const c = get(lineId); return c.counted !== '' && Number(c.damaged || 0) <= Number(c.counted); };
   const left = s.lines.filter((l: any) => !lineValid(l.id)).length;
   const ready = left === 0 && by.trim().length > 0;
-
-  const listen = (lineId: string) => {
-    if (voice.listening && micLine === lineId) { voice.stop(); return; }
-    micLineRef.current = lineId; setMicLine(lineId); voice.start();
-  };
+  const go = (to: number) => { voice.stop(); setHeard(null); setStep(Math.max(0, Math.min(n, to))); };
 
   const submit = () => {
     try { localStorage.setItem('loadmatch-name', by.trim()); } catch { /* ignore */ }
     const lines = Object.fromEntries(s.lines.map((l: any) => [l.id, { counted: Number(get(l.id).counted), damaged: Number(get(l.id).damaged || 0) }]));
     dispatch({ type: 'SUBMIT_RECEIPT', id: s.id, token, by: by.trim(), lines, photos, note: note.trim(), actor: 'Receiver' });
+    clearDraft(s.id);
     setConfirming(false);
   };
 
-  const num = 'w-16 p-2 rounded-lg border border-slate-300 text-center text-base font-mono font-bold';
-  const step = 'w-9 h-9 rounded-lg border border-slate-300 bg-white flex items-center justify-center text-slate-700 cursor-pointer active:bg-slate-100';
+  const num = 'w-20 p-2 rounded-lg border border-slate-300 text-center text-xl font-mono font-bold';
+  const stepBtn = 'w-11 h-11 rounded-lg border border-slate-300 bg-white flex items-center justify-center text-slate-700 cursor-pointer active:bg-slate-100';
 
-  return (
-    <PhoneFrame title="LoadMatch · Receive" sub={`${t('rcvTitle', lang)} · ${s.id}`} lang={lang} setLang={setLang}>
-      {head}
-      <Note>{t('rcvIntro', lang)}</Note>
-      {voice.error && voice.error !== 'lang_fallback' && <Note tone="warn"><MicOff className="w-4 h-4 inline mr-1" />{voice.error.replace(/_/g, ' ')}</Note>}
+  // ----- one line at a time -----
+  if (step < n) {
+    const l = s.lines[step];
+    const c = get(l.id);
+    const bad = c.counted !== '' && Number(c.damaged || 0) > Number(c.counted);
+    return (
+      <PhoneFrame title="LoadMatch · Receive" sub={`${t('rcvTitle', lang)} · ${s.id}`} lang={lang} setLang={setLang}>
+        {head}
+        <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
+          <span>{fill(t('lineOf', lang), { n: step + 1, total: n })}</span>
+          <span>{n - left}/{n} ✓</span>
+        </div>
+        <div className="flex gap-1">{s.lines.map((x: any, i: number) => <button key={x.id} aria-label={`line ${i + 1}`} onClick={() => go(i)} className={`h-1.5 flex-1 rounded-full cursor-pointer ${i === step ? 'bg-slate-900' : lineValid(x.id) ? 'bg-emerald-500' : 'bg-slate-200'}`} />)}</div>
 
-      <div className="space-y-3">
-        {s.lines.map((l: any) => {
-          const c = get(l.id);
-          const bad = c.counted !== '' && Number(c.damaged || 0) > Number(c.counted);
-          const listening = voice.listening && micLine === l.id;
-          return (
-            <div key={l.id} id={`rline-${l.id}`} className={`rounded-xl border p-3 space-y-2 ${lineValid(l.id) ? 'border-emerald-200 bg-emerald-50/40' : 'border-slate-200'}`}>
-              <div className="flex items-start justify-between gap-2">
-                <div className="text-xs font-bold text-slate-900">{item(l.item).name}</div>
-                <span className="text-[10px] text-slate-500 whitespace-nowrap">{unitWord(item(l.item).unit, lang)}</span>
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] font-bold text-slate-700">{t('counted', lang)}</span>
-                <div className="flex items-center gap-1.5">
-                  <button className={step} onClick={() => bump(l.id, 'counted', -1)} aria-label="minus"><Minus className="w-4 h-4" /></button>
-                  <input id={`r-count-${l.id}`} inputMode="numeric" value={c.counted} onChange={(e) => set(l.id, 'counted', e.target.value)} placeholder="?" className={num} />
-                  <button className={step} onClick={() => bump(l.id, 'counted', 1)} aria-label="plus"><Plus className="w-4 h-4" /></button>
-                  {voice.supported && (
-                    <button id={`r-mic-${l.id}`} onClick={() => listen(l.id)} title={t('speakCount', lang)} className={`w-9 h-9 rounded-lg flex items-center justify-center cursor-pointer ${listening ? 'bg-rose-600 text-white animate-pulse' : 'bg-slate-900 text-white'}`}><Mic className="w-4 h-4" /></button>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] font-bold text-slate-700">{t('damaged', lang)}</span>
-                <div className="flex items-center gap-1.5">
-                  <button className={step} onClick={() => bump(l.id, 'damaged', -1)} aria-label="minus"><Minus className="w-4 h-4" /></button>
-                  <input id={`r-dmg-${l.id}`} inputMode="numeric" value={c.damaged} onChange={(e) => set(l.id, 'damaged', e.target.value)} className={`${num} ${bad ? 'border-rose-500 text-rose-700' : ''}`} />
-                  <button className={step} onClick={() => bump(l.id, 'damaged', 1)} aria-label="plus"><Plus className="w-4 h-4" /></button>
-                  {voice.supported && <span className="w-9" />}
-                </div>
-              </div>
-              {listening && voice.heard && <div className="text-[11px] text-slate-500">“{voice.heard}”</div>}
+        <div id={`rline-${l.id}`} className="rounded-2xl border-2 border-slate-200 p-4 space-y-4">
+          <div>
+            <div className="text-base font-bold text-slate-900 leading-snug">{item(l.item).name}</div>
+            <div className="text-[11px] text-slate-500">{unitWord(item(l.item).unit, lang)}{!state.settings.blindCount && <> • {t('sentQty', lang)}: <b className="text-slate-800">{l.qty}</b></>}</div>
+          </div>
+
+          {voice.supported ? (
+            <div className="flex flex-col items-center gap-2">
+              <button id={`r-mic-${l.id}`} onClick={() => (voice.listening ? voice.stop() : (setHeard(null), voice.start()))}
+                className={`w-20 h-20 rounded-full flex items-center justify-center cursor-pointer shadow-md ${voice.listening ? 'bg-rose-600 text-white animate-pulse' : 'bg-slate-900 text-white'}`} aria-label={t('speakCount', lang)}>
+                <Mic className="w-9 h-9" />
+              </button>
+              <div className="text-xs font-bold text-slate-800">{voice.listening ? t('listening', lang) : t('tapMic', lang)}</div>
+              <div className="text-[11px] text-slate-500 text-center">{t('sayLike', lang)}</div>
+              {heard && <div id="r-heard" className={`text-xs rounded-lg px-3 py-1.5 ${heard.ok ? 'bg-emerald-50 text-emerald-900 border border-emerald-200' : 'bg-amber-50 text-amber-900 border border-amber-200'}`}>{heard.ok ? <>{t('heard', lang)}: “{heard.text}”</> : t('notUnderstood', lang)}</div>}
+              {voice.error && voice.error !== 'lang_fallback' && <div className="text-[11px] text-amber-800"><MicOff className="w-3.5 h-3.5 inline mr-1" />{voice.error.replace(/_/g, ' ')}</div>}
             </div>
+          ) : null}
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold text-slate-700">{t('counted', lang)}</span>
+              <div className="flex items-center gap-1.5">
+                <button className={stepBtn} onClick={() => bump(l.id, 'counted', -1)} aria-label="minus"><Minus className="w-4 h-4" /></button>
+                <input id={`r-count-${l.id}`} inputMode="numeric" value={c.counted} onChange={(e) => set(l.id, 'counted', e.target.value)} placeholder="?" className={num} />
+                <button className={stepBtn} onClick={() => bump(l.id, 'counted', 1)} aria-label="plus"><Plus className="w-4 h-4" /></button>
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold text-slate-700">{t('damaged', lang)}</span>
+              <div className="flex items-center gap-1.5">
+                <button className={stepBtn} onClick={() => bump(l.id, 'damaged', -1)} aria-label="minus"><Minus className="w-4 h-4" /></button>
+                <input id={`r-dmg-${l.id}`} inputMode="numeric" value={c.damaged} onChange={(e) => set(l.id, 'damaged', e.target.value)} className={`${num} ${bad ? 'border-rose-500 text-rose-700' : ''}`} />
+                <button className={stepBtn} onClick={() => bump(l.id, 'damaged', 1)} aria-label="plus"><Plus className="w-4 h-4" /></button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={() => go(step - 1)} disabled={step === 0} className="py-3 rounded-xl border border-slate-300 text-sm font-bold flex items-center justify-center disabled:opacity-30 cursor-pointer"><ChevronLeft className="w-4 h-4 mr-1" />{t('prev', lang)}</button>
+          <button id="btn-next-line" onClick={() => go(step + 1)} disabled={!lineValid(l.id)} className="py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center disabled:opacity-40 cursor-pointer">{step === n - 1 ? t('checkSubmit', lang) : t('next', lang)}<ChevronRight className="w-4 h-4 ml-1" /></button>
+        </div>
+        <div className="text-[10px] text-slate-400 text-center">{t('savedPhone', lang)}</div>
+      </PhoneFrame>
+    );
+  }
+
+  // ----- review and submit (still blind) -----
+  return (
+    <PhoneFrame title="LoadMatch · Receive" sub={`${t('checkSubmit', lang)} · ${s.id}`} lang={lang} setLang={setLang}>
+      {head}
+      <div className="rounded-xl border border-slate-200 divide-y divide-slate-100">
+        {s.lines.map((l: any, i: number) => {
+          const c = get(l.id);
+          return (
+            <button key={l.id} onClick={() => go(i)} className="w-full px-3 py-2 flex items-center justify-between text-xs text-left cursor-pointer hover:bg-slate-50">
+              <span className="pr-2 text-slate-800">{item(l.item).name}</span>
+              <span className={`font-mono font-bold whitespace-nowrap ${lineValid(l.id) ? 'text-slate-900' : 'text-rose-700'}`}>{c.counted || '?'}{Number(c.damaged) ? ` (${c.damaged} ${t('damagedWord', lang)})` : ''}</span>
+            </button>
           );
         })}
       </div>
-
-      <label className="flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-slate-300 text-xs font-bold text-slate-700 cursor-pointer">
-        <Camera className="w-4 h-4" />{t('addPhoto', lang)}{photos.length ? ` · ${photos.length} ${t('photos', lang)}` : ''}
-        <input id="r-photo" type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={(e) => setPhotos([...photos, ...Array.from(e.target.files || []).map((f) => f.name)])} />
-      </label>
+      <PhotoStrip photos={photos} onAdd={(r) => setPhotos([...photos, ...r])} label={t('addPhoto', lang)} kinds={['damage', 'unloading', 'delivery note', 'bill']} />
+      <div className="text-[10px] text-slate-400">{t('photosHere', lang)}</div>
       <label className="block text-[11px] font-bold text-slate-700">{t('note', lang)}
         <textarea id="r-note" value={note} onChange={(e) => setNote(e.target.value)} rows={2} className="mt-1 w-full p-2 rounded-lg border border-slate-300 text-sm" />
       </label>
       <label className="block text-[11px] font-bold text-slate-700">{t('yourName', lang)}
         <input id="r-name" value={by} onChange={(e) => setBy(e.target.value)} className="mt-1 w-full p-2.5 rounded-lg border border-slate-300 text-sm" />
       </label>
-
       {!confirming ? (
         <button id="btn-submit-count" disabled={!ready} onClick={() => setConfirming(true)} className="w-full min-h-[52px] rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-sm font-bold cursor-pointer shadow-md">
           {t('submit', lang)}{left ? ` · ${left} ${t('linesLeft', lang)}` : ''}
@@ -154,6 +225,49 @@ export default function Receive({ id, token }: { id: string; token: string }) {
           </div>
         </div>
       )}
+      <div className="text-[10px] text-slate-400 text-center">{t('savedPhone', lang)}</div>
+    </PhoneFrame>
+  );
+}
+
+// What the receiver and the sender are told. With "owner only", details stay with the owner.
+export function resultText(state: any, s: any, lang: string) {
+  const ds = diffsOf(state, s.id);
+  const head = `${s.id} · ${s.truckNo} · ${route(s)}`;
+  if (!ds.length) return `${head}\n✓ ${t('resultMatched', lang)}`;
+  if (state.settings.differencesTo === 'owner') return `${head}\n${t('resultDiff', lang)}`;
+  const kind: Record<string, string> = { short: t('short', lang), excess: t('excess', lang), damaged: t('damagedWord', lang) };
+  return `${head}\n${t('resultDiff', lang)}\n${ds.map((d: any) => `• ${item(d.item).name}: ${d.qty} ${kind[d.kind]}`).join('\n')}`;
+}
+
+// After submitting: the count is locked; now the sent quantity is shown next to the count.
+function Done({ s, lang, setLang, head }: { s: any; lang: string; setLang: (l: string) => void; head: React.ReactNode }) {
+  const { state } = useStore();
+  const matched = shipmentStatus(state, s) === 'MATCHED';
+  const showLines = state.settings.differencesTo !== 'owner';
+  return (
+    <PhoneFrame title="LoadMatch · Receive" sub={s.id} lang={lang} setLang={setLang}>
+      {head}
+      <Note tone="go"><CheckCircle2 className="w-4 h-4 inline mr-1" />{t('submitted', lang)}</Note>
+      <Note tone={matched ? 'go' : 'warn'}>{matched ? t('resultMatched', lang) : t('resultDiff', lang)}</Note>
+      {showLines && <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">{t('compare', lang)}</div>}
+      {showLines && <div className="rounded-xl border border-slate-200 divide-y divide-slate-100">
+        {s.lines.map((l: any) => {
+          const r = s.receipt.lines[l.id];
+          const same = r.counted === l.qty && !r.damaged;
+          return (
+            <div key={l.id} className="px-3 py-2 text-xs">
+              <div className="text-slate-800">{item(l.item).name}</div>
+              <div className="flex items-center justify-between font-mono mt-0.5">
+                <span className="text-slate-500">{t('sentQty', lang)} {l.qty} → {t('counted', lang)} <b className="text-slate-900">{r.counted}</b>{r.damaged ? ` (${r.damaged} ${t('damagedWord', lang)})` : ''}</span>
+                <span className={`font-sans font-bold ${same ? 'text-emerald-700' : 'text-amber-700'}`}>{same ? `✓ ${t('matchedLine', lang)}` : r.counted < l.qty ? `${l.qty - r.counted} ${t('short', lang)}` : r.counted > l.qty ? `${r.counted - l.qty} ${t('excess', lang)}` : `${r.damaged} ${t('damagedWord', lang)}`}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>}
+      <a id="btn-tell-sender" href={shareWhatsApp(resultText(state, s, lang))} target="_blank" rel="noreferrer" className="w-full min-h-[48px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center"><MessageCircle className="w-5 h-5 mr-2" />{t('tellSender', lang)}</a>
+      <Note><Lock className="w-4 h-4 inline mr-1" />{t('locked', lang)} {s.receipt.by}, {when(s.receipt.at)}</Note>
     </PhoneFrame>
   );
 }

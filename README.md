@@ -8,10 +8,12 @@ It came out of a factory visit: two units with the same GSTIN, a handwritten dis
 
 | Who | Where | What they do |
 |---|---|---|
-| Dispatch staff | Phone | Type the list or paste it from Excel. Tap *Loading started* / *Loading finished* (with the dock or gate) and send the receiver a WhatsApp link when the truck leaves. At the gate, enter a supplier's bill and count what arrived. |
-| Receiver | WhatsApp link, no login | Counts each line **without seeing the sent quantity**, marks damaged units, adds photos and submits once. The count locks. English, हिंदी, ಕನ್ನಡ, తెలుగు, with the option to speak a number. |
-| Owner | Phone or laptop | Sees only short, excess or damaged lines, with their value. Decides each one from options that fit the flow, sets due dates for promises, and must tick to confirm losses above their limit. Attaches the CCTV clip (the loading time window says where to look) and shares an evidence pack on purpose. |
-| Accountant | Laptop | Approves ready entries or rejects them with a reason (a rejected decision returns to the owner). Downloads one Tally XML file in import order. |
+| Dispatch (sender) | Phone | Lists what is going: typed, spoken or pasted from Excel, with a photo of the dispatch list, challan or order. Between own units, chooses **No money (stock transfer)** or **With invoice and GST** (suggested from the units' GSTINs, the sender decides), and can print a delivery challan for no-money moves. Records loading start and end with the dock or gate, then sends the receiver a WhatsApp link. Sees the result when the count comes back. |
+| Receive (floor staff) | WhatsApp link or the Receive tab, no login | Counts one line at a time by voice ("48, 2 damaged") in English, हिंदी, ಕನ್ನಡ or తెలుగు, sees what was heard, and fixes it with + and − if needed. The sent quantity is hidden until they submit (a setting); the count is saved on the phone as they go. After submitting, the count locks, they see sent vs counted, and they can tell the sender on WhatsApp. Supplier deliveries are entered and counted here, with a photo of the bill. |
+| Owner | Phone or laptop | Sees only short, extra or damaged lines, already compared, with the papers and photos. Decides each one with options that fit the move, asks the sender to explain with one tap, attaches the CCTV clip and shares an evidence pack. |
+| Accountant | No login | Gets the owner's pack: a printable report and one Tally file, in import order. Until it is sent, the owner can undo a decision. |
+
+Settings: whether the receiver counts blind, who sees the details of a difference (owner and sender, or owner only), each unit's GSTIN, the loss limit, how many hours a count may take, and the phone languages.
 
 ### Owner options by flow
 
@@ -23,7 +25,8 @@ It came out of a factory visit: two units with the same GSTIN, a handwritten dis
 
 ### Tally entries prepared
 
-- **Between units (same GSTIN):** a Stock Journal from the sending unit to *Goods in Transit* when the truck leaves. On receipt, good units go from *Goods in Transit* to the receiving unit, and damaged units go to *Damaged Goods*. A write-off moves them to *Transit Loss*.
+- **Between units, no money:** a Stock Journal from the sending unit to *Goods in Transit* when the truck leaves. On receipt, good units go from *Goods in Transit* to the receiving unit, and damaged units go to *Damaged Goods*. A write-off moves them to *Transit Loss*.
+- **Between units, with invoice** (usually units with different GSTINs): a branch transfer invoice with GST when the truck leaves, a receipt note for the good units at the receiving unit, and a credit note for anything written off.
 - **From a supplier:** a Receipt Note for the good units counted, plus a Debit Note if the owner chooses one.
 - **To a customer:** a Credit Note or a Sales invoice for the extra, with GST split CGST+SGST or IGST by the customer's state.
 - No voucher numbers are set, because Tally numbers vouchers itself. Ledger and godown names must match the company's own Tally masters, so import into a test company first.

@@ -8,7 +8,9 @@ export const COMPANY = {
   gstin: '29AAAAA0000A1Z5',
 };
 
-// Units of the same company (one GSTIN). Each is a godown in Tally.
+// Units of the same company. Each is a godown in Tally. Moves between them are internal (no customer,
+// no sale). By default they share the company's GSTIN; the owner can set a different GSTIN per unit in
+// Settings, which changes only the paperwork (a branch transfer invoice instead of stock journals).
 export const UNITS: Record<string, { id: string; name: string; godown: string }> = {
   MYS: { id: 'MYS', name: 'Mysuru unit (plywood)', godown: 'Mysuru Unit' },
   BLR: { id: 'BLR', name: 'Bengaluru unit (boxes)', godown: 'Bengaluru Unit' },
@@ -77,11 +79,10 @@ export function makeSeed(anchor: number) {
     ev.push({ type: 'SEND_TO_RECEIVER', id, token: tok(i), at: t0 + 95 * M, actor: 'Dispatch staff' });
     ev.push({ type: 'SUBMIT_RECEIPT', id, token: tok(i), by: r.flow === 'outbound' ? 'Customer stores' : 'Stores', lines: Object.fromEntries(r.lines.map(([, qty], j) => [`L${j + 1}`, { counted: qty, damaged: 0 }])), at: t0 + 9 * H, actor: 'Receiver' });
   });
-  // The accountant has already approved those entries (transfers make two stock journals, supplier deliveries one receipt note)
+  // The owner already sent those entries to the accountant (transfers make two stock journals, supplier deliveries one receipt note)
   const routineDrafts = routine.reduce((n, r) => n + (r.flow === 'transfer' ? 2 : r.flow === 'inbound' ? 1 : 0), 0);
   const routineIds = Array.from({ length: routineDrafts }, (_, i) => `D-${String(i + 1).padStart(4, '0')}`);
-  ev.push({ type: 'APPROVE_DRAFTS', ids: routineIds, at: anchor - 2 * D, actor: 'Accountant' });
-  ev.push({ type: 'EXPORT_DRAFTS', ids: routineIds, at: anchor - 2 * D + 5 * M, actor: 'Accountant' });
+  ev.push({ type: 'SEND_TO_ACCOUNTANT', ids: routineIds, at: anchor - 2 * D, actor: 'Owner' });
 
   // TRK-1013: last night's transfer, like the dispatch list from the field visit. 5 short, 2 damaged.
   ev.push({ type: 'CREATE_SHIPMENT', id: 'TRK-1013', flow: 'transfer', fromUnit: 'MYS', toUnit: 'BLR', truckNo: 'KA 40 A 2541', ref: 'DC-0418', at: at(-12), actor: 'Dispatch staff',
@@ -124,4 +125,13 @@ export const DEFAULT_SETTINGS = {
   // a truck not confirmed within this many hours shows as overdue
   receiptHours: 24,
   languages: { en: true, hi: true, kn: true, te: true },
+  // the receiver counts without seeing the sent quantity
+  blindCount: true,
+  // who hears about a difference: 'owner_sender' (owner and the sending staff) or 'owner' (owner only)
+  differencesTo: 'owner_sender',
+  // GSTIN and state per unit (same as the company unless the owner changes it)
+  units: {
+    MYS: { gstin: '29AAAAA0000A1Z5', state: 'Karnataka' },
+    BLR: { gstin: '29AAAAA0000A1Z5', state: 'Karnataka' },
+  } as Record<string, { gstin: string; state: string }>,
 };

@@ -1,9 +1,12 @@
-import React, { useMemo, useState } from 'react';
-import { ArrowRight, ChevronLeft, Plus, Trash2, Truck, Play, Square, Send, Copy, MessageCircle, ClipboardPaste, Warehouse, PackageCheck, AlertTriangle } from 'lucide-react';
-import { useStore, item, party, route, shipmentStatus, receiptOverdue, receiverPath, FLOW_LABEL, STATUS_META } from '../store.tsx';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { ArrowRight, ChevronLeft, Plus, Trash2, Truck, Play, Square, Send, Copy, MessageCircle, ClipboardPaste, PackageCheck, AlertTriangle, Mic, CheckCircle2 } from 'lucide-react';
+import { useStore, item, party, route, shipmentStatus, receiptOverdue, receiverPath, sameGstin, FLOW_LABEL, STATUS_META } from '../store.tsx';
+import { useVoice, findNumber } from '../lib/voice.ts';
+import { resultText } from './Receive.tsx';
 import { ITEMS, PARTIES, UNITS, LOADING_POINTS } from '../data/seed.ts';
 import { t, unitWord } from '../i18n.ts';
-import { PhoneFrame, Note, savedLang, saveLang, shareWhatsApp, appLink, newToken, type Go } from './ui.tsx';
+import { PhoneFrame, Note, PhotoStrip, savedLang, saveLang, shareWhatsApp, appLink, newToken, type Go } from './ui.tsx';
+import { challanHtml, printReport } from '../lib/report.ts';
 import { time, when, duration } from '../lib/format.ts';
 
 const BADGE: Record<string, string> = Object.fromEntries(Object.entries(STATUS_META).map(([k, v]) => [k, v.cls]));
@@ -12,9 +15,9 @@ export default function Dispatch({ go, initialId }: { go: Go; initialId?: string
   const [lang, setLangState] = useState(savedLang);
   const setLang = (l: string) => { setLangState(l); saveLang(l); };
   const [screen, setScreen] = useState<string>(initialId ? `truck:${initialId}` : 'list');
-  const sub = screen.startsWith('truck:') ? screen.slice(6) : screen.startsWith('new:') ? t(screen === 'new:transfer' ? 'newTransfer' : screen === 'new:outbound' ? 'newCustomer' : 'supplierDelivery', lang) : t('trucks', lang);
+  const sub = screen.startsWith('truck:') ? screen.slice(6) : screen.startsWith('new:') ? t(screen === 'new:transfer' ? 'newTransfer' : 'newCustomer', lang) : t('trucks', lang);
   return (
-    <PhoneFrame title="LoadMatch · Dispatch & gate" sub={sub} lang={lang} setLang={setLang}>
+    <PhoneFrame title="LoadMatch · Dispatch" sub={sub} lang={lang} setLang={setLang}>
       {screen === 'list' && <TruckList lang={lang} open={(id) => setScreen(`truck:${id}`)} create={(f) => setScreen(`new:${f}`)} />}
       {screen.startsWith('new:') && <NewList lang={lang} flow={screen.slice(4)} onBack={() => setScreen('list')} onSaved={(id) => setScreen(`truck:${id}`)} />}
       {screen.startsWith('truck:') && <TruckDetail lang={lang} id={screen.slice(6)} onBack={() => setScreen('list')} />}
@@ -27,13 +30,14 @@ function TruckList({ lang, open, create }: { lang: string; open: (id: string) =>
   const now = Date.now();
   const rank: Record<string, number> = { LOADING: 0, IN_TRANSIT: 1, TO_DECIDE: 2, WAITING: 3, MATCHED: 4, SETTLED: 5, CANCELLED: 6 };
   const list = state.shipments
+    .filter((s: any) => s.flow !== 'inbound')
     .filter((s: any) => !s.receipt || now - s.receipt.at < 48 * 3600000)
     .filter((s: any) => !s.cancelledAt || now - s.cancelledAt < 12 * 3600000)
     .sort((a: any, b: any) => rank[shipmentStatus(state, a)] - rank[shipmentStatus(state, b)] || b.createdAt - a.createdAt);
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-1 gap-2">
-        {([['transfer', 'newTransfer', Truck], ['outbound', 'newCustomer', Send], ['inbound', 'supplierDelivery', Warehouse]] as const).map(([f, k, Icon]) => (
+        {([['transfer', 'newTransfer', Truck], ['outbound', 'newCustomer', Send]] as const).map(([f, k, Icon]) => (
           <button key={f} id={`btn-new-${f}`} onClick={() => create(f)} className="w-full py-3 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-left text-sm font-bold text-slate-900 flex items-center justify-between cursor-pointer shadow-2xs">
             <span className="flex items-center"><Icon className="w-4 h-4 mr-2 text-emerald-700" />{t(k, lang)}</span><Plus className="w-4 h-4 text-slate-400" />
           </button>
@@ -76,7 +80,7 @@ function parsePasted(text: string) {
   return { ok, bad };
 }
 
-function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: string; onBack: () => void; onSaved: (id: string) => void }) {
+export function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: string; onBack: () => void; onSaved: (id: string) => void }) {
   const { state, dispatch } = useStore();
   const customers = Object.values(PARTIES).filter((p) => p.kind === 'customer');
   const suppliers = Object.values(PARTIES).filter((p) => p.kind === 'supplier');
@@ -86,6 +90,21 @@ function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: string; 
   const [truckNo, setTruck] = useState('');
   const [ref, setRef] = useState('');
   const [lines, setLines] = useState<any[]>([{ item: '', qty: '' }]);
+  // between own units: the sender decides if money is involved (default from the units' GSTINs)
+  const [billingPick, setBillingPick] = useState<string | null>(null);
+  const [docs, setDocs] = useState<any[]>([]);
+  const billing = billingPick || (sameGstin(state, fromUnit, toUnit) ? 'none' : 'invoice');
+  // speak a quantity for a line
+  const micLine = useRef<number | null>(null);
+  const [listeningLine, setListeningLine] = useState<number | null>(null);
+  const onText = useCallback((alts: string[]) => {
+    const i = micLine.current;
+    const n = alts.map((a) => findNumber(a)).find((x) => x != null);
+    if (i != null && n != null) setLines((ls) => ls.map((x, j) => (j === i ? { ...x, qty: String(n) } : x)));
+    setListeningLine(null);
+  }, []);
+  const voice = useVoice(lang, onText);
+  const listen = (i: number) => { if (voice.listening) { voice.stop(); setListeningLine(null); return; } micLine.current = i; setListeningLine(i); voice.start(); };
   const [pasting, setPasting] = useState(false);
   const [pasted, setPasted] = useState('');
   const parsed = useMemo(() => parsePasted(pasted), [pasted]);
@@ -93,7 +112,7 @@ function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: string; 
   const valid = clean.length > 0 && clean.length === lines.filter((l) => l.item || l.qty).length && truckNo.trim() && ref.trim() && (flow !== 'transfer' || fromUnit !== toUnit);
   const save = () => {
     const id = `TRK-${1000 + state.counters.trk + 1}`;
-    dispatch({ type: 'CREATE_SHIPMENT', id, flow, fromUnit: flow === 'inbound' ? null : fromUnit, toUnit: flow === 'outbound' ? null : toUnit, party: flow === 'transfer' ? null : partyId, truckNo, ref, lines: clean, actor: flow === 'inbound' ? 'Gate' : 'Dispatch staff' });
+    dispatch({ type: 'CREATE_SHIPMENT', id, flow, fromUnit: flow === 'inbound' ? null : fromUnit, toUnit: flow === 'outbound' ? null : toUnit, party: flow === 'transfer' ? null : partyId, truckNo, ref, lines: clean, billing: flow === 'transfer' ? billing : undefined, docs, actor: flow === 'inbound' ? 'Gate' : 'Dispatch staff' });
     onSaved(id);
   };
   const sel = 'mt-1 w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm';
@@ -108,6 +127,17 @@ function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: string; 
         <label className="col-span-2">{t(flow === 'transfer' ? 'challanNo' : flow === 'outbound' ? 'invoiceNo' : 'billNo', lang)}<input id="f-ref" value={ref} onChange={(e) => setRef(e.target.value)} className={sel} /></label>
       </div>
       {flow === 'transfer' && fromUnit === toUnit && <Note tone="warn">{t('fromUnit', lang)} = {t('toUnit', lang)}</Note>}
+      {flow === 'transfer' && fromUnit !== toUnit && (
+        <div className="space-y-1.5">
+          <div className="text-[11px] font-bold text-slate-700">{t('moneyQ', lang)}</div>
+          <div className="grid grid-cols-2 gap-2">
+            {([['none', 'noMoney'], ['invoice', 'withInvoice']] as const).map(([v, k]) => (
+              <button key={v} id={`billing-${v}`} onClick={() => setBillingPick(v)} className={`py-2.5 px-2 rounded-xl border text-xs font-bold cursor-pointer ${billing === v ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-800 border-slate-300'}`}>{t(k, lang)}</button>
+            ))}
+          </div>
+          <div className="text-[10px] text-slate-500">{t(sameGstin(state, fromUnit, toUnit) ? 'gstSame' : 'gstDiff', lang)}</div>
+        </div>
+      )}
 
       <div className="flex items-center justify-between pt-1">
         <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">{t(flow === 'inbound' ? 'billedQty' : 'qty', lang)}</div>
@@ -123,17 +153,21 @@ function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: string; 
       )}
       <div className="space-y-2">
         {lines.map((l, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <select id={`f-item-${i}`} value={l.item} onChange={(e) => setLines(lines.map((x, j) => (j === i ? { ...x, item: e.target.value } : x)))} className="flex-1 min-w-0 p-2.5 rounded-lg border border-slate-300 bg-white text-xs">
+          <div key={i} className="space-y-1.5 rounded-xl border border-slate-200 p-2">
+            <select id={`f-item-${i}`} value={l.item} onChange={(e) => setLines(lines.map((x, j) => (j === i ? { ...x, item: e.target.value } : x)))} className="w-full p-2.5 rounded-lg border border-slate-300 bg-white text-xs">
               <option value="">{t('item', lang)}…</option>
               {Object.values(ITEMS).map((it) => <option key={it.code} value={it.code}>{it.name}</option>)}
             </select>
+            <div className="flex items-center gap-2 justify-end">
+            {voice.supported && <button id={`f-mic-${i}`} onClick={() => listen(i)} aria-label={t('speakCount', lang)} className={`p-2 rounded-lg cursor-pointer ${listeningLine === i ? 'bg-rose-600 text-white animate-pulse' : 'bg-slate-900 text-white'}`}><Mic className="w-4 h-4" /></button>}
             <input id={`f-qty-${i}`} type="number" inputMode="numeric" min="1" value={l.qty} onChange={(e) => setLines(lines.map((x, j) => (j === i ? { ...x, qty: e.target.value } : x)))} placeholder="0" className="w-20 p-2.5 rounded-lg border border-slate-300 text-sm font-mono font-bold text-right" />
             <button onClick={() => setLines(lines.length > 1 ? lines.filter((_, j) => j !== i) : [{ item: '', qty: '' }])} className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 cursor-pointer" aria-label="Remove line"><Trash2 className="w-4 h-4" /></button>
+            </div>
           </div>
         ))}
         <button id="btn-add-line" onClick={() => setLines([...lines, { item: '', qty: '' }])} className="text-[11px] font-bold text-slate-700 flex items-center cursor-pointer"><Plus className="w-3.5 h-3.5 mr-1" />{t('addLine', lang)}</button>
       </div>
+      <PhotoStrip photos={docs} onAdd={(r) => setDocs([...docs, ...r])} label={t('addPaper', lang)} kinds={flow === 'inbound' ? ['supplier bill', 'order', 'delivery note'] : ['dispatch list', 'challan', 'order']} />
       <button id="btn-save-list" disabled={!valid} onClick={save} className="w-full min-h-[48px] rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-sm font-bold cursor-pointer">{t('saveList', lang)} ({clean.reduce((a, l) => a + l.qty, 0)})</button>
     </div>
   );
@@ -174,6 +208,11 @@ function TruckDetail({ lang, id, onBack }: { lang: string; id: string; onBack: (
         <div className="px-3 py-2 flex items-center justify-between text-xs font-bold bg-slate-50"><span>Total</span><span className="font-mono">{s.lines.reduce((a: number, l: any) => a + l.qty, 0)}</span></div>
       </div>
 
+      <div className="space-y-1">
+        <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">{t('papers', lang)}</div>
+        <PhotoStrip photos={s.docs || []} onAdd={(r) => dispatch({ type: 'ATTACH_DOC', id: s.id, docs: r, actor: s.flow === 'inbound' ? 'Gate' : 'Dispatch staff' })} label={t('addPaper', lang)} kinds={s.flow === 'inbound' ? ['supplier bill', 'order', 'delivery note'] : ['dispatch list', 'challan', 'order']} />
+        {s.flow === 'transfer' && s.billing === 'none' && <button id="btn-challan" onClick={() => printReport(challanHtml(state, s))} className="w-full py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 cursor-pointer">{t('printChallan', lang)}</button>}
+      </div>
       {st === 'LOADING' && s.flow !== 'inbound' && (
         <div className="space-y-2">
           <Note>{t('loadingFirst', lang)}</Note>
@@ -208,7 +247,12 @@ function TruckDetail({ lang, id, onBack }: { lang: string; id: string; onBack: (
             </>}
         </div>
       )}
-      {s.receipt && <Note tone={st === 'MATCHED' ? 'go' : 'warn'}>{t(`st_${st}`, lang)} • {s.receipt.by}, {when(s.receipt.at, now)}</Note>}
+      {s.receipt && (
+        <div id="sender-result" className={`rounded-xl p-3 text-xs border space-y-1 ${st === 'MATCHED' ? 'bg-emerald-50 border-emerald-200 text-emerald-950' : 'bg-amber-50 border-amber-200 text-amber-950'}`}>
+          <div className="font-bold flex items-center">{st === 'MATCHED' ? <CheckCircle2 className="w-4 h-4 mr-1" /> : <AlertTriangle className="w-4 h-4 mr-1" />}{t('receiverResult', lang)} · {s.receipt.by}, {when(s.receipt.at, now)}</div>
+          <pre className="whitespace-pre-wrap font-sans leading-relaxed">{resultText(state, s, lang).split('\n').slice(1).join('\n')}</pre>
+        </div>
+      )}
     </div>
   );
 }
