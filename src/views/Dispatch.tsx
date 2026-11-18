@@ -108,12 +108,14 @@ export function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: s
     setParty(out.party); setTo(out.fromUnit);
     setLines(jobworkBalance(state, out).filter((b: any) => b.pending > 0).map((b: any) => ({ item: b.item, qty: String(b.pending) })));
   };
-  const [truckNo, setTruck] = useState('');
-  const [driver, setDriver] = useState('');
-  const [driverPhone, setDriverPhone] = useState('');
+  // Prototype: the form opens filled with sample values; everything can still be changed
+  const demo = flow !== 'jobwork_in';
+  const [truckNo, setTruck] = useState(demo ? `KA 09 B ${1000 + Math.floor(Math.random() * 9000)}` : '');
+  const [driver, setDriver] = useState(demo ? 'Manju' : '');
+  const [driverPhone, setDriverPhone] = useState(demo ? '9845012345' : '');
   const [ewayBill, setEwayBill] = useState('');
-  const [ref, setRef] = useState('');
-  const [lines, setLines] = useState<any[]>([{ item: '', qty: '' }]);
+  const [ref, setRef] = useState(demo ? `${flow === 'outbound' ? 'INV' : flow === 'inbound' ? 'SB' : 'DC'}-${100 + Math.floor(Math.random() * 900)}` : '');
+  const [lines, setLines] = useState<any[]>(demo ? Object.keys(ITEMS).slice(0, 2).map((item, i) => ({ item, qty: i ? '30' : '50' })) : [{ item: '', qty: '' }]);
   // between own units: the sender decides if money is involved (default from the units' GSTINs)
   const [billingPick, setBillingPick] = useState<string | null>(null);
   const [docs, setDocs] = useState<any[]>([]);

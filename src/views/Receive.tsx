@@ -91,8 +91,9 @@ export default function Receive({ id, token, payload }: { id: string; token: str
   const s = sameLoad ? mine : remote ? shipmentOf(state, id) : null;
   const ok = s && s.token && s.token === token && !s.cancelledAt;
   const saved = loadDraft(`${id}-${token}`);
-  const [by, setBy] = useState(() => saved?.by || (() => { try { return localStorage.getItem('loadmatch-name') || ''; } catch { return ''; } })());
-  const [counts, setCounts] = useState<Record<string, Count>>(saved?.counts || {});
+  const [by, setBy] = useState(() => saved?.by || (() => { try { return localStorage.getItem('loadmatch-name') || 'Ravi'; } catch { return 'Ravi'; } })());
+  // Prototype: counts open filled in, with the first line 2 short and 1 damaged to show a difference
+  const [counts, setCounts] = useState<Record<string, Count>>(() => saved?.counts || (ok ? Object.fromEntries(s.lines.map((l: any, i: number) => [l.id, i === 0 ? { counted: String(Math.max(0, l.qty - 2)), damaged: '1' } : { counted: String(l.qty), damaged: '0' }])) : {}));
   const [photos, setPhotos] = useState<any[]>(saved?.photos || []);
   const [note, setNote] = useState(saved?.note || '');
   const [step, setStep] = useState<number>(saved?.step ?? 0); // 0..n-1 lines, n = review
