@@ -6,6 +6,7 @@ import { useVoice, parseCount } from '../lib/voice.ts';
 import { PhoneFrame, Note, PhotoStrip, savedLang, saveLang, shareWhatsApp, newToken, appLink } from './ui.tsx';
 import { NewList, Chain } from './Dispatch.tsx';
 import { when } from '../lib/format.ts';
+import { sharedMode } from '../sync.ts';
 
 // ---------- the Receive tab: your own floor staff ----------
 // Trucks heading to your units, and supplier deliveries at the gate.
@@ -276,7 +277,8 @@ function Done({ s, state, remote, lang, setLang, head }: { s: any; state: any; r
   const { dispatch } = useStore();
   // From another phone: the message to the sender carries a link that records this count on their phone.
   // Always: the receiver may be on a different phone even when this phone has a load with the same number.
-  const message = `${resultText(state, s, lang)}\n\n${t('saveCountLink', lang)}:\n${appLink(countBackPath(s, s.receipt))}`;
+  // With the shared database the count already reached everyone; the WhatsApp message is just a note.
+  const message = sharedMode ? resultText(state, s, lang) : `${resultText(state, s, lang)}\n\n${t('saveCountLink', lang)}:\n${appLink(countBackPath(s, s.receipt))}`;
   const matched = shipmentStatus(state, s) === 'MATCHED';
   const showLines = state.settings.differencesTo !== 'owner';
   return (
@@ -301,9 +303,9 @@ function Done({ s, state, remote, lang, setLang, head }: { s: any; state: any; r
         })}
       </div>}
       {!matched && s.flow !== 'outbound' && <Note tone="warn">{t('lrTip', lang)}</Note>}
-      <div id="r-send-back"><Note tone="warn">{t('sendBackNote', lang)}</Note></div>
+      {!sharedMode && <div id="r-send-back"><Note tone="warn">{t('sendBackNote', lang)}</Note></div>}
       {!matched && !remote && <PhotoStrip photos={(s.docs || []).filter((d: any) => d.by === 'Receiver')} onAdd={(r) => dispatch({ type: 'ATTACH_DOC', id: s.id, docs: r, actor: 'Receiver' })} label={t('addPhoto', lang)} lang={lang} kinds={['signed lorry receipt (bilty)', 'damage']} />}
-      <a id="btn-tell-sender" href={shareWhatsApp(message)} target="_blank" rel="noreferrer" className="w-full min-h-[48px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center"><MessageCircle className="w-5 h-5 mr-2" />{t('sendCountToSender', lang)}</a>
+      <a id="btn-tell-sender" href={shareWhatsApp(message)} target="_blank" rel="noreferrer" className="w-full min-h-[48px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center"><MessageCircle className="w-5 h-5 mr-2" />{t(sharedMode ? 'tellSender' : 'sendCountToSender', lang)}</a>
       <Note><Lock className="w-4 h-4 inline mr-1" />{t('locked', lang)} {s.receipt.by}, {when(s.receipt.at)}</Note>
     </PhoneFrame>
   );
