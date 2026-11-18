@@ -39,7 +39,7 @@ const T: Record<string, Tr> = {
   speakCount: { en: 'Speak the number', hi: 'संख्या बोलें', kn: 'ಸಂಖ್ಯೆ ಹೇಳಿ', te: 'సంఖ్య చెప్పండి' },
   // dispatch
   trucks: { en: 'Trucks', hi: 'गाड़ियाँ', kn: 'ವಾಹನಗಳು', te: 'వాహనాలు' },
-  newTransfer: { en: 'To our other unit (next job)', hi: 'हमारी दूसरी यूनिट को', kn: 'ನಮ್ಮ ಇನ್ನೊಂದು ಘಟಕಕ್ಕೆ', te: 'మా మరో యూనిట్‌కు' },
+  newTransfer: { en: 'To our other unit', hi: 'हमारी दूसरी यूनिट को', kn: 'ನಮ್ಮ ಇನ್ನೊಂದು ಘಟಕಕ್ಕೆ', te: 'మా మరో యూనిట్‌కు' },
   newCustomer: { en: 'To a customer', hi: 'ग्राहक को', kn: 'ಗ್ರಾಹಕರಿಗೆ', te: 'కస్టమర్‌కు' },
   supplierDelivery: { en: 'Supplier delivery at the gate', hi: 'गेट पर सप्लायर का माल', kn: 'ಗೇಟ್‌ನಲ್ಲಿ ಪೂರೈಕೆದಾರರ ಸರಕು', te: 'గేటు వద్ద సరఫరాదారు సరుకు' },
   customer: { en: 'Customer', hi: 'ग्राहक', kn: 'ಗ್ರಾಹಕ', te: 'కస్టమర్' },
@@ -127,7 +127,7 @@ const T: Record<string, Tr> = {
   optional: { en: 'optional', hi: 'वैकल्पिक', kn: 'ಐಚ್ಛಿಕ', te: 'ఐచ్ఛికం' },
   load: { en: 'Load', hi: 'माल', kn: 'ಸರಕು', te: 'సరుకు' },
   lrTip: { en: 'Before the driver leaves: write the shortage or damage on his lorry receipt (bilty), get it signed, and take a photo. Transport claims need this.', hi: 'ड्राइवर के जाने से पहले: कमी या खराबी उसकी बिल्टी (LR) पर लिखें, साइन करवाएँ और फोटो लें। ट्रांसपोर्ट क्लेम के लिए यह ज़रूरी है।', kn: 'ಚಾಲಕ ಹೋಗುವ ಮೊದಲು: ಕೊರತೆ ಅಥವಾ ಹಾನಿಯನ್ನು ಅವನ ಬಿಲ್ಟಿ (LR) ಮೇಲೆ ಬರೆದು, ಸಹಿ ಪಡೆದು, ಫೋಟೋ ತೆಗೆಯಿರಿ. ಸಾರಿಗೆ ಕ್ಲೇಮ್‌ಗೆ ಇದು ಬೇಕು.', te: 'డ్రైవర్ వెళ్లే ముందు: తక్కువ లేదా పాడైన వాటిని అతని బిల్టీ (LR) పై రాసి, సంతకం తీసుకుని, ఫోటో తీయండి. ట్రాన్స్‌పోర్ట్ క్లెయిమ్‌కు ఇది అవసరం.' },
-  newTransferSub: { en: 'Goods stay ours, e.g. Mysuru → Bengaluru for the next step', hi: 'माल हमारा ही रहता है, जैसे मैसूरु → बेंगलुरु अगले काम के लिए', kn: 'ಸರಕು ನಮ್ಮದೇ, ಉದಾ. ಮೈಸೂರು → ಬೆಂಗಳೂರು ಮುಂದಿನ ಕೆಲಸಕ್ಕೆ', te: 'సరుకు మనదే, ఉదా. మైసూరు → బెంగళూరు తదుపరి పనికి' },
+  newTransferSub: { en: 'Goods stay ours, e.g. Mysuru → Bengaluru', hi: 'माल हमारा ही रहता है, जैसे मैसूरु → बेंगलुरु', kn: 'ಸರಕು ನಮ್ಮದೇ, ಉದಾ. ಮೈಸೂರು → ಬೆಂಗಳೂರು', te: 'సరుకు మనదే, ఉదా. మైసూరు → బెంగళూరు' },
   newCustomerSub: { en: 'A sale; the customer counts it when it arrives', hi: 'बिक्री; ग्राहक पहुँचने पर गिनता है', kn: 'ಮಾರಾಟ; ತಲುಪಿದಾಗ ಗ್ರಾಹಕರು ಎಣಿಸುತ್ತಾರೆ', te: 'అమ్మకం; చేరినప్పుడు కస్టమర్ లెక్కిస్తారు' },
   otherLabel: { en: 'Other', hi: 'अन्य', kn: 'ಇತರೆ', te: 'ఇతర' },
   newJobworkSub: { en: 'send to another company for processing; it comes back to us (job work)', hi: 'दूसरी कंपनी को काम के लिए भेजें; माल वापस आएगा (जॉब वर्क)', kn: 'ಕೆಲಸಕ್ಕಾಗಿ ಬೇರೆ ಕಂಪನಿಗೆ ಕಳುಹಿಸಿ; ಸರಕು ವಾಪಸ್ ಬರುತ್ತದೆ (ಜಾಬ್ ವರ್ಕ್)', te: 'పనికోసం వేరే కంపెనీకి పంపండి; సరుకు తిరిగి వస్తుంది (జాబ్ వర్క్)' },

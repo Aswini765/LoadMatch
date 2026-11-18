@@ -8,7 +8,7 @@ const SOPS: [string, string[]][] = [
     'Tap "Loading started" and "Loading finished" and say where it is loaded. This time tells the owner where to look in the CCTV.',
     'Goods worth more than ₹50,000 usually need an e-way bill, even when nothing is sold. Write its number in the list.',
     'When the truck leaves, send the receiver link on WhatsApp. You will see the result here when they submit.',
-    'Most loads are "To our other unit (next job)": goods move between your own units for the next step. If the load was made from goods that came in earlier, pick it under "Made from".',
+    'Most loads are "To our other unit": goods move between your own units. If the load was made from goods that came in earlier, pick it under "Made from".',
     'If a truck comes back or never reaches, tap "Truck came back / did not reach" and write what happened. The receiver link stops working and the paperwork is undone.',
     'Sending goods to another company to process and send back is under "Other" (job work). It is not a sale; print the challan from the app. The job worker counts on arrival through the link.',
     'Carrying goods you promised a customer (the missing ones, or replacements)? Tick them on the list. When the customer counts them, the promise closes by itself.',
