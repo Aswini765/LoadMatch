@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: stocktrace
+    name: loadmatch
     runtime: node
     plan: free
     buildCommand: npm install && npm run build

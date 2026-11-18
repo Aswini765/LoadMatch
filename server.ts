@@ -1,7 +1,7 @@
 /**
- * StockTrace production server (same pattern as AeroDAG's server.ts):
+ * LoadMatch production server:
  * security headers, health probe, static hosting of the Vite build with SPA fallback.
- * All StockTrace data lives in the browser for this demo; there is no backend database yet.
+ * Data lives in the browser, or in Supabase when VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set at build time.
  */
 import express from 'express';
 import dotenv from 'dotenv';
@@ -22,7 +22,7 @@ app.use((_req, res, next) => {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'"
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-ancestors 'none'"
   );
   next();
 });
@@ -30,8 +30,7 @@ app.use((_req, res, next) => {
 app.get('/health', (_req, res) => {
   res.json({
     status: 'UP',
-    service: 'StockTrace short-supply resolution',
-    version: '2.0.0',
+    service: 'LoadMatch dispatch and receipt matching',
     timestamp: new Date().toISOString(),
     uptimeSeconds: Math.floor(process.uptime()),
   });
@@ -42,5 +41,5 @@ app.use(express.static(dist, { maxAge: '1h', index: false }));
 app.get('*', (_req, res) => res.sendFile(path.join(dist, 'index.html')));
 
 app.listen(port, () => {
-  console.log(`StockTrace listening on http://localhost:${port}`);
+  console.log(`LoadMatch listening on http://localhost:${port}`);
 });

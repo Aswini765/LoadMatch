@@ -2,105 +2,97 @@ import { COMPANY, ITEMS, PARTIES } from '../data/seed.ts';
 import { taxLines } from './tax.ts';
 import { tallyDate } from './format.ts';
 
-const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const amt = (n) => Number(n).toFixed(2);
+const esc = (s: any) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const amt = (n: number) => Number(n).toFixed(2);
+const qty = (q: number, code: string) => ` ${q} ${esc(ITEMS[code].unit)}`;
 
-// Draft Tally XML for a posted voucher. Ledger names (Sales, Output CGST, ...) must match the
-// company's own ledgers: import into a test company first. This is a starting point, not a certified integration.
-// Purchase entries are typed in from the supplier's bill (rates, tax and bill number come from it), so no XML.
-export const exportable = (d) => d.type !== 'purchase';
-
-export function voucherXml(d) {
+// Draft Tally XML for an approved draft. Ledger and godown names (Sales, Purchase, Output CGST,
+// Goods in Transit, ...) must match the company's own masters: import into a test company first.
+// No VOUCHERNUMBER: Tally numbers vouchers in its own series.
+function voucherBody(d: any) {
   const date = tallyDate(d.approvedAt || d.createdAt);
-  // No VOUCHERNUMBER: Tally assigns numbers in its own series.
   let body = '';
-  if (d.type === 'credit_note' || d.type === 'sales_invoice' || d.type === 'reissue') {
-    const p = PARTIES[d.party];
-    const t = taxLines(d.lines, p);
-    const isCN = d.type === 'credit_note';
-    const partySign = isCN ? '' : '-';
-    const inv = t.rows.map((r) => {
-      const it = ITEMS[r.item];
-      return `
-        <ALLINVENTORYENTRIES.LIST>
-          <STOCKITEMNAME>${esc(it.name)}</STOCKITEMNAME>
-          <ISDEEMEDPOSITIVE>${isCN ? 'Yes' : 'No'}</ISDEEMEDPOSITIVE>
-          <RATE>${amt(r.rate)}/${esc(it.unit)}</RATE>
-          <AMOUNT>${isCN ? '-' : ''}${amt(r.value)}</AMOUNT>
-          <ACTUALQTY> ${r.qty} ${esc(it.unit)}</ACTUALQTY>
-          <BILLEDQTY> ${r.qty} ${esc(it.unit)}</BILLEDQTY>${d.godowns?.[r.item] ? `
-          <BATCHALLOCATIONS.LIST>
-            <GODOWNNAME>${esc(d.godowns[r.item])}</GODOWNNAME>
-            <AMOUNT>${isCN ? '-' : ''}${amt(r.value)}</AMOUNT>
-            <ACTUALQTY> ${r.qty} ${esc(it.unit)}</ACTUALQTY>
-            <BILLEDQTY> ${r.qty} ${esc(it.unit)}</BILLEDQTY>
-          </BATCHALLOCATIONS.LIST>` : ''}
-          <ACCOUNTINGALLOCATIONS.LIST>
-            <LEDGERNAME>Sales</LEDGERNAME>
-            <ISDEEMEDPOSITIVE>${isCN ? 'Yes' : 'No'}</ISDEEMEDPOSITIVE>
-            <AMOUNT>${isCN ? '-' : ''}${amt(r.value)}</AMOUNT>
-          </ACCOUNTINGALLOCATIONS.LIST>
-        </ALLINVENTORYENTRIES.LIST>`;
-    }).join('');
-    const taxLedger = (name, v) => v ? `
-        <LEDGERENTRIES.LIST>
-          <LEDGERNAME>${name}</LEDGERNAME>
-          <ISDEEMEDPOSITIVE>${isCN ? 'Yes' : 'No'}</ISDEEMEDPOSITIVE>
-          <AMOUNT>${isCN ? '-' : ''}${amt(v)}</AMOUNT>
-        </LEDGERENTRIES.LIST>` : '';
-    body = `
-      <VOUCHER VCHTYPE="${isCN ? 'Credit Note' : 'Sales'}" ACTION="Create" OBJVIEW="Invoice Voucher View">
-        <DATE>${date}</DATE>
-        <VOUCHERTYPENAME>${isCN ? 'Credit Note' : 'Sales'}</VOUCHERTYPENAME>
-        <PARTYLEDGERNAME>${esc(p.name)}</PARTYLEDGERNAME>
-        <PARTYGSTIN>${esc(p.gstin)}</PARTYGSTIN>
-        <PLACEOFSUPPLY>${esc(p.state)}</PLACEOFSUPPLY>
-        <ISINVOICE>Yes</ISINVOICE>${isCN ? `
-        <REFERENCE>${esc(d.original.no)}</REFERENCE>
-        <REFERENCEDATE>${tallyDate(d.original.date)}</REFERENCEDATE>` : ''}
-        <NARRATION>${esc(d.narration)}</NARRATION>
-        <LEDGERENTRIES.LIST>
-          <LEDGERNAME>${esc(p.name)}</LEDGERNAME>
-          <ISDEEMEDPOSITIVE>${isCN ? 'No' : 'Yes'}</ISDEEMEDPOSITIVE>
-          <AMOUNT>${partySign}${amt(t.total)}</AMOUNT>
-        </LEDGERENTRIES.LIST>${taxLedger('Output CGST', t.cgst)}${taxLedger('Output SGST', t.sgst)}${taxLedger('Output IGST', t.igst)}${inv}
-      </VOUCHER>`;
-  } else if (d.type === 'stock_journal') {
-    const it = ITEMS[d.item];
-    const [g] = d.from.split(' / ');
+  if (d.type === 'stock_journal') {
+    const out = d.moves.map((m: any) => `
+        <INVENTORYENTRIESOUT.LIST>
+          <STOCKITEMNAME>${esc(ITEMS[m.item].name)}</STOCKITEMNAME>
+          <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
+          <ACTUALQTY>${qty(m.qty, m.item)}</ACTUALQTY>
+          <BATCHALLOCATIONS.LIST><GODOWNNAME>${esc(m.from)}</GODOWNNAME><ACTUALQTY>${qty(m.qty, m.item)}</ACTUALQTY></BATCHALLOCATIONS.LIST>
+        </INVENTORYENTRIESOUT.LIST>`).join('');
+    const inn = d.moves.map((m: any) => `
+        <INVENTORYENTRIESIN.LIST>
+          <STOCKITEMNAME>${esc(ITEMS[m.item].name)}</STOCKITEMNAME>
+          <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+          <ACTUALQTY>${qty(m.qty, m.item)}</ACTUALQTY>
+          <BATCHALLOCATIONS.LIST><GODOWNNAME>${esc(m.to)}</GODOWNNAME><ACTUALQTY>${qty(m.qty, m.item)}</ACTUALQTY></BATCHALLOCATIONS.LIST>
+        </INVENTORYENTRIESIN.LIST>`).join('');
     body = `
       <VOUCHER VCHTYPE="Stock Journal" ACTION="Create">
         <DATE>${date}</DATE>
         <VOUCHERTYPENAME>Stock Journal</VOUCHERTYPENAME>
-        <NARRATION>${esc(d.narration)}</NARRATION>
-        <INVENTORYENTRIESOUT.LIST>
-          <STOCKITEMNAME>${esc(it.name)}</STOCKITEMNAME>
-          <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
-          <ACTUALQTY> ${d.qty} ${esc(it.unit)}</ACTUALQTY>
-          <BATCHALLOCATIONS.LIST><GODOWNNAME>${esc(g)}</GODOWNNAME><ACTUALQTY> ${d.qty} ${esc(it.unit)}</ACTUALQTY></BATCHALLOCATIONS.LIST>
-        </INVENTORYENTRIESOUT.LIST>
-        <INVENTORYENTRIESIN.LIST>
-          <STOCKITEMNAME>${esc(it.name)}</STOCKITEMNAME>
-          <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
-          <ACTUALQTY> ${d.qty} ${esc(it.unit)}</ACTUALQTY>
-          <BATCHALLOCATIONS.LIST><GODOWNNAME>${esc(d.to.split(' / ')[0])}</GODOWNNAME><ACTUALQTY> ${d.qty} ${esc(it.unit)}</ACTUALQTY></BATCHALLOCATIONS.LIST>
-        </INVENTORYENTRIESIN.LIST>
+        <NARRATION>${esc(d.narration)}</NARRATION>${out}${inn}
       </VOUCHER>`;
-  } else if (d.type === 'physical_stock') {
-    const it = ITEMS[d.item];
+  } else if (d.type === 'receipt_note') {
+    const p = PARTIES[d.party];
+    const inv = d.lines.map((l: any) => `
+        <ALLINVENTORYENTRIES.LIST>
+          <STOCKITEMNAME>${esc(ITEMS[l.item].name)}</STOCKITEMNAME>
+          <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+          <RATE>${amt(l.rate)}/${esc(ITEMS[l.item].unit)}</RATE>
+          <AMOUNT>-${amt(l.qty * l.rate)}</AMOUNT>
+          <ACTUALQTY>${qty(l.qty, l.item)}</ACTUALQTY>
+          <BILLEDQTY>${qty(l.qty, l.item)}</BILLEDQTY>
+          <BATCHALLOCATIONS.LIST><GODOWNNAME>${esc(l.godown)}</GODOWNNAME><AMOUNT>-${amt(l.qty * l.rate)}</AMOUNT><ACTUALQTY>${qty(l.qty, l.item)}</ACTUALQTY><BILLEDQTY>${qty(l.qty, l.item)}</BILLEDQTY></BATCHALLOCATIONS.LIST>
+        </ALLINVENTORYENTRIES.LIST>`).join('');
     body = `
-      <VOUCHER VCHTYPE="Physical Stock" ACTION="Create">
+      <VOUCHER VCHTYPE="Receipt Note" ACTION="Create" OBJVIEW="Invoice Voucher View">
         <DATE>${date}</DATE>
-        <VOUCHERTYPENAME>Physical Stock</VOUCHERTYPENAME>
+        <VOUCHERTYPENAME>Receipt Note</VOUCHERTYPENAME>
+        <PARTYLEDGERNAME>${esc(p.name)}</PARTYLEDGERNAME>
+        <REFERENCE>${esc(d.ref)}</REFERENCE>
+        <NARRATION>${esc(d.narration)}</NARRATION>${inv}
+      </VOUCHER>`;
+  } else {
+    // party vouchers with GST: debit note to a supplier, credit note or sales invoice to a customer
+    const p = PARTIES[d.party];
+    const t = taxLines(d.lines, p);
+    const vch = d.type === 'debit_note' ? 'Debit Note' : d.type === 'credit_note' ? 'Credit Note' : 'Sales';
+    const itemLedger = d.type === 'debit_note' ? 'Purchase' : 'Sales';
+    const taxPrefix = d.type === 'debit_note' ? 'Input' : 'Output';
+    // party side: Dr on a debit note and a sales invoice, Cr on a credit note
+    const partyDr = d.type !== 'credit_note';
+    const lineDr = !partyDr;
+    const sign = (dr: boolean) => (dr ? '-' : '');
+    const inv = t.rows.map((r: any) => `
+        <ALLINVENTORYENTRIES.LIST>
+          <STOCKITEMNAME>${esc(ITEMS[r.item].name)}</STOCKITEMNAME>
+          <ISDEEMEDPOSITIVE>${lineDr ? 'Yes' : 'No'}</ISDEEMEDPOSITIVE>
+          <RATE>${amt(r.rate)}/${esc(ITEMS[r.item].unit)}</RATE>
+          <AMOUNT>${sign(lineDr)}${amt(r.value)}</AMOUNT>
+          <ACTUALQTY>${qty(r.qty, r.item)}</ACTUALQTY>
+          <BILLEDQTY>${qty(r.qty, r.item)}</BILLEDQTY>
+          <ACCOUNTINGALLOCATIONS.LIST><LEDGERNAME>${itemLedger}</LEDGERNAME><ISDEEMEDPOSITIVE>${lineDr ? 'Yes' : 'No'}</ISDEEMEDPOSITIVE><AMOUNT>${sign(lineDr)}${amt(r.value)}</AMOUNT></ACCOUNTINGALLOCATIONS.LIST>
+        </ALLINVENTORYENTRIES.LIST>`).join('');
+    const tax = (name: string, v: number) => (v ? `
+        <LEDGERENTRIES.LIST><LEDGERNAME>${taxPrefix} ${name}</LEDGERNAME><ISDEEMEDPOSITIVE>${lineDr ? 'Yes' : 'No'}</ISDEEMEDPOSITIVE><AMOUNT>${sign(lineDr)}${amt(v)}</AMOUNT></LEDGERENTRIES.LIST>` : '');
+    body = `
+      <VOUCHER VCHTYPE="${vch}" ACTION="Create" OBJVIEW="Invoice Voucher View">
+        <DATE>${date}</DATE>
+        <VOUCHERTYPENAME>${vch}</VOUCHERTYPENAME>
+        <PARTYLEDGERNAME>${esc(p.name)}</PARTYLEDGERNAME>
+        <PARTYGSTIN>${esc(p.gstin)}</PARTYGSTIN>
+        <PLACEOFSUPPLY>${esc(d.type === 'debit_note' ? COMPANY.state : p.state)}</PLACEOFSUPPLY>
+        <ISINVOICE>Yes</ISINVOICE>
+        <REFERENCE>${esc(d.ref)}</REFERENCE>
         <NARRATION>${esc(d.narration)}</NARRATION>
-        <INVENTORYENTRIESIN.LIST>
-          <STOCKITEMNAME>${esc(it.name)}</STOCKITEMNAME>
-          <ACTUALQTY> ${d.counted} ${esc(it.unit)}</ACTUALQTY>
-          <BATCHALLOCATIONS.LIST><GODOWNNAME>${esc(d.godown)}</GODOWNNAME><ACTUALQTY> ${d.counted} ${esc(it.unit)}</ACTUALQTY></BATCHALLOCATIONS.LIST>
-        </INVENTORYENTRIESIN.LIST>
+        <LEDGERENTRIES.LIST><LEDGERNAME>${esc(p.name)}</LEDGERNAME><ISDEEMEDPOSITIVE>${partyDr ? 'Yes' : 'No'}</ISDEEMEDPOSITIVE><AMOUNT>${sign(partyDr)}${amt(t.total)}</AMOUNT></LEDGERENTRIES.LIST>${tax('CGST', t.cgst)}${tax('SGST', t.sgst)}${tax('IGST', t.igst)}${inv}
       </VOUCHER>`;
   }
-  return `<ENVELOPE>
+  return body;
+}
+
+const envelope = (body: string) => `<ENVELOPE>
   <HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER>
   <BODY>
     <IMPORTDATA>
@@ -116,9 +108,12 @@ export function voucherXml(d) {
   </BODY>
 </ENVELOPE>
 `;
-}
 
-export async function download(filename, text, type = 'application/xml') {
+export const voucherXml = (d: any) => envelope(voucherBody(d));
+// One file for a batch; pass drafts already sorted in import order
+export const batchXml = (ds: any[]) => envelope(ds.map(voucherBody).join(''));
+
+export async function download(filename: string, text: string, type = 'application/xml') {
   // Inside a claude.ai artifact preview, files go through the viewer's downloads capability.
   const host = (window as any).claude;
   if (host?.use) {

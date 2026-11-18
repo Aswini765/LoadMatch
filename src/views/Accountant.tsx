@@ -1,238 +1,98 @@
-import type { Go } from './ui.tsx';
-import React, { useEffect, useState } from 'react';
-import { CheckCircle2, XCircle, Download, FileText, AlertTriangle, Clock, Truck, Lock } from 'lucide-react';
-import {
-  useStore, item, party, DRAFT_LABEL, orderStatus, orderOf, ROOT_CAUSES, STATUS_META, needsOwnerSignOff, blockingJournal, importOrder, diffValue,
-} from '../store.tsx';
-import { PageHeader } from './ui.tsx';
-import { inr, inrSigned, dateTime, date, when, duration } from '../lib/format.ts';
-import { taxLines, creditNoteDeadline, daysLeft } from '../lib/tax.ts';
-import { voucherXml, download, exportable } from '../lib/tally.ts';
+import React, { useState } from 'react';
+import { Download, Check, X, FileCode } from 'lucide-react';
+import { useStore, item, party, shipmentOf, route, importOrder, DRAFT_LABEL } from '../store.tsx';
+import { PageHeader, Panel, type Go } from './ui.tsx';
+import { taxLines } from '../lib/tax.ts';
+import { voucherXml, batchXml, download } from '../lib/tally.ts';
+import { inr, dateTime, tallyDate } from '../lib/format.ts';
 
-const ROUTE_LABEL: Record<string, string> = {
-  invoice_shipped: 'Invoice what is shipped',
-  cancel_irn: 'Cancel e-invoice (IRN) and re-issue',
-  cancel_reissue: 'Cancel and re-issue invoice',
-  credit_note: 'Credit note',
+const TYPE_CLS: Record<string, string> = {
+  stock_journal: 'bg-slate-100 text-slate-700 border-slate-200',
+  receipt_note: 'bg-sky-50 text-sky-800 border-sky-200',
+  debit_note: 'bg-amber-50 text-amber-800 border-amber-200',
+  credit_note: 'bg-rose-50 text-rose-800 border-rose-200',
+  sales_invoice: 'bg-emerald-50 text-emerald-800 border-emerald-200',
 };
-const TRUCK_WAITS = ['sales_invoice', 'reissue'];
-const URGENT_MS = 6 * 3600000;
 
-// Steps the Tally operator follows, in order, for each kind of draft
-function steps(d: any, now: number): string[] {
-  if (d.type === 'reissue' && d.route === 'cancel_irn') {
-    return [
-      ...(d.original.ewayBill ? [`Cancel e-way bill ${d.original.ewayBill.no} on the e-way bill portal (an active e-way bill blocks IRN cancellation).`] : []),
-      `Cancel the IRN of ${d.original.no} on the e-invoice portal before ${when(d.deadline, now)} (24-hour limit; full cancellation only).`,
-      `Cancel ${d.original.no} in Tally, then import the new invoice below (Tally gives it a fresh number; ${d.original.no} cannot be reused).`,
-      'Generate the IRN (and e-way bill, if needed) for the new invoice. The truck is waiting for it.',
-    ];
-  }
-  if (d.type === 'reissue') return [`Cancel ${d.original.no} in Tally (keep it in the series as cancelled).`, 'Import the new invoice below; Tally numbers it.', 'Confirm this practice with your CA. The truck is waiting for the new invoice.'];
-  if (d.type === 'credit_note') return ['Import the credit note; Tally numbers it and links the original invoice reference.', 'Generate its IRN if e-invoicing applies.', 'Declare it in GSTR-1 by the s.34(2) deadline shown.'];
-  if (d.type === 'sales_invoice') return ['Import the invoice; Tally numbers it.', 'Generate IRN / e-way bill if they apply. The truck is waiting for it.'];
-  if (d.type === 'stock_journal' && d.kind === 'transfer') return ['Import the stock journal to move the units to the shelf where they actually are.', 'Import it before any physical stock entry for the same shelf.'];
-  if (d.type === 'stock_journal') return ['Import the stock journal to move the damaged units out of saleable stock.', 'Import it before any physical stock entry for the same shelf.'];
-  if (d.type === 'purchase') return [`Enter the purchase from ${d.supplier}'s bill in Tally (rate, tax and bill number come from the bill).`, 'Then mark it entered here.'];
-  return ['Import the physical stock entry to set the shelf to the counted quantity.', 'Import it after the stock journals listed for this shelf.'];
-}
-
-function useNow(ms = 30000) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => { const t = setInterval(() => setNow(Date.now()), ms); return () => clearInterval(t); }, [ms]);
-  return now;
-}
+const amountOf = (d: any) => (d.lines && d.party ? (d.type === 'receipt_note' ? d.lines.reduce((a: number, l: any) => a + l.qty * l.rate, 0) : taxLines(d.lines, party(d.party)).total) : null);
 
 export default function Accountant({ go }: { go: Go }) {
   const { state, dispatch } = useStore();
-  const now = useNow();
-  const [tab, setTab] = useState('pending');
-  const [picked, setPicked] = useState<Record<string, boolean>>({});
-  const counts: Record<string, number> = { pending: 0, approved: 0, rejected: 0 };
-  state.drafts.forEach((d: any) => { counts[d.status]++; });
-  // most urgent first: IRN deadlines, then drafts a truck is waiting for, then the rest
-  const rank = (d: any) => (d.deadline ? 0 : TRUCK_WAITS.includes(d.type) ? 1 : needsOwnerSignOff(d) ? 3 : 2);
-  const list = state.drafts.filter((d: any) => d.status === tab)
-    .sort((a: any, b: any) => (tab === 'pending' ? rank(a) - rank(b) || (a.deadline || 0) - (b.deadline || 0) : 0) || b.createdAt - a.createdAt);
-  const selectable = (d: any) => d.status === 'pending' && !needsOwnerSignOff(d);
-  const selected = list.filter((d: any) => picked[d.id] && selectable(d)).map((d: any) => d.id);
-  const approved = state.drafts.filter((d: any) => d.status === 'approved' && exportable(d)).sort(importOrder);
-  const urgent = state.drafts.filter((d: any) => d.status === 'pending' && d.deadline && d.deadline - now < URGENT_MS);
-  const trucks = state.drafts.filter((d: any) => d.status === 'pending' && TRUCK_WAITS.includes(d.type));
+  const pending = state.drafts.filter((d: any) => d.status === 'pending').sort(importOrder);
+  const approved = state.drafts.filter((d: any) => d.status === 'approved').sort(importOrder);
+  const rejected = state.drafts.filter((d: any) => d.status === 'rejected');
+  const toExport = approved.filter((d: any) => !d.exportedAt);
+  const exportBatch = () => {
+    download(`loadmatch-tally-${tallyDate(Date.now())}.xml`, batchXml(toExport));
+    dispatch({ type: 'EXPORT_DRAFTS', ids: toExport.map((d: any) => d.id), actor: 'Accountant' });
+  };
+  const [sel, setSel] = useState<Set<string>>(() => new Set(pending.map((d: any) => d.id)));
+  const [tab, setTab] = useState<'pending' | 'approved' | 'rejected'>('pending');
+  const chosen = pending.filter((d: any) => sel.has(d.id));
+  const toggle = (id: string) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const list = tab === 'pending' ? pending : tab === 'approved' ? approved : rejected;
 
   return (
-    <div className="space-y-5 max-w-6xl mx-auto w-full pb-12">
-      <PageHeader title="Accountant: drafts for Tally" sub="Approve in a batch once a day, except the time-bound items at the top. Tally assigns every voucher number."
-        right={approved.length > 0 && (
-          <button onClick={() => download(`stocktrace-tally-import-${new Date().toISOString().slice(0, 10)}.xml`, approved.map((d: any) => voucherXml(d)).join('\n'))} className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-md font-semibold text-xs cursor-pointer shadow-2xs flex items-center space-x-1.5">
-            <Download className="w-3.5 h-3.5" /><span>Download approved for Tally ({approved.length}, in import order)</span>
-          </button>
-        )} />
+    <div className="space-y-6 max-w-5xl mx-auto">
+      <PageHeader title="Accountant" sub="Tally entries prepared from the counts and the owner's decisions." right={
+        <button id="btn-batch-xml" disabled={!toExport.length} onClick={exportBatch} className="px-3 py-2 rounded-lg bg-slate-900 disabled:opacity-40 text-white text-xs font-bold flex items-center cursor-pointer"><Download className="w-3.5 h-3.5 mr-1.5" />{toExport.length ? `Download ${toExport.length} new entr${toExport.length === 1 ? 'y' : 'ies'} for Tally` : 'Nothing new for Tally'}</button>} />
 
-      {urgent.length > 0 && (
-        <div id="acct-urgent" className="bg-rose-50 border border-rose-200 rounded-lg px-3.5 py-2.5 text-xs text-rose-900 flex items-start space-x-2">
-          <Clock className="w-4 h-4 shrink-0 mt-0.5" />
-          <span><strong>Do now:</strong> {urgent.map((d: any) => `${d.original.no} IRN cancellation closes ${when(d.deadline, now)} (${duration(d.deadline - now)} left)`).join('; ')}. After that it can only be fixed with a credit note.</span>
-        </div>
-      )}
-      {trucks.length > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-3.5 py-2 text-xs text-amber-900 flex items-center space-x-2">
-          <Truck className="w-4 h-4 shrink-0" /><span><strong>{trucks.length} truck(s) waiting</strong> for a new invoice: {trucks.map((d: any) => `${d.orderId} (leaves ${when(orderOf(state, d.orderId).dispatchBy, now)})`).join(', ')}.</span>
-        </div>
-      )}
-
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="inline-flex rounded-lg bg-slate-100 border border-slate-200 p-1 text-xs font-semibold">
-          {['pending', 'approved', 'rejected'].map((k) => (
-            <button key={k} id={`acct-tab-${k}`} onClick={() => setTab(k)} className={`px-3 py-1.5 rounded-md cursor-pointer transition-colors ${tab === k ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'}`}>
-              {k === 'pending' ? 'To approve' : k[0].toUpperCase() + k.slice(1)} ({counts[k]})
-            </button>
-          ))}
-        </div>
-        {tab === 'pending' && list.length > 0 && (
-          <div className="flex items-center gap-2 text-xs">
-            <button onClick={() => setPicked(Object.fromEntries(list.filter(selectable).map((d: any) => [d.id, true])))} className="px-2.5 py-1.5 rounded-md border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer font-semibold">Select all ready</button>
-            <button id="btn-approve-selected" disabled={!selected.length} onClick={() => { dispatch({ type: 'APPROVE_DRAFTS', draftIds: selected, actor: 'Accountant' }); setPicked({}); }}
-              className="px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-bold cursor-pointer flex items-center space-x-1"><CheckCircle2 className="w-3.5 h-3.5" /><span>Approve selected ({selected.length})</span></button>
-          </div>
-        )}
+      <div className="inline-flex rounded-lg bg-white border border-slate-200 p-0.5 text-xs">
+        {([['pending', `To approve (${pending.length})`], ['approved', `Approved (${approved.length})`], ['rejected', `Rejected (${rejected.length})`]] as const).map(([k, l]) => (
+          <button key={k} id={`tab-${k}`} onClick={() => setTab(k)} className={`px-3 py-1.5 rounded-md font-bold cursor-pointer ${tab === k ? 'bg-slate-900 text-white' : 'text-slate-600'}`}>{l}</button>
+        ))}
       </div>
 
-      <div className="space-y-4">
-        {list.map((d: any) => <DraftCard key={d.id} d={d} go={go} now={now} checked={!!picked[d.id]} onCheck={(v) => setPicked({ ...picked, [d.id]: v })} />)}
-        {!list.length && <div className="bg-white border border-slate-200 rounded-xl p-8 text-center text-xs text-slate-400">Nothing here.</div>}
-      </div>
-      <p className="text-[11px] text-slate-400">XML ledger names (Sales, Output CGST/SGST/IGST) and godown names must match your company in Tally: import into a test company first. Item and GST rates in this demo are sample values.</p>
+      <Panel eyebrow={tab === 'pending' ? 'In import order' : tab} title={tab === 'pending' ? `${chosen.length} of ${pending.length} selected` : `${list.length} entr${list.length === 1 ? 'y' : 'ies'}`} right={tab === 'pending' && pending.length > 0 && (
+        <div className="flex gap-2">
+          <button onClick={() => setSel(sel.size === pending.length ? new Set() : new Set(pending.map((d: any) => d.id)))} className="px-2.5 py-1.5 rounded-md border border-slate-300 text-xs font-bold cursor-pointer">{sel.size === pending.length ? 'Clear' : 'Select all'}</button>
+          <button id="btn-approve" disabled={!chosen.length} onClick={() => { dispatch({ type: 'APPROVE_DRAFTS', ids: chosen.map((d: any) => d.id), actor: 'Accountant' }); setSel(new Set()); }} className="px-3 py-1.5 rounded-md bg-emerald-600 disabled:opacity-40 text-white text-xs font-bold flex items-center cursor-pointer"><Check className="w-3.5 h-3.5 mr-1" />Approve {chosen.length}</button>
+        </div>)}>
+        {!list.length && <div className="text-xs text-slate-500">Nothing here.</div>}
+        <div className="space-y-2">
+          {list.map((d: any) => <DraftRow key={d.id} d={d} selectable={tab === 'pending'} selected={sel.has(d.id)} toggle={() => toggle(d.id)} />)}
+        </div>
+      </Panel>
     </div>
   );
 }
 
-function DraftCard({ d, go, now, checked, onCheck }: { d: any; go: Go; now: number; checked: boolean; onCheck: (v: boolean) => void }) {
+function DraftRow({ d, selectable, selected, toggle }: { d: any; selectable: boolean; selected: boolean; toggle: () => void }) {
   const { state, dispatch } = useStore();
   const [rejecting, setRejecting] = useState(false);
-  const [note, setNote] = useState('');
-  const isBill = ['credit_note', 'sales_invoice', 'reissue'].includes(d.type);
-  const p = isBill ? party(d.party) : null;
-  const t = isBill ? taxLines(d.lines, p) : null;
-  const cnDeadline = d.type === 'credit_note' ? creditNoteDeadline(d.original.date) : null;
-  const o = orderOf(state, d.orderId);
-  const waitingOwner = d.status === 'pending' && needsOwnerSignOff(d);
-  const blocker = d.status === 'pending' ? blockingJournal(state, d) : null;
-  const left = d.deadline ? d.deadline - now : null;
-
+  const [why, setWhy] = useState('');
+  const s = shipmentOf(state, d.shipmentId);
+  const amount = amountOf(d);
   return (
-    <div id={`draft-${d.id}`} className={`bg-white border rounded-xl shadow-2xs overflow-hidden ${left != null && left < URGENT_MS && d.status === 'pending' ? 'border-rose-300' : 'border-slate-200'}`}>
-      <div className="px-4 py-3 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          {d.status === 'pending' && <input type="checkbox" disabled={waitingOwner} checked={checked && !waitingOwner} onChange={(e) => onCheck(e.target.checked)} className="w-4 h-4 accent-emerald-600" aria-label={`Select ${d.id}`} />}
-          <FileText className="w-4 h-4 text-slate-500" />
-          <span className="text-sm font-bold text-slate-900">{DRAFT_LABEL[d.type]}{d.kind === 'transfer' ? ' (transfer)' : d.kind === 'damaged' ? ' (damaged)' : ''}</span>
-          <span className="font-mono text-[11px] bg-slate-100 border border-slate-200 px-1.5 rounded text-slate-700">{d.id}</span>
-          {d.route && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-slate-50 text-slate-700 border-slate-200">{ROUTE_LABEL[d.route]}</span>}
-          {d.deadline && d.status === 'pending' && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${left! < URGENT_MS ? 'bg-rose-50 text-rose-800 border-rose-200' : 'bg-amber-50 text-amber-800 border-amber-200'}`}>CANCEL IRN BY {when(d.deadline, now).toUpperCase()} • {left! > 0 ? `${duration(left!)} LEFT` : 'PASSED'}</span>}
-          {TRUCK_WAITS.includes(d.type) && d.status === 'pending' && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-amber-50 text-amber-800 border-amber-200">TRUCK WAITING</span>}
-        </div>
-        <div className="text-[11px] text-slate-500">
-          Order <button onClick={() => go('owner', { caseId: d.orderId })} className="font-mono underline cursor-pointer">{d.orderId}</button>
-          {o && <> ({STATUS_META[orderStatus(state, o)].label.toLowerCase()})</>} • Drafted {dateTime(d.createdAt)}
-        </div>
-      </div>
-
-      <div className="p-4 grid grid-cols-1 lg:grid-cols-12 gap-4 text-xs">
-        <div className="lg:col-span-8 space-y-3">
-          {isBill && (
-            <>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div><span className="text-slate-400 block text-[11px]">Party</span><span className="font-semibold text-slate-900">{p.name}</span></div>
-                <div><span className="text-slate-400 block text-[11px]">GSTIN</span><span className="font-mono text-slate-900">{p.gstin}</span></div>
-                <div><span className="text-slate-400 block text-[11px]">Place of supply</span><span className="font-semibold text-slate-900">{p.state} ({t.intra ? 'CGST + SGST' : 'IGST'})</span></div>
-                <div><span className="text-slate-400 block text-[11px]">{d.original ? (d.type === 'credit_note' ? 'Against invoice' : 'Replaces invoice') : 'Basis'}</span><span className="font-mono font-semibold text-slate-900">{d.original ? `${d.original.no}, ${date(d.original.date)}` : 'Quantity shipped'}</span></div>
-              </div>
-              <div className="border border-slate-200 rounded-lg overflow-x-auto">
-                <table className="w-full text-left text-[11px]">
-                  <thead><tr className="bg-slate-50 text-slate-500 uppercase tracking-wider"><th className="py-1.5 px-2.5">Item</th><th className="py-1.5 px-2.5">HSN</th><th className="py-1.5 px-2.5">Godown</th><th className="py-1.5 px-2.5 text-right">Qty</th><th className="py-1.5 px-2.5 text-right">Rate</th><th className="py-1.5 px-2.5 text-right">Taxable</th></tr></thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {t.rows.map((r: any, i: number) => {
-                      const it = item(r.item);
-                      return <tr key={i}><td className="py-1.5 px-2.5 font-medium text-slate-800">{it.name}</td><td className="py-1.5 px-2.5 font-mono">{it.hsn}</td><td className="py-1.5 px-2.5">{d.godowns?.[r.item] || '—'}</td><td className="py-1.5 px-2.5 text-right font-mono">{r.qty} {it.unit}</td><td className="py-1.5 px-2.5 text-right font-mono">{inr(r.rate)}</td><td className="py-1.5 px-2.5 text-right font-mono">{inr(r.value)}</td></tr>;
-                    })}
-                  </tbody>
-                </table>
-                <div className="bg-slate-50 border-t border-slate-200 px-2.5 py-2 font-mono text-[11px] space-y-0.5 text-right">
-                  <div>Taxable: {inr(t.taxable)}</div>
-                  {t.intra ? <><div>CGST: {inr(t.cgst)}</div><div>SGST: {inr(t.sgst)}</div></> : <div>IGST: {inr(t.igst)}</div>}
-                  <div className="font-bold text-slate-900 text-xs">Total: {inr(t.total)}</div>
-                </div>
-              </div>
-            </>
-          )}
-          {d.type === 'stock_journal' && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div><span className="text-slate-400 block text-[11px]">Item</span><span className="font-semibold text-slate-900">{item(d.item).name}</span></div>
-              <div><span className="text-slate-400 block text-[11px]">Quantity</span><span className="font-mono font-semibold text-slate-900">{d.qty} {item(d.item).unit}</span></div>
-              <div><span className="text-slate-400 block text-[11px]">From</span><span className="font-semibold text-slate-900">{d.from}</span></div>
-              <div><span className="text-slate-400 block text-[11px]">To</span><span className="font-semibold text-slate-900">{d.to}</span></div>
-            </div>
-          )}
-          {d.type === 'purchase' && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div><span className="text-slate-400 block text-[11px]">Supplier</span><span className="font-semibold text-slate-900">{d.supplier}</span></div>
-              <div><span className="text-slate-400 block text-[11px]">Item</span><span className="font-semibold text-slate-900">{item(d.item).name}</span></div>
-              <div><span className="text-slate-400 block text-[11px]">Quantity / godown</span><span className="font-mono font-semibold text-slate-900">{d.qty} {item(d.item).unit} • {d.godown}</span></div>
-              <div><span className="text-slate-400 block text-[11px]">Buying rate (owner's note)</span><span className="font-mono font-semibold text-slate-900">{d.rate != null ? `${inr(d.rate)} (${inr(d.rate * d.qty)})` : 'From the bill'}</span></div>
-            </div>
-          )}
-          {d.type === 'physical_stock' && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div><span className="text-slate-400 block text-[11px]">Item / shelf</span><span className="font-semibold text-slate-900">{item(d.item).name}, {d.godown} / {d.shelf}</span></div>
-              <div><span className="text-slate-400 block text-[11px]">Expected / counted</span><span className="font-mono font-semibold text-slate-900">{d.book} / {d.counted}</span></div>
-              <div><span className="text-slate-400 block text-[11px]">Difference</span><span className={`font-mono font-bold ${d.counted < d.book ? 'text-rose-700' : 'text-emerald-700'}`}>{d.counted - d.book > 0 ? '+' : ''}{d.counted - d.book} ({inrSigned(diffValue(d))})</span></div>
-              <div><span className="text-slate-400 block text-[11px]">Cause (in-charge)</span><span className="font-semibold text-slate-900">{ROOT_CAUSES[d.cause]}</span></div>
-            </div>
-          )}
-          <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px] text-slate-700"><span className="font-bold">Narration:</span> {d.narration}</div>
-          {d.ownerApprovedAt && <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-900"><span className="font-bold">Owner signed off the loss</span> {dateTime(d.ownerApprovedAt)}.</div>}
-          {d.rejectNote && <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-[11px] text-rose-900"><span className="font-bold">Rejected{d.rejectedBy ? ` by ${d.rejectedBy}` : ''}:</span> {d.rejectNote}</div>}
-        </div>
-
-        <div className="lg:col-span-4 space-y-3">
-          {d.why && <div className="p-2.5 rounded-lg border bg-slate-50 border-slate-200 text-[11px] text-slate-700"><span className="font-bold">Why this route:</span> {d.why}</div>}
-          <div className="p-2.5 rounded-lg border bg-white border-slate-200 text-[11px] text-slate-700">
-            <div className="font-bold mb-1">Steps</div>
-            <ol className="list-decimal list-inside space-y-0.5">{steps(d, now).map((s) => <li key={s}>{s}</li>)}</ol>
+    <div id={`draft-${d.id}`} className={`rounded-lg border p-3 text-xs space-y-2 ${selected ? 'border-emerald-300 bg-emerald-50/30' : 'border-slate-200'}`}>
+      <div className="flex items-start gap-3">
+        {selectable && <input type="checkbox" checked={selected} onChange={toggle} className="mt-1 w-4 h-4 accent-emerald-700 cursor-pointer" aria-label={`Select ${d.id}`} />}
+        <div className="flex-1 min-w-0 space-y-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${TYPE_CLS[d.type]}`}>{DRAFT_LABEL[d.type]}</span>
+            <span className="font-mono text-slate-500">{d.id}</span>
+            {d.party && <span className="font-bold text-slate-900">{party(d.party).name}</span>}
+            {d.ref && <span className="text-slate-500">ref {d.ref}</span>}
+            <span className="text-slate-400">{s.id} · {route(s)}</span>
           </div>
-          {cnDeadline && (
-            <div className={`p-2.5 rounded-lg border text-[11px] ${daysLeft(cnDeadline, now) < 60 ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
-              <div className="font-bold flex items-center">{daysLeft(cnDeadline, now) < 60 && <AlertTriangle className="w-3.5 h-3.5 mr-1" />}s.34(2) deadline: {date(cnDeadline)}</div>
-              <div>{daysLeft(cnDeadline, now)} days left, or the annual return date if earlier.</div>
-            </div>
-          )}
-          {waitingOwner && <div className="p-2.5 rounded-lg border bg-rose-50 border-rose-200 text-[11px] text-rose-900 flex items-start"><Lock className="w-3.5 h-3.5 mr-1 mt-0.5 shrink-0" /><span><strong>Waiting for the owner's sign-off:</strong> a loss of {inr(-diffValue(d), 0)} is above the {inr(state.settings.writeOffLimit, 0)} limit.</span></div>}
-          {blocker && !waitingOwner && <div className="p-2.5 rounded-lg border bg-amber-50 border-amber-200 text-[11px] text-amber-900"><strong>Approve {blocker.id} ({DRAFT_LABEL[blocker.type].toLowerCase()}) first</strong>, or select both: the journal must go into Tally before this count, or the shelf ends up wrong.</div>}
-
-          {d.status === 'pending' && !rejecting && (
-            <div className="grid grid-cols-2 gap-2">
-              <button id={`btn-approve-${d.id}`} disabled={waitingOwner || !!blocker} onClick={() => dispatch({ type: 'APPROVE_DRAFT', draftId: d.id, actor: 'Accountant' })} className="py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg font-bold text-xs flex items-center justify-center space-x-1 cursor-pointer shadow-2xs"><CheckCircle2 className="w-3.5 h-3.5" /><span>{d.type === 'purchase' ? 'Mark entered' : 'Approve'}</span></button>
-              <button id={`btn-reject-${d.id}`} onClick={() => setRejecting(true)} className="py-2.5 bg-white border border-rose-300 text-rose-700 hover:bg-rose-50 rounded-lg font-bold text-xs flex items-center justify-center space-x-1 cursor-pointer"><XCircle className="w-3.5 h-3.5" /><span>Reject</span></button>
-            </div>
-          )}
-          {d.status === 'pending' && rejecting && (
-            <div className="space-y-2">
-              <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder="Why? (required, the owner will see this)" className="w-full text-[11px] p-2 rounded-lg border border-slate-300" />
-              <div className="grid grid-cols-2 gap-2">
-                <button onClick={() => setRejecting(false)} className="py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold cursor-pointer">Cancel</button>
-                <button disabled={!note.trim()} onClick={() => dispatch({ type: 'REJECT_DRAFT', draftId: d.id, note, actor: 'Accountant' })} className="py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white rounded-lg text-xs font-bold cursor-pointer">Confirm reject</button>
-              </div>
-            </div>
-          )}
-          {d.status === 'approved' && (
-            <div className="space-y-2">
-              <div className="text-[11px] text-emerald-800">{d.type === 'purchase' ? 'Marked entered' : 'Approved'} by {d.approvedBy}, {dateTime(d.approvedAt)}.{exportable(d) ? ' Import into Tally; Tally assigns the number.' : ''}</div>
-              {exportable(d) && <button onClick={() => download(`${d.id}-${d.type}.xml`, voucherXml(d))} className="w-full py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg font-bold text-xs flex items-center justify-center space-x-1 cursor-pointer"><Download className="w-3.5 h-3.5" /><span>Download Tally XML</span></button>}
-            </div>
-          )}
+          {d.moves && <div className="text-slate-700 space-y-0.5">{d.moves.map((m: any, i: number) => <div key={i}>{m.qty} {item(m.item).unit} {item(m.item).name}: <span className="text-slate-500">{m.from} → {m.to}</span></div>)}</div>}
+          {d.lines && <div className="text-slate-700 space-y-0.5">{d.lines.map((l: any, i: number) => <div key={i}>{l.qty} {item(l.item).unit} {item(l.item).name} @ {inr(l.rate, 0)} {d.type !== 'receipt_note' && <span className="text-slate-400">+{l.gst}% GST</span>}</div>)}</div>}
+          <div className="text-slate-500 italic">{d.narration}</div>
+          {d.status === 'rejected' && <div className="text-rose-700 font-semibold">Rejected: {d.rejectNote} ({dateTime(d.rejectedAt)})</div>}
+          {d.status === 'approved' && <div className="text-emerald-700 font-semibold">Approved {dateTime(d.approvedAt)}{d.exportedAt ? ` · downloaded for Tally ${dateTime(d.exportedAt)}` : ' · not downloaded yet'}</div>}
+        </div>
+        <div className="text-right shrink-0 space-y-1">
+          {amount != null && <div className="font-bold text-slate-900">{inr(amount)}</div>}
+          <button onClick={() => download(`${d.id}-${d.type}.xml`, voucherXml(d))} className="text-[11px] font-bold text-slate-600 flex items-center cursor-pointer ml-auto"><FileCode className="w-3.5 h-3.5 mr-0.5" />XML</button>
         </div>
       </div>
+      {selectable && (rejecting ? (
+        <div className="flex gap-2">
+          <input id={`reject-why-${d.id}`} autoFocus value={why} onChange={(e) => setWhy(e.target.value)} placeholder="Reason" className="flex-1 min-w-0 p-2 rounded border border-slate-300" />
+          <button id={`reject-ok-${d.id}`} disabled={!why.trim()} onClick={() => dispatch({ type: 'REJECT_DRAFT', id: d.id, note: why, actor: 'Accountant' })} className="px-3 rounded-md bg-rose-600 disabled:opacity-40 text-white font-bold cursor-pointer">Reject</button>
+          <button onClick={() => setRejecting(false)} className="px-2 rounded-md border border-slate-300 cursor-pointer"><X className="w-3.5 h-3.5" /></button>
+        </div>
+      ) : <button id={`reject-${d.id}`} onClick={() => setRejecting(true)} className="text-[11px] font-bold text-rose-700 cursor-pointer">Reject…</button>)}
     </div>
   );
 }

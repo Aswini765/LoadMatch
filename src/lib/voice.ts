@@ -1,16 +1,19 @@
-// Voice input for the picker's phone: speech recognition with visible errors, and a parser that
+// Voice input for the receiver's phone: speech recognition with visible errors, and a parser that
 // understands numbers and commands in English, Hindi and Kannada (digits in any script, or number words).
 import { useCallback, useRef, useState } from 'react';
 
-const SPEECH: Record<string, string> = { en: 'en-IN', hi: 'hi-IN', kn: 'kn-IN' };
+const SPEECH: Record<string, string> = { en: 'en-IN', hi: 'hi-IN', kn: 'kn-IN', te: 'te-IN' };
 
 export const speechSupported = () =>
   typeof window !== 'undefined' && Boolean((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
 
 // ---------- numbers ----------
-// Devanagari ०-९ and Kannada ೦-೯ digits -> 0-9
+// Devanagari, Telugu and Kannada digits -> 0-9
 export function normalizeDigits(s: string) {
-  return s.replace(/[०-९]/g, (d) => String(d.charCodeAt(0) - 0x0966)).replace(/[೦-೯]/g, (d) => String(d.charCodeAt(0) - 0x0CE6));
+  return s
+    .replace(/[\u0966-\u096F]/g, (d) => String(d.charCodeAt(0) - 0x0966))
+    .replace(/[\u0C66-\u0C6F]/g, (d) => String(d.charCodeAt(0) - 0x0C66))
+    .replace(/[\u0CE6-\u0CEF]/g, (d) => String(d.charCodeAt(0) - 0x0CE6));
 }
 
 const HI = 'शून्य एक दो तीन चार पाँच छह सात आठ नौ दस ग्यारह बारह तेरह चौदह पंद्रह सोलह सत्रह अठारह उन्नीस बीस इक्कीस बाईस तेईस चौबीस पच्चीस छब्बीस सत्ताईस अट्ठाईस उनतीस तीस इकतीस बत्तीस तैंतीस चौंतीस पैंतीस छत्तीस सैंतीस अड़तीस उनतालीस चालीस इकतालीस बयालीस तैंतालीस चवालीस पैंतालीस छियालीस सैंतालीस अड़तालीस उनचास पचास इक्यावन बावन तिरपन चौवन पचपन छप्पन सत्तावन अट्ठावन उनसठ साठ इकसठ बासठ तिरसठ चौंसठ पैंसठ छियासठ सड़सठ अड़सठ उनहत्तर सत्तर इकहत्तर बहत्तर तिहत्तर चौहत्तर पचहत्तर छिहत्तर सतहत्तर अठहत्तर उन्यासी अस्सी इक्यासी बयासी तिरासी चौरासी पचासी छियासी सत्तासी अट्ठासी नवासी नब्बे इक्यानवे बानवे तिरानवे चौरानवे पंचानवे छियानवे सत्तानवे अट्ठानवे निन्यानवे सौ'.split(' ');
@@ -22,7 +25,8 @@ const KN_TENS: Record<string, number> = { 'ಇಪ್ಪತ್ತು': 20, 'ಮ�
 // Kannada fuses tens and units ("ಇಪ್ಪತ್ತೈದು" = 25): the units' fused endings after a tens stem
 const KN_FUSED: Record<string, number> = { 'ಒಂದು': 1, 'ೆರಡು': 2, 'ಮೂರು': 3, 'ನಾಲ್ಕು': 4, 'ೈದು': 5, 'ಾರು': 6, 'ೇಳು': 7, 'ೆಂಟು': 8, 'ೊಂಬತ್ತು': 9, 'ೊಂದು': 1 };
 
-const WORDS: Record<string, number> = { ...Object.fromEntries(HI.map((w, i) => [w, i])), ...HI_EXTRA, ...Object.fromEntries(EN_UNITS.map((w, i) => [w, i])), ...EN_TENS, hundred: 100, ...KN_UNITS, ...KN_TENS };
+const TE: Record<string, number> = { 'సున్నా': 0, 'ఒకటి': 1, 'రెండు': 2, 'మూడు': 3, 'నాలుగు': 4, 'ఐదు': 5, 'ఆరు': 6, 'ఏడు': 7, 'ఎనిమిది': 8, 'తొమ్మిది': 9, 'పది': 10, 'ఇరవై': 20, 'ముప్పై': 30, 'నలభై': 40, 'యాభై': 50, 'అరవై': 60, 'డెబ్బై': 70, 'ఎనభై': 80, 'తొంభై': 90, 'వంద': 100, 'okati': 1, 'rendu': 2, 'moodu': 3, 'naalugu': 4, 'padi': 10, 'vanda': 100 };
+const WORDS: Record<string, number> = { ...TE, ...Object.fromEntries(HI.map((w, i) => [w, i])), ...HI_EXTRA, ...Object.fromEntries(EN_UNITS.map((w, i) => [w, i])), ...EN_TENS, hundred: 100, ...KN_UNITS, ...KN_TENS };
 
 function kannadaFused(tok: string) {
   for (const [w, tens] of Object.entries(KN_TENS)) {
@@ -57,21 +61,21 @@ export function findNumber(text: string): number | null {
 
 // ---------- commands ----------
 const has = (s: string, re: RegExp) => re.test(s);
-const NEG = /not here|nahi|nahin|नहीं|ನಹಿ|ಇಲ್ಲ|illa|missing/;
+const NEG = /not here|nahi|nahin|नहीं|ನಹಿ|ಇಲ್ಲ|illa|లేదు|ledu|missing/;
 
 export type VoiceParse = { qty: number | null; reason: string | null; found: boolean; notHere: boolean; send: boolean; owner: boolean; text: string };
 
 export function parseVoice(text: string): VoiceParse {
   const s = text.toLowerCase();
   let reason: string | null = null;
-  if (has(s, /damag|broken|खराब|टूट|ಹಾಳ|kharab|haala/)) reason = 'damaged';
+  if (has(s, /damag|broken|खराब|टूट|ಹಾಳ|పాడై|విరిగ|kharab|haala/)) reason = 'damaged';
   else if (has(s, /wrong|गलत|ತಪ್ಪು|galat|tappu/)) reason = 'wrong_item';
   else if (has(s, /fewer|less|short|not found|not on|missing|कम|नहीं मिला|नहीं है|ಕಡಿಮೆ|ಸಿಗಲಿಲ್ಲ|ಇಲ್ಲ|kam|kadime|nahi mila|sigalilla/)) reason = 'not_found';
   const notHere = has(s, NEG);
   const found = !notHere && has(s, /found|here|got|yes|mila|मिला|मिले|मिल गया|हाँ|हां|ಸಿಕ್ಕ|ಇದೆ|ಹೌದು|sikkide|haan/);
   return {
     qty: findNumber(s), reason, found, notHere, text,
-    send: has(s, /send|submit|report|save|भेज|सेव|ಕಳುಹಿಸ|ಉಳಿಸ|bhej|kalisi/),
+    send: has(s, /send|submit|report|save|भेज|सेव|ಕಳುಹಿಸ|ಉಳಿಸ|పంపు|సేవ్|bhej|kalisi|pampu/),
     owner: has(s, /owner|boss|malik|मालिक|सेठ|ಮಾಲೀಕ|maalika/),
   };
 }
@@ -86,7 +90,7 @@ const ERRORS: Record<string, string> = {
   'language-not-supported': 'lang_fallback',
 };
 
-// One utterance at a time. Tries the picker's language first; if the phone cannot recognise it
+// One utterance at a time. Tries the screen's language first; if the phone cannot recognise it
 // (common for Kannada), it retries in Indian English and says so.
 export function useVoice(lang: string, onText: (alternatives: string[]) => void) {
   const [listening, setListening] = useState(false);

@@ -1,107 +1,64 @@
-# StockTrace v2.2 — Short-Supply Resolution for SME distributors on Tally
+# LoadMatch — dispatch and receipt matching for small businesses
 
-StockTrace helps a small distributor resolve an order that cannot ship in full, end to end: the picker reports the short, a quick search checks only places that have a Tally record behind them, the owner decides what happens to the order, StockTrace drafts the credit note / invoice / stock entries for the accountant to approve, the customer gets a message, and a recount stops the same gap recurring.
+LoadMatch checks what was loaded onto a truck against what arrived at the other end. It covers trucks between a business's own units, deliveries to customers and deliveries from suppliers. Everyone uses a phone and WhatsApp links. Only the differences reach the owner, and the accountant gets Tally entries ready to approve.
 
-v2 follows the requirements doc "StockTrace — Requirements & End-to-End Flow (v2)" and keeps the v1 visual design (same header, cards, picker phone layout, console tables). It uses the same stack as AeroDAG: React 19, TypeScript, Vite, Tailwind CSS 4, and an Express server for Render.
+It came out of a factory visit: two units with the same GSTIN, a handwritten dispatch list, counting done by hand at the other end, the owner chasing differences on the phone and CCTV checked only after an argument.
 
-**Trust principle:** StockTrace drafts. People decide and approve. Nothing reaches Tally until the accountant approves it, and no location is ever suggested without a record.
+## How it works
 
----
-
-## What changed in v2.2 (after a full role-by-role test)
-
-- **Goods match the paperwork:** a substitute or bought-in stock becomes a pick task on the picker's phone, and there's a pack list. The truck is held until any new invoice is approved, and the packer marks the order dispatched. After dispatch, every correction is a credit note.
-- **Stock losses are controlled:** losses above the owner's limit (default ₹2,000) need the owner's sign-off. "Found on another shelf" becomes a transfer, not a write-off. Damaged units set aside are excluded from the recount. Stock journals must be imported before the count for the same shelf. A place that should have had stock but didn't gets its own recount.
-- **Picker:** quantities default from the record, and the picker can undo a short report. Picking needs a confirm. Units are shown. Hints are in Hindi and Kannada too. Returned goods come last, with a condition warning. Orders are sorted by truck time. Reset has moved to Settings, behind a confirmation.
-- **Owner:** each option shows its own bill impact. A part substitute must say what happens to the rest, and the substitute's price goes into the customer message. Arranged stock records the buying price and margin and drafts a purchase entry. Shipped orders only offer options that still apply.
-- **Accountant:** the IRN deadline is shown with its date and time left, and trucks waiting for an invoice come first. Purchase entries are marked as entered. The Tally XML carries godowns and downloads in import order.
-- **Reports:** sales lost vs recovered, and write-offs including those waiting for approval. Settings changes are logged.
-- **Demo data** is timed relative to the reset, so deadlines are always realistic.
-
-## Capabilities & Implementation Status
-
-v2.1 reworks the flow around how each role actually works: the picker is on a phone, the owner decides per order, the accountant works in a daily batch, and Tally owns voucher numbering.
-
-| Feature | Status | Details |
+| Who | Where | What they do |
 |---|---|---|
-| Picker on the phone: report shorts only, then "Order picked" | **Working** | Lines not marked short count as fully picked; stock is deducted at "Order picked" (SAP EWM-style pick denial, not per-line confirmation). |
-| English · हिंदी · ಕನ್ನಡ, read-aloud, voice input | **Working (prototype)** | Uses the phone's speech engine where available; taps always work. |
-| Cited quick search | **Working** | Only places with a record: today's purchase receipts (goods not yet shelved), Tally stock summary, stock journals in the last 14 days. No record → straight to the owner. Time limit, then auto-escalation. |
-| Owner: one decision per order | **Working** | All short lines decided together: partial, backorder, substitute (from a mapped alternative with stock), source elsewhere, cancel line. Records what the customer agreed to. One customer message per order. |
-| Correct bill fix (GST) | **Working** | No invoice yet → invoice what ships. E-invoice under 24 h → cancel IRN and re-issue (cancel e-way bill first). Over 24 h → credit note. Not on e-invoicing → cancel and re-issue (confirm with CA). |
-| Accountant daily batch | **Working** | Select and approve together; time-bound IRN cancellations first; step list per draft; s.34(2) deadline; reject with reason returns the order to the owner and reverses substitute stock. |
-| Tally XML | **Draft** | No voucher numbers in the XML: Tally assigns them on import. Ledger names must match your company: test on a sample company first. |
-| Recount by the godown in-charge | **Working** | Starts after the order is picked; one recount per shelf even with several shorts; root cause required; a difference becomes a Physical Stock draft. |
-| Reports | **Working** | Shorts per 1,000 lines, value, credit notes vs re-issues, write-offs, recount causes, open backorders, CSV log. |
-| Shared data across phones (Supabase) | **Working, needs setup** | Append-only event log, replayed the same way on every device; offline outbox; live updates. Without setup, data stays in one browser (header shows "This device only"). |
-| Live TallyPrime connector | **Not built** | Items, stock, orders and invoices are **sample data** in `src/data/seed.ts`. |
-| WhatsApp Business API | **Not built** | Share link only. |
+| Dispatch staff | Phone | Type the list or paste it from Excel. Tap *Loading started* / *Loading finished* (with the dock or gate) and send the receiver a WhatsApp link when the truck leaves. At the gate, enter a supplier's bill and count what arrived. |
+| Receiver | WhatsApp link, no login | Counts each line **without seeing the sent quantity**, marks damaged units, adds photos and submits once. The count locks. English, हिंदी, ಕನ್ನಡ, తెలుగు, with the option to speak a number. |
+| Owner | Phone or laptop | Sees only short, excess or damaged lines, with their value. Decides each one from options that fit the flow, sets due dates for promises, and must tick to confirm losses above their limit. Attaches the CCTV clip (the loading time window says where to look) and shares an evidence pack on purpose. |
+| Accountant | Laptop | Approves ready entries or rejects them with a reason (a rejected decision returns to the owner). Downloads one Tally XML file in import order. |
 
-### Turning on shared data
+### Owner options by flow
 
-1. In Supabase → SQL editor, run `supabase/migrations/20261112_stocktrace_events.sql`.
-2. In Render → the StockTrace static site → Environment, add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (Project Settings → API). Optionally `VITE_STOCKTRACE_WORKSPACE`.
-3. Redeploy (Vite reads these at build time). The header chip changes to "Shared • live".
+| | Short | Damaged | Excess |
+|---|---|---|---|
+| **Between own units** | Write off as transit loss · Investigate | Write off · Investigate | Loading list was wrong: record as sent · Investigate |
+| **From a supplier** | Replacement (due date) · Debit note · Accept · Investigate | same | Keep and get billed · Return (due date) · Investigate |
+| **To a customer** | Send the rest (due date) · Credit note · Investigate | Send replacements (due date) · Credit note · Investigate | Bill the extra · Customer returns (due date) · Investigate |
 
-The included row-level-security policy lets anyone with the anon key read and append to the `demo` workspace. That is fine for a demo, not for real customer data: add Supabase Auth and per-company policies first.
+### Tally entries prepared
 
-All company names, GSTINs, item rates and GST rates are fictional demo values.
+- **Between units (same GSTIN):** a Stock Journal from the sending unit to *Goods in Transit* when the truck leaves. On receipt, good units go from *Goods in Transit* to the receiving unit, and damaged units go to *Damaged Goods*. A write-off moves them to *Transit Loss*.
+- **From a supplier:** a Receipt Note for the good units counted, plus a Debit Note if the owner chooses one.
+- **To a customer:** a Credit Note or a Sales invoice for the extra, with GST split CGST+SGST or IGST by the customer's state.
+- No voucher numbers are set, because Tally numbers vouchers itself. Ledger and godown names must match the company's own Tally masters, so import into a test company first.
 
----
+## Built on open standards
 
-## Run locally
+LoadMatch keeps an append-only event log (who did what, when, on which truck) in JSON. It runs in the phone's browser, shares by plain links, and exports Tally XML and CSV. That keeps it cheap and easy to connect to later (scales, barcode or RFID readers, an ERP). It does **not** claim conformance with any Industry 4.0 standard.
+
+## Run it
 
 ```bash
 npm install
-npm run dev          # http://localhost:3000 (Vite dev server)
-npm run test:unit    # end-to-end flow tests through the real reducer
-npm run lint         # TypeScript type check
+npm run dev      # http://localhost:3000
+npm test         # rule tests
+npm run build    # production build in dist/
 ```
 
-Production mode (what Render runs):
+Without Supabase settings, data stays in the browser on that device. To share data across phones:
 
-```bash
-npm run build
-npm start            # Express serves dist/ on $PORT, health check at /health
-```
+1. In Supabase, run `supabase/migrations/20261118_loadmatch_events.sql` (SQL Editor → New query → Run).
+2. Set `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` and optionally `VITE_LOADMATCH_WORKSPACE` in the hosting environment, then rebuild.
 
-`npm run build:single` produces `dist-single/index.html`, one self-contained file for sharing a preview.
+The demo policy lets anyone with the public key read and add events for the `demo` workspace. Before real data goes in, add sign-in and a policy for each business, and check receiver tokens on the server.
 
-## Deploy on Render
+## Stack
 
-`render.yaml` is included. Either use it as a Blueprint, or create a **Web Service** with:
+React 19, TypeScript, Vite, Tailwind CSS 4, lucide-react, optional Supabase (Postgres + realtime), and an Express static server for Render.
 
-- Build command: `npm install && npm run build`
-- Start command: `npm start`
-- Health check path: `/health`
-- Node 22.12 or later
+## Demo data
 
-To replace the current `stocktrace-i150` service, point that service at this repository and use the same commands.
+Kaveri Wood Products, Mysuru: a plywood unit in Mysuru and a box unit in Bengaluru, two timber suppliers and two customers (one in Tamil Nadu, for IGST). The demo opens with 12 matched trucks plus:
 
-## Demo walkthrough (the professor's example)
+- a transfer with 2 damaged and 5 short,
+- a supplier delivery 10 short, with a replacement promised,
+- a customer delivery 3 over,
+- one truck in transit and one still loading.
 
-1. **Picker** (phone) → ORD-1031 → LED Bulb *Short*: found 2 of 100, reason *Not found*.
-2. StockTrace lists places with a record: Receiving Area (purchase PUR-0388 received today, not yet shelved) and Back Store (stock summary + stock journal). Check them, or *Send to owner now*. Back to the order → *Order picked: send to packing*.
-3. **Owner** → ORD-1031 → *Ship partial*, customer *agreed* → confirm. Because INV-2611's e-invoice is under 24 hours old, the fix is: cancel the IRN and re-issue for what ships, no credit note. Share the WhatsApp message.
-4. **Accountant** → the re-issue draft is at the top with its deadline and steps → *Approve selected* → download Tally XML.
-5. **Picker → Godown in-charge** → recount Main Godown / R2-B, then record why the book was wrong. A difference becomes a Physical Stock draft.
-6. **Reports** → the case appears in the log with its order status and cause; export CSV for the CA.
-
-Use *Reset* on the Picker screen to restore the demo data.
-
-## Project structure
-
-```
-server.ts                 Express: security headers, /health, static dist with SPA fallback
-src/data/seed.ts          Sample Tally data (items, godowns, stock, stock journals, parties, orders)
-src/core.ts               Reducer (every action of the flow), selectors, correction route
-src/store.tsx             React provider: event replay, dispatch, escalation timer
-src/sync.ts               Supabase event log + offline outbox (or this-device storage)
-supabase/migrations/      Event table, demo RLS policy, realtime
-src/lib/search.ts         Cited quick-search suggestions
-src/lib/tax.ts            GST split, s.34(2) deadline
-src/lib/tally.ts          Tally XML for approved drafts (no voucher numbers)
-src/i18n.ts               Picker strings in English, Hindi, Kannada; voice parser
-src/views/                Home, Picker, Owner, Accountant, Reports, SOP and Settings modals
-tests/flow.test.ts        24 end-to-end flow tests
-```
+All times are relative to the moment the demo is reset.

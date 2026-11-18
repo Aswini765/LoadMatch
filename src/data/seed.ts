@@ -1,143 +1,127 @@
-// Demo data standing in for what StockTrace would read from TallyPrime
-// (items, godowns and sub-godowns used as shelves, book stock, stock journals,
-// recent purchases, parties, orders, invoices). All names, GSTINs and rates are fictional.
-//
-// Times are relative to the moment the demo was (re)set, so the story is always consistent:
-// one e-invoice is 30 minutes old, another is close to its 24-hour cancellation limit, and so on.
+// Demo data for LoadMatch. All company, party and vehicle names are fictional.
+// Times are relative to the moment the demo was (re)set, so the story always reads as "today".
 
 export const COMPANY = {
-  name: 'Kaveri Electricals',
+  name: 'Kaveri Wood Products',
   city: 'Mysuru',
   state: 'Karnataka',
   gstin: '29AAAAA0000A1Z5',
 };
 
+// Units of the same company (one GSTIN). Each is a godown in Tally.
+export const UNITS: Record<string, { id: string; name: string; godown: string }> = {
+  MYS: { id: 'MYS', name: 'Mysuru unit (plywood)', godown: 'Mysuru Unit' },
+  BLR: { id: 'BLR', name: 'Bengaluru unit (boxes)', godown: 'Bengaluru Unit' },
+};
+// Tally godowns used for goods between units, damaged goods and losses
+export const GODOWNS = { transit: 'Goods in Transit', damaged: 'Damaged Goods', loss: 'Transit Loss' };
+
 export type Item = { code: string; name: string; unit: string; hsn: string; rate: number; gst: number };
-
 export const ITEMS: Record<string, Item> = {
-  'EL-901': { code: 'EL-901', name: 'LED Bulb 9W (box of 10)', unit: 'box', hsn: '8539', rate: 650, gst: 18 },
-  'EL-902': { code: 'EL-902', name: 'LED Bulb 10W (box of 10)', unit: 'box', hsn: '8539', rate: 690, gst: 18 },
-  'EL-214': { code: 'EL-214', name: 'Modular Switch 6A', unit: 'pc', hsn: '8536', rate: 38, gst: 18 },
-  'EL-215': { code: 'EL-215', name: 'Modular Switch 6A (alt. brand)', unit: 'pc', hsn: '8536', rate: 36, gst: 18 },
-  'EL-330': { code: 'EL-330', name: 'MCB 32A Single Pole', unit: 'pc', hsn: '8536', rate: 210, gst: 18 },
-  'EL-512': { code: 'EL-512', name: 'FR Wire 1.5 sq mm, 90 m coil', unit: 'coil', hsn: '8544', rate: 1450, gst: 18 },
-  'EL-707': { code: 'EL-707', name: 'Ceiling Fan Regulator', unit: 'pc', hsn: '8536', rate: 320, gst: 18 },
-  'EL-118': { code: 'EL-118', name: 'Extension Board, 4 socket', unit: 'pc', hsn: '8536', rate: 275, gst: 18 },
+  'OKU-AB-91': { code: 'OKU-AB-91', name: 'Face veneer Okoume AB, 91 × 45.5 × 6 mm', unit: 'pcs', hsn: '4408', rate: 85, gst: 18 },
+  'OKU-DG-90': { code: 'OKU-DG-90', name: 'Face veneer Okoume D/G, 90 × 48 × 15 mm', unit: 'pcs', hsn: '4408', rate: 120, gst: 18 },
+  'BRP-1148': { code: 'BRP-1148', name: 'Face veneer Barpas, 1148 × 452 × 6 mm', unit: 'pcs', hsn: '4408', rate: 140, gst: 18 },
+  'BRP-1136': { code: 'BRP-1136', name: 'Face veneer Barpas, 1136 × 452 × 6 mm', unit: 'pcs', hsn: '4408', rate: 138, gst: 18 },
+  'PLY-12': { code: 'PLY-12', name: 'Plywood 12 mm, 8 × 4 ft', unit: 'pcs', hsn: '4412', rate: 1450, gst: 18 },
+  'PLY-18': { code: 'PLY-18', name: 'Plywood 18 mm, 8 × 4 ft', unit: 'pcs', hsn: '4412', rate: 2050, gst: 18 },
+  'BOX-RB': { code: 'BOX-RB', name: 'RB box, nailed, 600 × 400 × 400 mm', unit: 'pcs', hsn: '4415', rate: 380, gst: 18 },
+  'BOX-NL': { code: 'BOX-NL', name: 'Nail-less box, 800 × 600 × 500 mm', unit: 'pcs', hsn: '4415', rate: 420, gst: 18 },
+  'LOG-RW': { code: 'LOG-RW', name: 'Rubberwood logs, bundle', unit: 'bundles', hsn: '4403', rate: 2400, gst: 18 },
+  'LOG-SIL': { code: 'LOG-SIL', name: 'Silver oak logs, bundle', unit: 'bundles', hsn: '4403', rate: 2100, gst: 18 },
 };
 
-// Items the owner may offer instead (set up by the owner once; shown only when in stock)
-export const SUBSTITUTES: Record<string, string[]> = {
-  'EL-901': ['EL-902'],
-  'EL-214': ['EL-215'],
+export const PARTIES: Record<string, { id: string; name: string; kind: 'supplier' | 'customer'; city: string; state: string; gstin: string }> = {
+  lakshmi: { id: 'lakshmi', name: 'Sri Lakshmi Timbers', kind: 'supplier', city: 'Hunsur', state: 'Karnataka', gstin: '29BBBBB1111B1Z2' },
+  coastal: { id: 'coastal', name: 'Coastal Veneers', kind: 'supplier', city: 'Mangaluru', state: 'Karnataka', gstin: '29CCCCC2222C1Z9' },
+  deccan: { id: 'deccan', name: 'Deccan Pumps Ltd', kind: 'customer', city: 'Hosur', state: 'Tamil Nadu', gstin: '33DDDDD3333D1Z4' },
+  sunrise: { id: 'sunrise', name: 'Sunrise Ceramics', kind: 'customer', city: 'Bengaluru', state: 'Karnataka', gstin: '29EEEEE4444E1Z7' },
 };
 
-export const PARTIES = {
-  sharma: { id: 'sharma', name: 'Sharma Traders', city: 'Mysuru', state: 'Karnataka', gstin: '29BBBBB1111B1Z2' },
-  vinayaka: { id: 'vinayaka', name: 'Vinayaka Electricals', city: 'Mandya', state: 'Karnataka', gstin: '29CCCCC2222C1Z9' },
-  coastal: { id: 'coastal', name: 'Coastal Agencies', city: 'Kasaragod', state: 'Kerala', gstin: '32DDDDD3333D1Z4' },
-};
+export const LOADING_POINTS = ['Dock 1', 'Dock 2', 'Gate'];
 
-// Godowns where returned goods sit until someone checks their condition
-export const RETURNS_GODOWNS = ['Returns Area'];
+const H = 3600000, M = 60000, D = 24 * H;
 
-// Book stock per godown / shelf (Tally sub-godowns), as Tally's stock summary would show it
-export const STOCK = [
-  { item: 'EL-901', godown: 'Main Godown', shelf: 'R2-B', qty: 140 },
-  { item: 'EL-901', godown: 'Back Store', shelf: 'BS-1', qty: 12 },
-  { item: 'EL-901', godown: 'Receiving Area', shelf: 'RCV', qty: 6 },
-  { item: 'EL-902', godown: 'Main Godown', shelf: 'R2-C', qty: 30 },
-  { item: 'EL-214', godown: 'Main Godown', shelf: 'R1-A', qty: 300 },
-  { item: 'EL-215', godown: 'Main Godown', shelf: 'R1-B', qty: 80 },
-  { item: 'EL-330', godown: 'Main Godown', shelf: 'R3-C', qty: 40 },
-  { item: 'EL-330', godown: 'Back Store', shelf: 'BS-2', qty: 10 },
-  { item: 'EL-330', godown: 'Returns Area', shelf: 'RT-1', qty: 5 },
-  { item: 'EL-512', godown: 'Main Godown', shelf: 'R4-A', qty: 18 },
-  { item: 'EL-707', godown: 'Main Godown', shelf: 'R5-B', qty: 25 },
-  { item: 'EL-707', godown: 'Returns Area', shelf: 'RT-1', qty: 3 },
-  { item: 'EL-118', godown: 'Main Godown', shelf: 'R1-D', qty: 30 },
-  { item: 'EL-118', godown: 'Back Store', shelf: 'BS-3', qty: 6 },
-];
-
-// Every godown / shelf the in-charge can name when stock turns up on the wrong shelf
-export const LOCATIONS = [...new Set([...STOCK.map((s) => `${s.godown} / ${s.shelf}`), 'Main Godown / R1-C', 'Main Godown / R2-A', 'Back Store / BS-4'])].sort();
-
-const H = 3600000, M = 60000;
-
+// Seed events, replayed through the same reducer as live actions, so their numbers obey the same rules.
 export function makeSeed(anchor: number) {
-  const at = (h: number, m = 0) => anchor + h * H + m * M; // hours / minutes relative to the reset
-  const slot = (h: number) => Math.round((anchor + h * H) / (30 * M)) * 30 * M; // truck times on the half hour
+  const at = (h: number, m = 0) => anchor + h * H + m * M;
+  const ev: any[] = [];
+  const tok = (n: number) => `demo${n}k`;
 
-  // Recent stock journals (transfers) recorded in Tally
-  const MOVEMENTS = [
-    { no: 'SJ-0412', at: at(-96), item: 'EL-901', qty: 4, from: 'Main Godown / R2-B', to: 'Back Store / BS-1' },
-    { no: 'SJ-0418', at: at(-48), item: 'EL-330', qty: 5, from: 'Main Godown / R3-C', to: 'Returns Area / RT-1' },
-    { no: 'SJ-0421', at: at(-20), item: 'EL-118', qty: 6, from: 'Main Godown / R1-D', to: 'Back Store / BS-3' },
+  // A month of routine transfers and deliveries that matched (for the reports)
+  const routine = [
+    { d: 28, flow: 'transfer', lines: [['OKU-AB-91', 180], ['BRP-1148', 210]] },
+    { d: 26, flow: 'outbound', party: 'sunrise', lines: [['BOX-RB', 300]] },
+    { d: 24, flow: 'inbound', party: 'coastal', lines: [['OKU-AB-91', 400]] },
+    { d: 21, flow: 'transfer', lines: [['OKU-DG-90', 150], ['BRP-1136', 190]] },
+    { d: 19, flow: 'outbound', party: 'deccan', lines: [['BOX-NL', 120]] },
+    { d: 17, flow: 'transfer', lines: [['PLY-12', 60], ['PLY-18', 40]] },
+    { d: 14, flow: 'inbound', party: 'lakshmi', lines: [['LOG-RW', 40]] },
+    { d: 12, flow: 'transfer', lines: [['OKU-AB-91', 220], ['BRP-1148', 200]] },
+    { d: 10, flow: 'outbound', party: 'sunrise', lines: [['BOX-RB', 250]] },
+    { d: 7, flow: 'transfer', lines: [['OKU-DG-90', 120], ['PLY-12', 50]] },
+    { d: 5, flow: 'inbound', party: 'coastal', lines: [['BRP-1136', 300]] },
+    { d: 3, flow: 'outbound', party: 'deccan', lines: [['BOX-NL', 90]] },
   ];
+  routine.forEach((r, i) => {
+    const t0 = anchor - r.d * D - 6 * H;
+    const id = `TRK-${String(1001 + i)}`;
+    const base: any = { type: 'CREATE_SHIPMENT', id, flow: r.flow, at: t0, actor: r.flow === 'inbound' ? 'Gate (Mysuru)' : 'Dispatch staff', lines: r.lines.map(([item, qty]) => ({ item, qty })) };
+    if (r.flow === 'transfer') Object.assign(base, { fromUnit: 'MYS', toUnit: 'BLR', truckNo: 'KA 09 B 4471', ref: `DC-${310 + i}` });
+    if (r.flow === 'outbound') Object.assign(base, { fromUnit: 'BLR', party: r.party, truckNo: 'KA 05 M 8812', ref: `INV-${2480 + i}` });
+    if (r.flow === 'inbound') Object.assign(base, { toUnit: 'MYS', party: r.party, truckNo: 'KA 12 T 0931', ref: `SB-${700 + i}` });
+    ev.push(base);
+    if (r.flow !== 'inbound') {
+      ev.push({ type: 'LOADING', id, point: 'Dock 1', phase: 'start', at: t0 + 20 * M, actor: 'Dispatch staff' });
+      ev.push({ type: 'LOADING', id, point: 'Dock 1', phase: 'end', at: t0 + 90 * M, actor: 'Dispatch staff' });
+    }
+    ev.push({ type: 'SEND_TO_RECEIVER', id, token: tok(i), at: t0 + 95 * M, actor: 'Dispatch staff' });
+    ev.push({ type: 'SUBMIT_RECEIPT', id, token: tok(i), by: r.flow === 'outbound' ? 'Customer stores' : 'Stores', lines: Object.fromEntries(r.lines.map(([, qty], j) => [`L${j + 1}`, { counted: qty, damaged: 0 }])), at: t0 + 9 * H, actor: 'Receiver' });
+  });
+  // The accountant has already approved those entries (transfers make two stock journals, supplier deliveries one receipt note)
+  const routineDrafts = routine.reduce((n, r) => n + (r.flow === 'transfer' ? 2 : r.flow === 'inbound' ? 1 : 0), 0);
+  const routineIds = Array.from({ length: routineDrafts }, (_, i) => `D-${String(i + 1).padStart(4, '0')}`);
+  ev.push({ type: 'APPROVE_DRAFTS', ids: routineIds, at: anchor - 2 * D, actor: 'Accountant' });
+  ev.push({ type: 'EXPORT_DRAFTS', ids: routineIds, at: anchor - 2 * D + 5 * M, actor: 'Accountant' });
 
-  // Purchases booked in Tally in the last few hours whose goods may still be in the receiving area
-  const PURCHASES = [
-    { no: 'PUR-0388', at: at(-1, -20), supplier: 'Bright Lamps Pvt Ltd', item: 'EL-901', qty: 6, to: 'Receiving Area / RCV' },
-  ];
+  // TRK-1013: last night's transfer, like the dispatch list from the field visit. 5 short, 2 damaged.
+  ev.push({ type: 'CREATE_SHIPMENT', id: 'TRK-1013', flow: 'transfer', fromUnit: 'MYS', toUnit: 'BLR', truckNo: 'KA 40 A 2541', ref: 'DC-0418', at: at(-12), actor: 'Dispatch staff',
+    lines: [{ item: 'OKU-DG-90', qty: 119 }, { item: 'OKU-AB-91', qty: 248 }, { item: 'BRP-1148', qty: 203 }, { item: 'BRP-1136', qty: 208 }] });
+  ev.push({ type: 'LOADING', id: 'TRK-1013', point: 'Dock 2', phase: 'start', at: at(-11, -20), actor: 'Dispatch staff' });
+  ev.push({ type: 'LOADING', id: 'TRK-1013', point: 'Dock 2', phase: 'end', at: at(-9, -5), actor: 'Dispatch staff' });
+  ev.push({ type: 'SEND_TO_RECEIVER', id: 'TRK-1013', token: 'demo13k', at: at(-9), actor: 'Dispatch staff' });
+  ev.push({ type: 'SUBMIT_RECEIPT', id: 'TRK-1013', token: 'demo13k', by: 'Ravi (Bengaluru stores)', at: at(-1, -30), actor: 'Receiver',
+    lines: { L1: { counted: 119, damaged: 0 }, L2: { counted: 248, damaged: 2 }, L3: { counted: 198, damaged: 0 }, L4: { counted: 208, damaged: 0 } },
+    photos: ['unloading-bay.jpg', 'damaged-okoume.jpg'], note: 'Two Okoume sheets cracked at the edges.' });
 
-  // invoice.irnAt: e-invoice (IRN) generated; invoice.ewayBill: e-way bill generated and still active
-  const ORDERS = [
-    {
-      id: 'ORD-1031', party: 'sharma', placedAt: at(0, -50), dispatchBy: slot(7),
-      invoice: { no: 'INV-2611', date: at(0, -30), irnAt: at(0, -29), ewayBill: null },
-      lines: [
-        { item: 'EL-901', qty: 100, godown: 'Main Godown', shelf: 'R2-B' },
-        { item: 'EL-214', qty: 50, godown: 'Main Godown', shelf: 'R1-A' },
-      ],
-    },
-    {
-      id: 'ORD-1032', party: 'vinayaka', placedAt: at(0, -15), dispatchBy: slot(8),
-      invoice: null,
-      lines: [
-        { item: 'EL-330', qty: 20, godown: 'Main Godown', shelf: 'R3-C' },
-        { item: 'EL-512', qty: 6, godown: 'Main Godown', shelf: 'R4-A' },
-      ],
-    },
-    {
-      // invoiced and e-invoiced yesterday: about 3.5 hours left to cancel the IRN
-      id: 'ORD-1033', party: 'coastal', placedAt: at(-21), dispatchBy: slot(3),
-      invoice: { no: 'INV-2612', date: at(-20, -35), irnAt: at(-20, -30), ewayBill: { no: 'EWB 1910 2233 4455', at: at(-20, -25) } },
-      lines: [
-        { item: 'EL-707', qty: 10, godown: 'Main Godown', shelf: 'R5-B' },
-        { item: 'EL-118', qty: 12, godown: 'Main Godown', shelf: 'R1-D' },
-      ],
-    },
-    // Earlier orders used by the scripted sample cases
-    {
-      // invoiced three days ago (past the 24-hour IRN window) and already dispatched
-      id: 'ORD-1027', party: 'coastal', placedAt: at(-77), dispatchBy: slot(-49),
-      invoice: { no: 'INV-2598', date: at(-76), irnAt: at(-76, 1), ewayBill: null },
-      lines: [{ item: 'EL-214', qty: 100, godown: 'Main Godown', shelf: 'R1-A' }],
-    },
-    {
-      id: 'ORD-1029', party: 'vinayaka', placedAt: at(-2), dispatchBy: slot(6),
-      invoice: null,
-      lines: [{ item: 'EL-118', qty: 12, godown: 'Main Godown', shelf: 'R1-D' }],
-    },
-  ];
+  // TRK-1014: supplier delivery yesterday: 100 billed, 90 arrived; owner asked for replacement in the next batch
+  ev.push({ type: 'CREATE_SHIPMENT', id: 'TRK-1014', flow: 'inbound', toUnit: 'MYS', party: 'lakshmi', truckNo: 'KA 45 C 7720', ref: 'SB-0951', at: at(-26), actor: 'Gate (Mysuru)', lines: [{ item: 'LOG-RW', qty: 100 }] });
+  ev.push({ type: 'SEND_TO_RECEIVER', id: 'TRK-1014', token: 'demo14k', at: at(-26), actor: 'Gate (Mysuru)' });
+  ev.push({ type: 'SUBMIT_RECEIPT', id: 'TRK-1014', token: 'demo14k', by: 'Gate (Mysuru)', at: at(-25, -30), actor: 'Receiver', lines: { L1: { counted: 90, damaged: 0 } } });
+  ev.push({ type: 'DECIDE', diffId: 'DIF-0003', action: 'replace', dueAt: at(48), note: 'Supplier will send 10 bundles with the next load.', at: at(-24), actor: 'Owner' });
 
-  // Scripted history so the Owner and Accountant screens are not empty on first open.
-  // It runs through the same reducer as live actions, so its numbers obey the same rules.
-  const SCRIPT = [
-    { type: 'REPORT_SHORT', orderId: 'ORD-1027', lineIdx: 0, found: 90, reason: 'not_found', at: at(-51), actor: 'Picker' },
-    { type: 'ORDER_PICKED', orderId: 'ORD-1027', at: at(-51, 8), actor: 'Picker' },
-    { type: 'DECIDE_ORDER', orderId: 'ORD-1027', lines: { 'CASE-0001': { outcome: 'partial' } }, customerChoice: 'agreed', note: 'Ravi at Coastal OK with 90 now', at: at(-51, 20), actor: 'Owner' },
-    { type: 'MESSAGE_SENT', orderId: 'ORD-1027', at: at(-51, 25), actor: 'Owner' },
-    { type: 'DISPATCHED', orderId: 'ORD-1027', at: at(-49, 10), actor: 'Packer' },
-    { type: 'REPORT_SHORT', orderId: 'ORD-1029', lineIdx: 0, found: 8, reason: 'damaged', at: at(0, -55), actor: 'Picker' },
-    { type: 'ORDER_PICKED', orderId: 'ORD-1029', at: at(0, -48), actor: 'Picker' },
-  ];
+  // TRK-1015: customer dispatch this morning, customer reports 3 extra boxes
+  ev.push({ type: 'CREATE_SHIPMENT', id: 'TRK-1015', flow: 'outbound', fromUnit: 'BLR', party: 'sunrise', truckNo: 'KA 05 M 8812', ref: 'INV-2519', at: at(-6), actor: 'Dispatch staff', lines: [{ item: 'BOX-RB', qty: 300 }] });
+  ev.push({ type: 'LOADING', id: 'TRK-1015', point: 'Dock 1', phase: 'start', at: at(-5, -40), actor: 'Dispatch staff' });
+  ev.push({ type: 'LOADING', id: 'TRK-1015', point: 'Dock 1', phase: 'end', at: at(-5, -5), actor: 'Dispatch staff' });
+  ev.push({ type: 'SEND_TO_RECEIVER', id: 'TRK-1015', token: 'demo15k', at: at(-5), actor: 'Dispatch staff' });
+  ev.push({ type: 'SUBMIT_RECEIPT', id: 'TRK-1015', token: 'demo15k', by: 'Sunrise stores', at: at(-2), actor: 'Receiver', lines: { L1: { counted: 303, damaged: 0 } } });
 
-  return { MOVEMENTS, PURCHASES, ORDERS, SCRIPT };
+  // TRK-1016: transfer that left 3 hours ago, still on the road
+  ev.push({ type: 'CREATE_SHIPMENT', id: 'TRK-1016', flow: 'transfer', fromUnit: 'MYS', toUnit: 'BLR', truckNo: 'KA 09 B 4471', ref: 'DC-0419', at: at(-4), actor: 'Dispatch staff', lines: [{ item: 'PLY-12', qty: 80 }, { item: 'PLY-18', qty: 45 }] });
+  ev.push({ type: 'LOADING', id: 'TRK-1016', point: 'Dock 1', phase: 'start', at: at(-3, -50), actor: 'Dispatch staff' });
+  ev.push({ type: 'LOADING', id: 'TRK-1016', point: 'Dock 1', phase: 'end', at: at(-3, -10), actor: 'Dispatch staff' });
+  ev.push({ type: 'SEND_TO_RECEIVER', id: 'TRK-1016', token: 'demo16k', at: at(-3), actor: 'Dispatch staff' });
+
+  // TRK-1017: customer dispatch being loaded now
+  ev.push({ type: 'CREATE_SHIPMENT', id: 'TRK-1017', flow: 'outbound', fromUnit: 'BLR', party: 'deccan', truckNo: 'TN 70 K 3390', ref: 'INV-2520', at: at(0, -30), actor: 'Dispatch staff', lines: [{ item: 'BOX-NL', qty: 150 }, { item: 'BOX-RB', qty: 60 }] });
+
+  return ev;
 }
 
 export const DEFAULT_SETTINGS = {
-  searchMinutes: 10,
-  eInvoicing: true,
-  writeOffLimit: 2000, // stock losses above this value need the owner's sign-off before the accountant can approve
-  languages: { en: true, hi: true, kn: true },
+  // losses above this value need an explicit confirmation from the owner
+  writeOffLimit: 5000,
+  // a truck not confirmed within this many hours shows as overdue
+  receiptHours: 24,
+  languages: { en: true, hi: true, kn: true, te: true },
 };

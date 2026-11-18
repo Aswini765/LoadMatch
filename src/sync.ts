@@ -1,18 +1,18 @@
 // Shared data across phones and laptops.
 //
 // Every user action is an event appended to one Supabase table. Each device replays the events,
-// in table order, through the same reducer, so the picker's phone, the owner's phone and the
-// accountant's laptop all compute the same state. If Supabase is not configured, the app runs in
+// in table order, through the same reducer, so the dispatch phone, the receiver's phone, the owner's
+// phone and the accountant's laptop all compute the same state. If Supabase is not configured, the app runs in
 // "this device only" mode and keeps its events in localStorage.
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 const URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-export const WORKSPACE = (import.meta.env.VITE_STOCKTRACE_WORKSPACE as string | undefined) || 'demo';
-const TABLE = 'stocktrace_events';
-// v5: the event log starts with a RESET that anchors the demo's clock (older logs are ignored)
-const LOCAL_KEY = `stocktrace-v5-events-${WORKSPACE}`;
-const OUTBOX_KEY = `stocktrace-outbox-${WORKSPACE}`;
+export const WORKSPACE = (import.meta.env.VITE_LOADMATCH_WORKSPACE as string | undefined) || 'demo';
+const TABLE = 'loadmatch_events';
+// The event log starts with a RESET that anchors the demo's clock
+const LOCAL_KEY = `loadmatch-events-${WORKSPACE}`;
+const OUTBOX_KEY = `loadmatch-outbox-${WORKSPACE}`;
 
 export const sharedMode = Boolean(URL && KEY);
 let client: SupabaseClient | null = null;
@@ -72,7 +72,7 @@ export async function flush(): Promise<boolean> {
 export function subscribe(onInsert: () => void) {
   if (!client) return () => {};
   const ch = client
-    .channel(`stocktrace-${WORKSPACE}`)
+    .channel(`loadmatch-${WORKSPACE}`)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: TABLE, filter: `workspace=eq.${WORKSPACE}` }, onInsert)
     .subscribe();
   return () => { client!.removeChannel(ch); };
