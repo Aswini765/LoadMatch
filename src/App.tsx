@@ -7,7 +7,6 @@ import Receive, { ReceiveTab, CountBack } from './views/Receive.tsx';
 import Owner, { EvidenceView } from './views/Owner.tsx';
 import { useStore, receiptOverdue, countedByUs, atGate } from './store.tsx';
 import Reports from './views/Reports.tsx';
-import Setup from './views/Setup.tsx';
 import SopModal from './views/SopModal.tsx';
 import SettingsModal from './views/SettingsModal.tsx';
 import type { Go } from './views/ui.tsx';
@@ -18,7 +17,6 @@ const ROLES = [
   ['receive', 'Receive'],
   ['owner', 'Owner'],
   ['reports', 'Reports'],
-  ['setup', 'Company setup'],
 ];
 
 function SyncChip() {
@@ -57,8 +55,7 @@ function useHashRoute() {
 }
 
 export default function App() {
-  // opening the email login link lands on Company setup
-  const [view, setView] = useState(() => (/[?&]setup=1/.test(window.location.search) || /access_token=/.test(window.location.hash) ? 'setup' : 'home'));
+  const [view, setView] = useState('home');
   const [openId, setOpenId] = useState<string | null>(null);
   const link = useHashRoute();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -139,7 +136,6 @@ export default function App() {
             {view === 'owner' && <Owner go={go} initialId={openId} key={`${openId || 'list'}-${nav}`} />}
             {view === 'receive' && <ReceiveTab key={nav} />}
             {view === 'reports' && <Reports go={go} />}
-            {view === 'setup' && <Setup />}
           </>}
         </main>
       </div>
