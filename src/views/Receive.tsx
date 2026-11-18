@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Mic, MicOff, Camera, Lock, CheckCircle2, AlertTriangle, Minus, Plus, ChevronLeft, ChevronRight, MessageCircle, PackageCheck, Warehouse, ArrowRight, Wrench } from 'lucide-react';
-import { useStore, item, route, shipmentOf, diffsOf, shipmentStatus, receiverPath, countedByUs, jobworkOpen, FLOW_LABEL } from '../store.tsx';
+import { useStore, item, route, shipmentOf, diffsOf, shipmentStatus, receiverPath, countedByUs, jobworkOpen, loadName, FLOW_LABEL } from '../store.tsx';
 import { t, fill, unitWord } from '../i18n.ts';
 import { useVoice, parseCount } from '../lib/voice.ts';
 import { PhoneFrame, Note, PhotoStrip, savedLang, saveLang, shareWhatsApp, newToken } from './ui.tsx';
@@ -42,9 +42,9 @@ export function ReceiveTab() {
           {open.map((s: any) => (
             <button key={s.id} id={`count-${s.id}`} onClick={() => start(s)} className="w-full text-left bg-white hover:bg-slate-50 border border-slate-200 rounded-xl p-3 shadow-2xs cursor-pointer flex items-center justify-between">
               <div className="min-w-0">
-                <div className="flex items-center gap-2"><span className="font-mono text-xs font-bold text-slate-900">{s.id}</span><span className="text-[10px] text-slate-500">{FLOW_LABEL[s.flow]}</span></div>
+                <div className="flex items-center gap-2"><span className="text-xs font-bold text-slate-900">{s.truckNo}</span><span className="text-[10px] text-slate-500">{FLOW_LABEL[s.flow]}</span></div>
                 <div className="text-[11px] text-slate-600 mt-0.5 truncate">{route(s)}</div>
-                <div className="text-[11px] text-slate-500">{s.truckNo} • {s.lines.length} • {s.sentAt ? when(s.sentAt) : when(s.createdAt)}</div>
+                <div className="text-[11px] text-slate-500">{loadName(s.id)} • {s.lines.length} {s.lines.length === 1 ? 'item' : 'items'} • {s.sentAt ? when(s.sentAt) : when(s.createdAt)}</div>
               </div>
               <span className="text-xs font-bold text-emerald-800 flex items-center shrink-0"><PackageCheck className="w-4 h-4 mr-1" />{t('countThis', lang)}<ArrowRight className="w-3.5 h-3.5 ml-0.5" /></span>
             </button>
@@ -106,7 +106,8 @@ export default function Receive({ id, token }: { id: string; token: string }) {
   const head = (
     <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs space-y-0.5">
       <div className="font-bold text-slate-900 text-sm">{route(s)}</div>
-      <div className="text-slate-600">{t('truck', lang)} <span className="font-mono font-bold">{s.truckNo}</span> • {t('ref', lang)} {s.ref} • {s.id}</div>
+      <div className="text-slate-600">{t('truck', lang)} <span className="font-mono font-bold">{s.truckNo}</span> • {t('ref', lang)} {s.ref} • {loadName(s.id)}</div>
+      {(s.driver || s.driverPhone) && <div className="text-slate-600">{t('driver', lang)}: {s.driver || '—'}{s.driverPhone && <a href={`tel:${s.driverPhone}`} className="ml-2 inline-block font-bold text-emerald-800">📞 {t('callDriver', lang)}</a>}</div>}
     </div>
   );
 
@@ -138,7 +139,7 @@ export default function Receive({ id, token }: { id: string; token: string }) {
     const c = get(l.id);
     const bad = c.counted !== '' && Number(c.damaged || 0) > Number(c.counted);
     return (
-      <PhoneFrame title="LoadMatch · Receive" sub={`${t('rcvTitle', lang)} · ${s.id}`} lang={lang} setLang={setLang}>
+      <PhoneFrame title="LoadMatch · Receive" sub={`${t('rcvTitle', lang)} · ${loadName(s.id)}`} lang={lang} setLang={setLang}>
         {head}
         <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
           <span>{fill(t('lineOf', lang), { n: step + 1, total: n })}</span>
@@ -196,7 +197,7 @@ export default function Receive({ id, token }: { id: string; token: string }) {
 
   // ----- review and submit (still blind) -----
   return (
-    <PhoneFrame title="LoadMatch · Receive" sub={`${t('checkSubmit', lang)} · ${s.id}`} lang={lang} setLang={setLang}>
+    <PhoneFrame title="LoadMatch · Receive" sub={`${t('checkSubmit', lang)} · ${loadName(s.id)}`} lang={lang} setLang={setLang}>
       {head}
       <div className="rounded-xl border border-slate-200 divide-y divide-slate-100">
         {s.lines.map((l: any, i: number) => {
@@ -238,7 +239,7 @@ export default function Receive({ id, token }: { id: string; token: string }) {
 // What the receiver and the sender are told. With "owner only", details stay with the owner.
 export function resultText(state: any, s: any, lang: string) {
   const ds = diffsOf(state, s.id);
-  const head = `${s.id} · ${s.truckNo} · ${route(s)}`;
+  const head = `${loadName(s.id)} · ${s.truckNo} · ${route(s)}`;
   if (!ds.length) return `${head}\n✓ ${t('resultMatched', lang)}`;
   if (state.settings.differencesTo === 'owner') return `${head}\n${t('resultDiff', lang)}`;
   const kind: Record<string, string> = { short: t('short', lang), excess: t('excess', lang), damaged: t('damagedWord', lang) };
@@ -247,11 +248,11 @@ export function resultText(state: any, s: any, lang: string) {
 
 // After submitting: the count is locked; now the sent quantity is shown next to the count.
 function Done({ s, lang, setLang, head }: { s: any; lang: string; setLang: (l: string) => void; head: React.ReactNode }) {
-  const { state } = useStore();
+  const { state, dispatch } = useStore();
   const matched = shipmentStatus(state, s) === 'MATCHED';
   const showLines = state.settings.differencesTo !== 'owner';
   return (
-    <PhoneFrame title="LoadMatch · Receive" sub={s.id} lang={lang} setLang={setLang}>
+    <PhoneFrame title="LoadMatch · Receive" sub={loadName(s.id)} lang={lang} setLang={setLang}>
       {head}
       <Note tone="go"><CheckCircle2 className="w-4 h-4 inline mr-1" />{t('submitted', lang)}</Note>
       <Note tone={matched ? 'go' : 'warn'}>{matched ? t('resultMatched', lang) : t('resultDiff', lang)}</Note>
@@ -271,6 +272,8 @@ function Done({ s, lang, setLang, head }: { s: any; lang: string; setLang: (l: s
           );
         })}
       </div>}
+      {!matched && s.flow !== 'outbound' && <Note tone="warn">{t('lrTip', lang)}</Note>}
+      {!matched && <PhotoStrip photos={(s.docs || []).filter((d: any) => d.by === 'Receiver')} onAdd={(r) => dispatch({ type: 'ATTACH_DOC', id: s.id, docs: r, actor: 'Receiver' })} label={t('addPhoto', lang)} kinds={['signed lorry receipt (bilty)', 'damage']} />}
       <a id="btn-tell-sender" href={shareWhatsApp(resultText(state, s, lang))} target="_blank" rel="noreferrer" className="w-full min-h-[48px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center"><MessageCircle className="w-5 h-5 mr-2" />{t('tellSender', lang)}</a>
       <Note><Lock className="w-4 h-4 inline mr-1" />{t('locked', lang)} {s.receipt.by}, {when(s.receipt.at)}</Note>
     </PhoneFrame>

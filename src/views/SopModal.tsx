@@ -2,10 +2,11 @@ import React from 'react';
 import { X, BookOpen } from 'lucide-react';
 
 const SOPS: [string, string[]][] = [
-  ['1 · Dispatch (sender)', [
-    'Make the list before loading: type it, speak the quantities, or paste from Excel. Add a photo of the dispatch list, challan or order.',
+  ['1 · Dispatch (the person sending)', [
+    'Make the list before loading: type it, speak the numbers, or paste from Excel. Add the driver\'s name and phone, and a photo of the dispatch list, challan or order.',
     'Between your own units, choose "No money (stock transfer)" or "With invoice and GST". The app suggests one from the units\' GSTINs; you decide. For no money, print the delivery challan from the app.',
-    'Tap "Loading started" and "Loading finished" and pick the dock or gate. This time window is how the owner finds the CCTV footage.',
+    'Tap "Loading started" and "Loading finished" and say where it is loaded. This time tells the owner where to look in the CCTV.',
+    'Goods worth more than ₹50,000 usually need an e-way bill, even when nothing is sold. Write its number in the list.',
     'When the truck leaves, send the receiver link on WhatsApp. You will see the result here when they submit.',
     'If this load was made from an earlier one (for example plywood from the logs that came in), pick it under "Made from". The owner can then follow the chain.',
     'Sending goods to another company to process and send back: use "Send for job work". It is not a sale; print the challan from the app. The job worker counts on arrival through the link.',
@@ -14,16 +15,17 @@ const SOPS: [string, string[]][] = [
     'Open the link, or the Receive tab for trucks coming to your unit, supplier deliveries at the gate, and goods coming back from job work (pick the load; what is still with the job worker is filled in).',
     'Count one line at a time. Tap the mic and say the number, e.g. "48" or "48, 2 damaged", in your language. Check what was heard; fix with + and −.',
     'The sent quantity is hidden while you count. Your count is saved on the phone as you go.',
-    'Add photos of damage or the delivery note, then submit once. The count locks; you then see sent vs counted and can tell the sender on WhatsApp.',
+    'Add photos of damage or the delivery note, then submit once. The count locks; you then see what was sent next to what you counted, and can tell the sender on WhatsApp.',
+    'If something is short or damaged: before the driver leaves, write it on his lorry receipt (bilty), get it signed, and add a photo. Transport claims need this.',
   ]],
   ['3 · Owner', [
-    'You see only differences, already compared. Decide each one: write off, replacement, debit or credit note, bill the extra, or investigate first.',
-    'Ask the sender to explain with one tap. Attach the CCTV clip and share the evidence pack only with the people who need it.',
+    'You see only what did not match; the app has already compared. For each one choose what happens: take the loss, ask for it to be sent or replaced, pay or charge less, charge for the extra, or check first.',
+    'Ask the sender to explain with one tap. Add the CCTV video and share the proof only with the people who need it.',
     'Losses above your limit need a tick to confirm. Promises get a due date; mark them done when they happen.',
     'Job work: see what is still with each job worker and how many days are left of the one-year limit. Send a reminder from there.',
   ]],
   ['4 · Accountant (no login)', [
-    'The owner sends the ready entries as a printable report and one Tally file, already in import order. Until they are sent, the owner can undo a decision.',
+    'The owner sends a report to print, and one Tally file that is already in the right order to load. Until it is sent, the owner can undo a decision.',
     'Ledger and godown names must match your Tally masters (Goods in Transit, Damaged Goods, Transit Loss, Branch Transfer). Try the file on a test company first. Invoices themselves are still made in Tally.',
   ]],
 ];

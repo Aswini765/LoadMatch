@@ -20,7 +20,7 @@ export default function Home({ go }: { go: Go }) {
     { id: 'dispatch', icon: Truck, title: 'Dispatch', who: 'Sender, on the phone', what: 'Lists what is going (typed, spoken or pasted from Excel), records loading start and end, chooses whether money is involved between units, and sends the receiver a WhatsApp link. Sees the result when the count comes back.', n: loading, nLabel: 'loading' },
     { id: 'receive', icon: PackageCheck, title: 'Receive', who: 'Floor staff, by voice', what: 'Counts one line at a time by speaking: “48, 2 damaged”. The sent quantity stays hidden until the count is submitted; then the app shows sent vs counted and tells the sender. Supplier deliveries are counted here too.', n: toCount + transit, nLabel: late ? `to count · ${late} late` : 'to count' },
     { id: 'owner', icon: Scale, title: 'Owner', who: 'Sees only differences', what: 'Short, extra or damaged lines with their value, already compared. Decides each one, asks the sender to explain, attaches the CCTV clip, and sends the accountant a printable report and a Tally file.', n: decide, nLabel: 'to decide' },
-    { id: 'owner', icon: FileCode, title: 'Accountant', who: 'Gets a report, no login', what: 'Receives the owner’s pack: the entries to pass (stock transfers, branch invoices, receipts, debit and credit notes) in import order, printed or as one Tally file.', n: drafts, nLabel: 'ready to send' },
+    { id: 'owner', icon: FileCode, title: 'Accountant', who: 'Gets a report, no login', what: 'Gets a report from the owner, to print or to load into Tally in one go. No new software to learn.', n: drafts, nLabel: 'ready to send' },
   ];
 
 
@@ -28,8 +28,8 @@ export default function Home({ go }: { go: Go }) {
     <div className="space-y-6 max-w-5xl mx-auto">
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-2xs space-y-3">
         <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">LoadMatch</div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-950">What was loaded, matched against what arrived.</h1>
-        <p className="text-sm text-slate-600 max-w-3xl">The sender lists what is loaded. At the other end the floor staff count it by voice, in their own language. The app compares the two, tells the sender, and shows the owner only the differences, with the loading time to pull the CCTV. The accountant gets a ready report and Tally file. Works for moves between your own units (with or without money), to customers and from suppliers.</p>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-950">What was sent. What arrived. What's missing.</h1>
+        <p className="text-sm text-slate-600 max-w-3xl">The sender lists what is put on the truck. Where it arrives, the staff count it by speaking, in their own language. The app compares the two, tells the sender, and shows the owner only what does not match, with the loading time to check the CCTV. The accountant gets a ready report. Works between your own units, with customers, suppliers and job workers.</p>
         <div className="text-xs text-slate-500">Demo: {COMPANY.name}, {COMPANY.city} · two units, two suppliers, two customers</div>
       </div>
 

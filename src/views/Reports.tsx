@@ -1,6 +1,6 @@
 import React from 'react';
 import { Download } from 'lucide-react';
-import { useStore, item, route, diffsOf, lossValue, shipmentStatus, ACTIONS, KIND_LABEL, FLOW_LABEL } from '../store.tsx';
+import { useStore, item, route, diffsOf, lossValue, loadName, ACTIONS, KIND_LABEL, FLOW_LABEL } from '../store.tsx';
 import { PageHeader, Panel, type Go } from './ui.tsx';
 import { inr0, dateTime } from '../lib/format.ts';
 import { download } from '../lib/tally.ts';
@@ -34,10 +34,10 @@ export default function Reports({ go }: { go: Go }) {
   const byFlow = group((s) => FLOW_LABEL[s.flow]);
 
   const csv = () => {
-    const head = ['difference', 'truck', 'flow', 'route', 'truck_no', 'ref', 'item', 'kind', 'qty', 'unit', 'value_inr', 'status', 'decision', 'due', 'loss_inr', 'counted_by', 'counted_at'];
+    const head = ['difference', 'load', 'type', 'route', 'truck_no', 'ref', 'item', 'kind', 'qty', 'unit', 'value_inr', 'status', 'decision', 'due', 'loss_inr', 'counted_by', 'counted_at'];
     const rows = diffs.map((d: any) => {
       const s = state.shipments.find((x: any) => x.id === d.shipmentId);
-      return [d.id, s.id, s.flow, route(s), s.truckNo, s.ref, item(d.item).name, d.kind, d.qty, item(d.item).unit, d.value, d.status, d.decision ? ACTIONS[d.decision.action].label : '', d.decision?.dueAt ? dateTime(d.decision.dueAt) : '', lossValue(d), s.receipt.by, dateTime(s.receipt.at)];
+      return [d.id, loadName(s.id), FLOW_LABEL[s.flow], route(s), s.truckNo, s.ref, item(d.item).name, d.kind, d.qty, item(d.item).unit, d.value, d.status, d.decision ? ACTIONS[d.decision.action].label : '', d.decision?.dueAt ? dateTime(d.decision.dueAt) : '', lossValue(d), s.receipt.by, dateTime(s.receipt.at)];
     });
     const q = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     download('loadmatch-differences.csv', [head, ...rows].map((r) => r.map(q).join(',')).join('\n'), 'text/csv');
@@ -45,28 +45,28 @@ export default function Reports({ go }: { go: Go }) {
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
-      <PageHeader title="Reports" sub={`${counted.length} trucks counted · ${diffs.length} differences`} right={
-        <button id="btn-csv" onClick={csv} className="px-3 py-2 rounded-lg border border-slate-300 bg-white text-xs font-bold flex items-center cursor-pointer"><Download className="w-3.5 h-3.5 mr-1.5" />Differences CSV</button>} />
+      <PageHeader title="Reports" sub={`${counted.length} trucks counted · ${diffs.length} differences found`} right={
+        <button id="btn-csv" onClick={csv} className="px-3 py-2 rounded-lg border border-slate-300 bg-white text-xs font-bold flex items-center cursor-pointer"><Download className="w-3.5 h-3.5 mr-1.5" />Download for Excel</button>} />
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Tile label="Trucks that matched" value={`${pct(matched.length, counted.length)}%`} sub={`${matched.length} of ${counted.length}`} />
         <Tile label={`Counted within ${hours}h`} value={`${pct(onTime.length, counted.length)}%`} sub={`${onTime.length} of ${counted.length}`} />
-        <Tile label="Recovered" value={inr0(recovered)} sub="replaced, billed, noted or corrected" tone="text-emerald-700" />
+        <Tile label="Got back" value={inr0(recovered)} sub="replaced, charged or corrected" tone="text-emerald-700" />
         <Tile label="Lost" value={inr0(lost)} sub={`${inr0(openValue)} still open`} tone="text-rose-700" />
       </div>
       <Panel eyebrow="Where differences happen" title="By route">
         <Table rows={byRoute} />
       </Panel>
-      <Panel eyebrow="By kind of movement" title="By flow">
+      <Panel eyebrow="By type of move" title="Where goods went">
         <Table rows={byFlow} />
       </Panel>
-      <Panel eyebrow="All differences" title="Status">
+      <Panel eyebrow="All differences" title="What happened to each">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
-            <thead><tr className="text-left text-slate-500 border-b border-slate-200"><th className="py-1.5 pr-2">Diff</th><th className="pr-2">Item</th><th className="pr-2">Kind</th><th className="pr-2 text-right">Value</th><th className="pr-2">Decision</th><th>Status</th></tr></thead>
+            <thead><tr className="text-left text-slate-500 border-b border-slate-200"><th className="py-1.5 pr-2">Truck</th><th className="pr-2">Item</th><th className="pr-2">Kind</th><th className="pr-2 text-right">Value</th><th className="pr-2">Decision</th><th>Status</th></tr></thead>
             <tbody>{diffs.map((d: any) => (
               <tr key={d.id} className="border-b border-slate-100">
-                <td className="py-1.5 pr-2 font-mono">{d.id}</td><td className="pr-2">{d.qty} {item(d.item).name}</td><td className="pr-2">{KIND_LABEL[d.kind]}</td>
-                <td className="pr-2 text-right font-mono">{inr0(d.value)}</td><td className="pr-2">{d.decision ? ACTIONS[d.decision.action].label : '—'}</td><td className="capitalize">{d.status}</td>
+                <td className="py-1.5 pr-2">{(state.shipments.find((x: any) => x.id === d.shipmentId) || {}).truckNo}</td><td className="pr-2">{d.qty} {item(d.item).name}</td><td className="pr-2">{KIND_LABEL[d.kind]}</td>
+                <td className="pr-2 text-right font-mono">{inr0(d.value)}</td><td className="pr-2">{d.decision ? ACTIONS[d.decision.action].label : '—'}</td><td>{({ open: 'Needs decision', investigating: 'Checking', waiting: 'Promise pending', settled: 'Closed' } as any)[d.status] || d.status}</td>
               </tr>))}</tbody>
           </table>
         </div>

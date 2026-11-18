@@ -130,7 +130,7 @@ export function PhotoStrip({ photos, onAdd, kinds, label, lang = 'en' }: { photo
             return (
               <button key={p.id} type="button" onClick={() => openPhoto(p.id)} title={`${p.kind}: ${p.name}`} className="w-16 text-left cursor-pointer">
                 {data ? <img src={data} alt={p.kind} className="w-16 h-16 object-cover rounded-lg border border-slate-200" />
-                  : <span className="w-16 h-16 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center"><FileImage className="w-5 h-5 text-slate-400" /></span>}
+                  : <span className="w-16 h-16 rounded-lg border border-dashed border-slate-300 bg-slate-50 flex flex-col items-center justify-center text-center"><FileImage className="w-4 h-4 text-slate-400" /><span className="text-[8px] leading-tight text-slate-400 px-0.5">on the phone that took it</span></span>}
                 <span className="block text-[9px] text-slate-500 truncate mt-0.5">{p.kind}</span>
               </button>
             );

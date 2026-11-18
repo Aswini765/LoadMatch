@@ -11,9 +11,9 @@ export const VERSION = 1;
 const HOUR = 3600000;
 
 export const FLOW_LABEL: Record<string, string> = {
-  transfer: 'Transfer between units',
-  inbound: 'Supplier delivery',
-  outbound: 'Customer dispatch',
+  transfer: 'To our other unit',
+  inbound: 'From a supplier',
+  outbound: 'To a customer',
   jobwork_out: 'Sent for job work',
   jobwork_in: 'Back from job work',
 };
@@ -24,27 +24,29 @@ export const countedByUs = (s: any) => atGate(s.flow) || s.flow === 'transfer';
 // Job work: goods sent to another company to process and bring back. Inputs must come back within a year.
 export const JOBWORK_DAYS = 365;
 const DAY = 24 * 3600000;
-export const KIND_LABEL: Record<string, string> = { short: 'Short', excess: 'Excess', damaged: 'Damaged' };
+export const KIND_LABEL: Record<string, string> = { short: 'Short', excess: 'Extra', damaged: 'Damaged' };
+// How a load is named on screens and in messages: "Load 1013"
+export const loadName = (id: string) => `Load ${String(id).replace(/^TRK-/, '')}`;
 
 // What the owner can do with a difference. due = stays open until a date; settles = closed at once;
 // loss = the business absorbs the value (needs an explicit confirmation above the limit).
 export const ACTIONS: Record<string, { label: string; due?: boolean; settles?: boolean; loss?: boolean; draft?: string }> = {
-  write_off: { label: 'Write off as transit loss', settles: true, loss: true, draft: 'Stock journal to Transit Loss' },
-  correct_list: { label: 'Loading list was wrong: record the extra as sent', settles: true, draft: 'Stock journal between units' },
-  replace: { label: 'Supplier replaces it in the next batch', due: true },
-  debit_note: { label: 'Debit note to the supplier', settles: true, draft: 'Debit note' },
-  accept: { label: 'Accept the loss', settles: true, loss: true },
-  keep_extra: { label: 'Keep the extra; supplier bills it', settles: true },
-  return_extra: { label: 'Return the extra to the supplier', due: true },
-  send_rest: { label: 'Send the missing quantity', due: true },
-  send_replacement: { label: 'Send replacements', due: true },
-  credit_note: { label: 'Credit note to the customer', settles: true, loss: true, draft: 'Credit note' },
-  bill_extra: { label: 'Bill the extra to the customer', settles: true, draft: 'Sales invoice' },
-  customer_returns: { label: 'Customer returns the extra', due: true },
+  write_off: { label: 'We take the loss', settles: true, loss: true, draft: 'Stock journal to Transit Loss' },
+  correct_list: { label: 'Our list was wrong: they really got the extra', settles: true, draft: 'Stock journal between units' },
+  replace: { label: 'Supplier sends it with the next load', due: true },
+  debit_note: { label: 'Pay the supplier less (debit note)', settles: true, draft: 'Debit note' },
+  accept: { label: 'We take the loss', settles: true, loss: true },
+  keep_extra: { label: 'Keep the extra and pay for it', settles: true },
+  return_extra: { label: 'Send the extra back to the supplier', due: true },
+  send_rest: { label: 'We send the missing goods', due: true },
+  send_replacement: { label: 'We send replacements', due: true },
+  credit_note: { label: 'Charge the customer less (credit note)', settles: true, loss: true, draft: 'Credit note' },
+  bill_extra: { label: 'Charge the customer for the extra', settles: true, draft: 'Sales invoice' },
+  customer_returns: { label: 'Customer sends the extra back', due: true },
   jobworker_sends_rest: { label: 'Job worker sends the rest', due: true },
   jobworker_replaces: { label: 'Job worker replaces the damaged ones', due: true },
-  keep_returned: { label: 'Record the extra as returned', settles: true, draft: 'Stock journal from the job worker' },
-  investigate: { label: 'Investigate first (CCTV, driver, sender)' },
+  keep_returned: { label: 'They sent back more: add it to our stock', settles: true, draft: 'Stock journal from the job worker' },
+  investigate: { label: 'Check first (CCTV, driver, sender)' },
 };
 export const OPTIONS: Record<string, Record<string, string[]>> = {
   transfer: { short: ['write_off', 'investigate'], damaged: ['write_off', 'investigate'], excess: ['correct_list', 'investigate'] },
@@ -61,6 +63,15 @@ export const DRAFT_LABEL: Record<string, string> = {
   debit_note: 'Debit Note',
   credit_note: 'Credit Note',
   sales_invoice: 'Sales Invoice',
+};
+
+export const DRAFT_PLAIN: Record<string, string> = {
+  stock_journal: 'Stock moved',
+  branch_invoice: 'Bill to our other unit',
+  receipt_note: 'Goods received',
+  debit_note: 'Supplier to be paid less',
+  credit_note: 'Customer to be charged less',
+  sales_invoice: 'Extra charged to the customer',
 };
 
 export const item = (code: string) => ITEMS[code];
@@ -90,11 +101,11 @@ export function shipmentStatus(state: any, s: any) {
 }
 export const STATUS_META: Record<string, { label: string; cls: string }> = {
   LOADING: { label: 'Loading', cls: 'bg-slate-100 text-slate-700 border-slate-200' },
-  IN_TRANSIT: { label: 'Waiting for receiver', cls: 'bg-sky-50 text-sky-800 border-sky-200' },
+  IN_TRANSIT: { label: 'On the way', cls: 'bg-sky-50 text-sky-800 border-sky-200' },
   MATCHED: { label: 'All matched', cls: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
-  TO_DECIDE: { label: 'Owner to decide', cls: 'bg-amber-50 text-amber-800 border-amber-200' },
-  WAITING: { label: 'Waiting on promise', cls: 'bg-violet-50 text-violet-800 border-violet-200' },
-  SETTLED: { label: 'Settled', cls: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
+  TO_DECIDE: { label: 'Needs your decision', cls: 'bg-amber-50 text-amber-800 border-amber-200' },
+  WAITING: { label: 'Promise pending', cls: 'bg-violet-50 text-violet-800 border-violet-200' },
+  SETTLED: { label: 'Closed', cls: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
   CANCELLED: { label: 'Cancelled', cls: 'bg-slate-100 text-slate-500 border-slate-200' },
 };
 export const receiptOverdue = (state: any, s: any, now = Date.now()) => Boolean(s.sentAt && !s.receipt && !s.cancelledAt && now - s.sentAt > state.settings.receiptHours * HOUR);
@@ -129,7 +140,7 @@ export const evidencePath = (d: any) => `#/e/${d.id}/${d.evidenceToken}`;
 // One WhatsApp-ready summary per truck for the owner
 export function truckSummary(state: any, s: any) {
   const ds = diffsOf(state, s.id);
-  const head = `${s.id} · ${s.truckNo} · ${route(s)}`;
+  const head = `${loadName(s.id)} · ${s.truckNo} · ${route(s)}`;
   if (!s.receipt) return `${head}\nWaiting for the receiver's count.`;
   if (!ds.length) return `${head}\nAll ${s.lines.length} lines matched ✓ (counted by ${s.receipt.by})`;
   const lines = ds.map((d: any) => `• ${ITEMS[d.item].name}: ${KIND_LABEL[d.kind].toLowerCase()} ${d.qty} ${ITEMS[d.item].unit} (${inr(d.value, 0)})`);
@@ -142,8 +153,8 @@ export function evidenceText(state: any, d: any) {
   const r = s.receipt.lines[d.lineId];
   const it = ITEMS[d.item];
   const parts = [
-    `Evidence: ${d.id} · ${s.id} · ${s.truckNo}`,
-    `${route(s)} · ref ${s.ref}`,
+    `Proof: ${loadName(s.id)} · truck ${s.truckNo}${s.driver ? ` · driver ${s.driver}${s.driverPhone ? ` (${s.driverPhone})` : ''}` : ''}`,
+    `${route(s)} · ${s.flow === 'outbound' ? 'invoice' : s.flow === 'inbound' ? 'bill' : 'challan'} ${s.ref}${s.ewayBill ? ` · e-way bill ${s.ewayBill}` : ''}`,
     `${it.name}: sent ${l.qty}, counted ${r.counted}${r.damaged ? `, damaged ${r.damaged}` : ''} → ${KIND_LABEL[d.kind].toLowerCase()} ${d.qty} ${it.unit}`,
   ];
   if (s.loading?.startAt) parts.push(`Loading: ${s.loading.point}, ${fmtTime(s.loading.startAt)}–${fmtTime(s.loading.endAt)} on ${fmtDate(s.loading.startAt)} (check CCTV for this window)`);
@@ -249,6 +260,7 @@ export function reducer(state: any, action: any): any {
       let s: any = {
         id, flow, fromUnit: action.fromUnit || null, toUnit: action.toUnit || null, party: action.party || null,
         truckNo: String(action.truckNo).trim().toUpperCase(), ref: String(action.ref).trim(),
+        driver: String(action.driver || '').trim(), driverPhone: String(action.driverPhone || '').replace(/[^0-9+]/g, ''), ewayBill: String(action.ewayBill || '').trim(),
         lines: lines.map((l: any, i: number) => ({ id: `L${i + 1}`, item: l.item, qty: l.qty })),
         createdAt: at, createdBy: actor, loading: null, sentAt: null, token: null, receipt: null, cancelledAt: null, audit: [],
         // between own units the sender chooses: 'none' = stock transfer, no money; 'invoice' = branch invoice with GST.

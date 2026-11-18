@@ -1,9 +1,10 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { ArrowRight, ChevronLeft, Plus, Trash2, Truck, Play, Square, Send, Copy, MessageCircle, ClipboardPaste, PackageCheck, AlertTriangle, Mic, CheckCircle2, Wrench, Link2 } from 'lucide-react';
-import { useStore, item, party, route, shipmentStatus, receiptOverdue, receiverPath, sameGstin, atGate, jobworkOpen, jobworkBalance, parentOf, childrenOf, FLOW_LABEL, STATUS_META } from '../store.tsx';
+import { useStore, item, party, route, shipmentStatus, receiptOverdue, receiverPath, sameGstin, atGate, jobworkOpen, jobworkBalance, parentOf, childrenOf, loadName, FLOW_LABEL, STATUS_META } from '../store.tsx';
 import { useVoice, findNumber } from '../lib/voice.ts';
 import { resultText } from './Receive.tsx';
 import { ITEMS, PARTIES, UNITS, LOADING_POINTS } from '../data/seed.ts';
+import { inr0 } from '../lib/format.ts';
 import { t, unitWord } from '../i18n.ts';
 import { PhoneFrame, Note, PhotoStrip, savedLang, saveLang, shareWhatsApp, appLink, newToken, type Go } from './ui.tsx';
 import { challanHtml, printReport } from '../lib/report.ts';
@@ -15,7 +16,7 @@ export default function Dispatch({ go, initialId }: { go: Go; initialId?: string
   const [lang, setLangState] = useState(savedLang);
   const setLang = (l: string) => { setLangState(l); saveLang(l); };
   const [screen, setScreen] = useState<string>(initialId ? `truck:${initialId}` : 'list');
-  const sub = screen.startsWith('truck:') ? screen.slice(6) : screen.startsWith('new:') ? t(screen === 'new:transfer' ? 'newTransfer' : screen === 'new:jobwork_out' ? 'newJobwork' : 'newCustomer', lang) : t('trucks', lang);
+  const sub = screen.startsWith('truck:') ? loadName(screen.slice(6)) : screen.startsWith('new:') ? t(screen === 'new:transfer' ? 'newTransfer' : screen === 'new:jobwork_out' ? 'newJobwork' : 'newCustomer', lang) : t('trucks', lang);
   return (
     <PhoneFrame title="LoadMatch · Dispatch" sub={sub} lang={lang} setLang={setLang}>
       {screen === 'list' && <TruckList lang={lang} open={(id) => setScreen(`truck:${id}`)} create={(f) => setScreen(`new:${f}`)} />}
@@ -51,12 +52,12 @@ function TruckList({ lang, open, create }: { lang: string; open: (id: string) =>
           <button key={s.id} id={`truck-${s.id}`} onClick={() => open(s.id)} className="w-full text-left bg-white hover:bg-slate-50 border border-slate-200 rounded-xl p-3 shadow-2xs cursor-pointer flex items-center justify-between">
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-mono text-xs font-bold text-slate-900">{s.id}</span>
+                <span className="text-xs font-bold text-slate-900">{s.truckNo}</span>
                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${BADGE[st]}`}>{t(`st_${st}`, lang)}</span>
                 {late && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-rose-50 text-rose-800 border-rose-200">{duration(now - s.sentAt)}</span>}
               </div>
               <div className="text-[11px] text-slate-600 mt-0.5 truncate">{route(s)}</div>
-              <div className="text-[11px] text-slate-500">{s.truckNo} • {s.lines.length} • {when(s.createdAt, now)}</div>
+              <div className="text-[11px] text-slate-500">{loadName(s.id)} • {s.lines.length} {s.lines.length === 1 ? 'item' : 'items'} • {when(s.createdAt, now)}</div>
             </div>
             <ArrowRight className="w-4 h-4 text-slate-400 shrink-0" />
           </button>
@@ -104,6 +105,9 @@ export function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: s
     setLines(jobworkBalance(state, out).filter((b: any) => b.pending > 0).map((b: any) => ({ item: b.item, qty: String(b.pending) })));
   };
   const [truckNo, setTruck] = useState('');
+  const [driver, setDriver] = useState('');
+  const [driverPhone, setDriverPhone] = useState('');
+  const [ewayBill, setEwayBill] = useState('');
   const [ref, setRef] = useState('');
   const [lines, setLines] = useState<any[]>([{ item: '', qty: '' }]);
   // between own units: the sender decides if money is involved (default from the units' GSTINs)
@@ -128,7 +132,7 @@ export function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: s
   const valid = clean.length > 0 && clean.length === lines.filter((l) => l.item || l.qty).length && truckNo.trim() && ref.trim() && (flow !== 'transfer' || fromUnit !== toUnit) && (flow !== 'jobwork_in' || parentId);
   const save = () => {
     const id = `TRK-${1000 + state.counters.trk + 1}`;
-    dispatch({ type: 'CREATE_SHIPMENT', id, flow, fromUnit: hasFrom ? fromUnit : null, toUnit: hasTo ? toUnit : null, party: flow === 'transfer' ? null : partyId, parentId: parentId || undefined, truckNo, ref, lines: clean, billing: flow === 'transfer' ? billing : undefined, docs, actor: gate ? 'Gate' : 'Dispatch staff' });
+    dispatch({ type: 'CREATE_SHIPMENT', id, flow, fromUnit: hasFrom ? fromUnit : null, toUnit: hasTo ? toUnit : null, party: flow === 'transfer' ? null : partyId, parentId: parentId || undefined, truckNo, ref, driver, driverPhone, ewayBill, lines: clean, billing: flow === 'transfer' ? billing : undefined, docs, actor: gate ? 'Gate' : 'Dispatch staff' });
     onSaved(id);
   };
   const sel = 'mt-1 w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm';
@@ -140,21 +144,23 @@ export function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: s
           <label className="col-span-2">{t('whichJobwork', lang)}
             <select id="f-parent" value={parentId} onChange={(e) => pickReturn(e.target.value)} className={sel}>
               <option value="">…</option>
-              {openJobwork.map((x: any) => <option key={x.id} value={x.id}>{x.id} · {party(x.party).name} · {jobworkBalance(state, x).reduce((a: number, b: any) => a + b.pending, 0)} {t('stillThere', lang)}</option>)}
+              {openJobwork.map((x: any) => <option key={x.id} value={x.id}>{loadName(x.id)} · {party(x.party).name} · {jobworkBalance(state, x).reduce((a: number, b: any) => a + b.pending, 0)} {t('stillThere', lang)}</option>)}
             </select>
           </label>
         )}
-        {hasFrom && <label>{t('fromUnit', lang)}<select id="f-from" value={fromUnit} onChange={(e) => setFrom(e.target.value)} className={sel}>{Object.values(UNITS).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></label>}
-        {hasTo && <label>{t('toUnit', lang)}<select id="f-to" value={toUnit} onChange={(e) => setTo(e.target.value)} className={sel}>{Object.values(UNITS).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></label>}
+        {hasFrom && <label>{t('fromUnit', lang)}<select id="f-from" value={fromUnit} onChange={(e) => setFrom(e.target.value)} className={sel}>{Object.values(UNITS).map((u) => <option key={u.id} value={u.id}>{u.name.split(' (')[0]}</option>)}</select></label>}
+        {hasTo && <label>{t('toUnit', lang)}<select id="f-to" value={toUnit} onChange={(e) => setTo(e.target.value)} className={sel}>{Object.values(UNITS).map((u) => <option key={u.id} value={u.id}>{u.name.split(' (')[0]}</option>)}</select></label>}
         {flow !== 'transfer' && <label>{t(flow === 'outbound' ? 'customer' : flow === 'inbound' ? 'supplier' : 'jobworker', lang)}<select id="f-party" disabled={flow === 'jobwork_in'} value={partyId} onChange={(e) => setParty(e.target.value)} className={sel}>{partyList.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}
-        <label>{t('truckNo', lang)}<input id="f-truck" value={truckNo} onChange={(e) => setTruck(e.target.value)} placeholder="KA 40 A 2541" className={sel} /></label>
+        <label className="col-span-2">{t('truckNo', lang)}<input id="f-truck" value={truckNo} onChange={(e) => setTruck(e.target.value)} placeholder="KA 40 A 2541" className={sel} /></label>
+        <label>{t('driver', lang)} <span className="font-normal text-slate-400">({t('optional', lang)})</span><input id="f-driver" value={driver} onChange={(e) => setDriver(e.target.value)} className={sel} /></label>
+        <label>{t('driverPhone', lang)} <span className="font-normal text-slate-400">({t('optional', lang)})</span><input id="f-driver-phone" type="tel" inputMode="tel" value={driverPhone} onChange={(e) => setDriverPhone(e.target.value)} className={sel} /></label>
         <label className="col-span-2">{t(flow === 'transfer' || flow === 'jobwork_out' ? 'challanNo' : flow === 'outbound' ? 'invoiceNo' : flow === 'jobwork_in' ? 'jwChallanNo' : 'billNo', lang)}<input id="f-ref" value={ref} onChange={(e) => setRef(e.target.value)} className={sel} /></label>
       </div>
       {hasFrom && madeFromOptions.length > 0 && (
         <label className="block text-[11px] font-bold text-slate-700">{t('madeFrom', lang)}
           <select id="f-madefrom" value={parentId} onChange={(e) => setParentId(e.target.value)} className={sel}>
             <option value="">—</option>
-            {madeFromOptions.map((x: any) => <option key={x.id} value={x.id}>{x.id} · {route(x)}</option>)}
+            {madeFromOptions.map((x: any) => <option key={x.id} value={x.id}>{loadName(x.id)} · {route(x)}</option>)}
           </select>
         </label>
       )}
@@ -199,6 +205,12 @@ export function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: s
         ))}
         <button id="btn-add-line" onClick={() => setLines([...lines, { item: '', qty: '' }])} className="text-[11px] font-bold text-slate-700 flex items-center cursor-pointer"><Plus className="w-3.5 h-3.5 mr-1" />{t('addLine', lang)}</button>
       </div>
+      {!gate && (
+        <label className="block text-[11px] font-bold text-slate-700">{t('ewayBill', lang)} <span className="font-normal text-slate-400">({t('optional', lang)})</span>
+          <input id="f-eway" value={ewayBill} onChange={(e) => setEwayBill(e.target.value)} className={sel} />
+          {clean.reduce((a, l) => a + l.qty * ITEMS[l.item].rate, 0) > 50000 && !ewayBill.trim() && <span className="block mt-1 font-normal text-amber-800">{t('ewayNeeded', lang)} ({inr0(clean.reduce((a, l) => a + l.qty * ITEMS[l.item].rate, 0))})</span>}
+        </label>
+      )}
       <PhotoStrip photos={docs} onAdd={(r) => setDocs([...docs, ...r])} label={t('addPaper', lang)} kinds={flow === 'inbound' ? ['supplier bill', 'order', 'delivery note'] : flow === 'jobwork_in' ? ['job worker challan', 'delivery note'] : ['dispatch list', 'challan', 'order']} />
       <button id="btn-save-list" disabled={!valid} onClick={save} className="w-full min-h-[48px] rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-sm font-bold cursor-pointer">{t('saveList', lang)} ({clean.reduce((a, l) => a + l.qty, 0)})</button>
     </div>
@@ -214,7 +226,7 @@ function TruckDetail({ lang, id, onBack }: { lang: string; id: string; onBack: (
   const st = shipmentStatus(state, s);
   const now = Date.now();
   const link = s.token ? appLink(receiverPath(s)) : '';
-  const msg = `${t('linkMessage', lang)} ${s.id} · ${s.truckNo} · ${route(s)}\n${link}`;
+  const msg = `${t('linkMessage', lang)} ${loadName(s.id)} · ${s.truckNo} · ${route(s)}${s.driver ? ` · ${s.driver}` : ''}${s.driverPhone ? ` ${s.driverPhone}` : ''}\n${link}`;
   const sendOrCount = () => {
     const token = newToken();
     dispatch({ type: 'SEND_TO_RECEIVER', id: s.id, token, actor: atGate(s.flow) ? 'Gate' : 'Dispatch staff' });
@@ -227,6 +239,8 @@ function TruckDetail({ lang, id, onBack }: { lang: string; id: string; onBack: (
         <div>
           <div className="text-sm font-bold text-slate-900">{route(s)}</div>
           <div className="text-[11px] text-slate-500">{FLOW_LABEL[s.flow]} • {t('truck', lang)} {s.truckNo} • {t('ref', lang)} {s.ref}</div>
+          {(s.driver || s.driverPhone) && <div className="text-[11px] text-slate-500">{t('driver', lang)}: {s.driver || '—'}{s.driverPhone && <> • <a href={`tel:${s.driverPhone}`} className="text-emerald-800 font-bold">{s.driverPhone}</a></>}</div>}
+          {s.ewayBill && <div className="text-[11px] text-slate-500">{t('ewayBill', lang)}: {s.ewayBill}</div>}
         </div>
         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${BADGE[st]}`}>{t(`st_${st}`, lang)}</span>
       </div>
@@ -298,8 +312,8 @@ export function Chain({ s, lang }: { s: any; lang: string }) {
   if (!parent && !kids.length) return null;
   return (
     <div id="chain" className="rounded-lg bg-slate-50 border border-slate-200 p-2 text-[11px] text-slate-700 space-y-0.5">
-      {parent && <div><Link2 className="w-3 h-3 inline mr-1" />{t(s.flow === 'jobwork_in' ? 'returnOf' : 'madeFromShort', lang)} <b className="font-mono">{parent.id}</b> · {route(parent)}</div>}
-      {kids.map((k: any) => <div key={k.id}><Link2 className="w-3 h-3 inline mr-1" />{t(k.flow === 'jobwork_in' ? 'cameBack' : 'nextLoad', lang)} <b className="font-mono">{k.id}</b> · {route(k)}</div>)}
+      {parent && <div><Link2 className="w-3 h-3 inline mr-1" />{t(s.flow === 'jobwork_in' ? 'returnOf' : 'madeFromShort', lang)} <b>{loadName(parent.id)}</b> · {route(parent)}</div>}
+      {kids.map((k: any) => <div key={k.id}><Link2 className="w-3 h-3 inline mr-1" />{t(k.flow === 'jobwork_in' ? 'cameBack' : 'nextLoad', lang)} <b>{loadName(k.id)}</b> · {route(k)}</div>)}
     </div>
   );
 }

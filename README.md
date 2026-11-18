@@ -15,6 +15,8 @@ It came out of a factory visit: two units with the same GSTIN, a handwritten dis
 
 **Job work and load chains.** Goods sent to another company for processing ("Send for job work") move on a delivery challan, no sale. When they come back ("Back from job work" in Receive), the app fills in what is still with the job worker and counts it like any load. The owner sees, per job worker, what is still out and how many days are left of the one-year limit for inputs, with a reminder button. Any outgoing load can be marked "made from" an earlier one, so the owner can follow supplier → unit → unit → customer.
 
+**Plain language.** Screens use everyday words (short, extra, damaged; "we take the loss", "pay the supplier less") and familiar trade terms (challan, bill, GST, e-way bill, bilty). Accounting names appear only in the accountant's report and Tally file. Loads carry the driver's name and phone (the receiver can call), the e-way bill number (with a reminder above ₹50,000), and after a difference the receiver is prompted to note it on the driver's lorry receipt and photograph it, as transport claims require.
+
 Settings: whether the receiver counts blind, who sees the details of a difference (owner and sender, or owner only), each unit's GSTIN, the loss limit, how many hours a count may take, and the phone languages.
 
 ### Owner options by flow
