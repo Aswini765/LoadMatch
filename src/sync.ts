@@ -16,7 +16,7 @@ const OUTBOX_KEY = `loadmatch-outbox-${WORKSPACE}`;
 
 export const sharedMode = Boolean(URL && KEY);
 export let client: SupabaseClient | null = null;
-if (sharedMode) client = createClient(URL!, KEY!, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } });
+if (sharedMode) client = createClient(URL!, KEY!, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'implicit' } });
 
 export type Ev = { id: number; action: any };
 

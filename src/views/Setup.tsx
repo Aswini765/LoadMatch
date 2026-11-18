@@ -1,4 +1,4 @@
-// Company setup on the shared database: log in with an email code, create the company,
+// Company setup on the shared database: log in with an email link, create the company,
 // then add units, people, items and rules. Uses the stage-1 tables (supabase/migrations/20261119_*).
 import React, { useCallback, useEffect, useState } from 'react';
 import { LogOut, Mail, Building2, Factory, Users, Package, SlidersHorizontal, Plus, Check, AlertTriangle } from 'lucide-react';
@@ -44,42 +44,32 @@ export default function Setup() {
   return <div className="max-w-3xl mx-auto space-y-4">{session ? <Company session={session} /> : <Login />}</div>;
 }
 
-// ---------- 1. log in with a code sent by email (no password, no sign-up form) ----------
+// ---------- 1. log in with a link sent by email (no password, no sign-up form) ----------
+// The link works on any device: open it on the phone or computer where you want to be logged in.
 function Login() {
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
-  const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const send = async () => {
     setBusy(true); setErr('');
-    const { error } = await supa!.auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: true } });
+    const { error } = await supa!.auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: true, emailRedirectTo: `${window.location.origin}${window.location.pathname}?setup=1` } });
     setBusy(false);
     if (error) setErr(plain(error)); else setSent(true);
-  };
-  const verify = async () => {
-    setBusy(true); setErr('');
-    const { error } = await supa!.auth.verifyOtp({ email: email.trim(), token: code.trim(), type: 'email' });
-    setBusy(false);
-    if (error) setErr(plain(error));
   };
   const okEmail = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim());
   return (
     <Panel eyebrow="Company setup" title="Log in">
-      <p className="text-xs text-slate-600">We send a code to your email. No password needed. Staff do not need this: they count through the WhatsApp link.</p>
+      <p className="text-xs text-slate-600">We email you a login link. No password needed. Staff who only count do not need this: they use the WhatsApp link.</p>
       {!sent ? (
         <div className="space-y-3">
           <label className={lbl}>Your email<input id="login-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" className={inp} /></label>
-          <button id="btn-send-code" disabled={!okEmail || busy} onClick={send} className={btn}><Mail className="w-4 h-4 inline mr-1" />{busy ? 'Sending…' : 'Send code'}</button>
+          <button id="btn-send-link" disabled={!okEmail || busy} onClick={send} className={btn}><Mail className="w-4 h-4 inline mr-1" />{busy ? 'Sending…' : 'Email me a login link'}</button>
         </div>
       ) : (
         <div className="space-y-3">
-          <Note>Code sent to <b>{email.trim()}</b>. Check your inbox (and spam).</Note>
-          <label className={lbl}>Code from the email<input id="login-code" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, ''))} className={`${inp} font-mono text-lg tracking-widest`} /></label>
-          <div className="flex gap-2">
-            <button id="btn-verify" disabled={code.length < 6 || busy} onClick={verify} className={btn}>{busy ? 'Checking…' : 'Log in'}</button>
-            <button onClick={() => { setSent(false); setCode(''); }} className={btn2}>Change email</button>
-          </div>
+          <Note tone="go">Link sent to <b>{email.trim()}</b>. Open the email (check spam too) and tap <b>Sign in</b>. Open it on the device where you want to use LoadMatch.</Note>
+          <button onClick={() => setSent(false)} className={btn2}>Use another email</button>
         </div>
       )}
       {err && <div id="login-error" className="text-xs font-bold text-rose-700"><AlertTriangle className="w-3.5 h-3.5 inline mr-1" />{err}</div>}

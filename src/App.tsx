@@ -57,7 +57,8 @@ function useHashRoute() {
 }
 
 export default function App() {
-  const [view, setView] = useState('home');
+  // opening the email login link lands on Company setup
+  const [view, setView] = useState(() => (/[?&]setup=1/.test(window.location.search) || /access_token=/.test(window.location.hash) ? 'setup' : 'home'));
   const [openId, setOpenId] = useState<string | null>(null);
   const link = useHashRoute();
   const [mobileOpen, setMobileOpen] = useState(false);
