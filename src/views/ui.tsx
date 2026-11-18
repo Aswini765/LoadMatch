@@ -1,6 +1,6 @@
 import React from 'react';
 import { STATUS_META, useStore } from '../store.tsx';
-import { LANGS } from '../i18n.ts';
+import { LANGS, kindWord } from '../i18n.ts';
 import { savePhotos, photoData, openPhoto, type PhotoRef } from '../lib/photos.ts';
 import { Camera as CameraIcon, FileImage } from 'lucide-react';
 
@@ -114,7 +114,7 @@ export function PhotoStrip({ photos, onAdd, kinds, label, lang = 'en' }: { photo
       {onAdd && (
         <div className="flex items-center gap-2">
           {kinds && kinds.length > 1 && (
-            <select value={kind} onChange={(e) => setKind(e.target.value)} className="p-2 rounded-lg border border-slate-300 bg-white text-xs">{kinds.map((k) => <option key={k}>{k}</option>)}</select>
+            <select value={kind} onChange={(e) => setKind(e.target.value)} className="p-2 rounded-lg border border-slate-300 bg-white text-xs">{kinds.map((k) => <option key={k} value={k}>{kindWord(k, lang)}</option>)}</select>
           )}
           <label className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-dashed border-slate-300 text-xs font-bold text-slate-700 cursor-pointer">
             <CameraIcon className="w-4 h-4" />{busy ? '…' : label || 'Add photo'}
@@ -131,7 +131,7 @@ export function PhotoStrip({ photos, onAdd, kinds, label, lang = 'en' }: { photo
               <button key={p.id} type="button" onClick={() => openPhoto(p.id)} title={`${p.kind}: ${p.name}`} className="w-16 text-left cursor-pointer">
                 {data ? <img src={data} alt={p.kind} className="w-16 h-16 object-cover rounded-lg border border-slate-200" />
                   : <span className="w-16 h-16 rounded-lg border border-dashed border-slate-300 bg-slate-50 flex flex-col items-center justify-center text-center"><FileImage className="w-4 h-4 text-slate-400" /><span className="text-[8px] leading-tight text-slate-400 px-0.5">on the phone that took it</span></span>}
-                <span className="block text-[9px] text-slate-500 truncate mt-0.5">{p.kind}</span>
+                <span className="block text-[9px] text-slate-500 truncate mt-0.5">{kindWord(p.kind, lang)}</span>
               </button>
             );
           })}

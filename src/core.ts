@@ -34,6 +34,7 @@ export const ACTIONS: Record<string, { label: string; due?: boolean; settles?: b
   write_off: { label: 'We take the loss', settles: true, loss: true, draft: 'Stock journal to Transit Loss' },
   correct_list: { label: 'Our list was wrong: they really got the extra', settles: true, draft: 'Stock journal between units' },
   replace: { label: 'Supplier sends it with the next load', due: true },
+  adjust_next_bill: { label: 'Adjust it in the next bill', settles: true, draft: 'Debit or credit note, to adjust in the next bill' },
   debit_note: { label: 'Pay the supplier less (debit note)', settles: true, draft: 'Debit note' },
   accept: { label: 'We take the loss', settles: true, loss: true },
   keep_extra: { label: 'Keep the extra and pay for it', settles: true },
@@ -50,8 +51,8 @@ export const ACTIONS: Record<string, { label: string; due?: boolean; settles?: b
 };
 export const OPTIONS: Record<string, Record<string, string[]>> = {
   transfer: { short: ['write_off', 'investigate'], damaged: ['write_off', 'investigate'], excess: ['correct_list', 'investigate'] },
-  inbound: { short: ['replace', 'debit_note', 'accept', 'investigate'], damaged: ['replace', 'debit_note', 'accept', 'investigate'], excess: ['keep_extra', 'return_extra', 'investigate'] },
-  outbound: { short: ['send_rest', 'credit_note', 'investigate'], damaged: ['send_replacement', 'credit_note', 'investigate'], excess: ['bill_extra', 'customer_returns', 'investigate'] },
+  inbound: { short: ['replace', 'adjust_next_bill', 'debit_note', 'accept', 'investigate'], damaged: ['replace', 'adjust_next_bill', 'debit_note', 'accept', 'investigate'], excess: ['keep_extra', 'return_extra', 'investigate'] },
+  outbound: { short: ['send_rest', 'adjust_next_bill', 'credit_note', 'investigate'], damaged: ['send_replacement', 'adjust_next_bill', 'credit_note', 'investigate'], excess: ['bill_extra', 'customer_returns', 'investigate'] },
   jobwork_out: { short: ['write_off', 'investigate'], damaged: ['write_off', 'investigate'], excess: ['correct_list', 'investigate'] },
   jobwork_in: { short: ['jobworker_sends_rest', 'write_off', 'investigate'], damaged: ['jobworker_replaces', 'write_off', 'investigate'], excess: ['keep_returned', 'investigate'] },
 };
@@ -195,22 +196,28 @@ function decisionDraft(state: any, s: any, d: any, action: string, at: number) {
   // from the sending branch and extra goods are invoiced too. Same flow, different paperwork.
   if (s.flow === 'transfer' && s.billing === 'invoice') {
     const branch = { partyInfo: branchParty(state, s.toUnit), fromState: unitTax(state, s.fromUnit).state, ref: s.ref, lines: [priced(d.item, d.qty)] };
-    if (action === 'write_off') return { ...base, ...branch, type: 'credit_note', narration: `${s.id} (${s.ref}): ${d.qty} ${it.unit} ${it.name} ${d.kind === 'damaged' ? 'damaged' : 'lost'} in transit, ${route(s)}. Written off by the owner against the branch transfer invoice.` };
+    if (action === 'write_off') return { ...base, ...branch, type: 'credit_note', narration: `${s.id} (${s.ref}): ${d.qty} ${it.unit} ${it.name} ${d.kind === 'damaged' ? 'damaged' : 'lost'} on the way, ${route(s)}. Owner took the loss (against the branch bill).` };
     if (action === 'correct_list') return { ...base, ...branch, type: 'branch_invoice', narration: `${s.id} (${s.ref}): ${d.qty} ${it.unit} ${it.name} loaded but not on the list; invoiced to the branch as sent.` };
   }
   if (s.flow === 'jobwork_out' || s.flow === 'jobwork_in') {
     const jw = jobworkerGodown(s.party);
-    if (action === 'write_off') return { ...base, type: 'stock_journal', moves: [{ item: d.item, qty: d.qty, from: s.flow === 'jobwork_in' && d.kind === 'damaged' ? GODOWNS.damaged : jw, to: GODOWNS.loss }], narration: `${s.id} (${s.ref}): ${d.qty} ${it.unit} ${it.name} ${d.kind === 'damaged' ? 'damaged' : 'lost'} on job work with ${PARTIES[s.party].name}. Written off by the owner.` };
+    if (action === 'write_off') return { ...base, type: 'stock_journal', moves: [{ item: d.item, qty: d.qty, from: s.flow === 'jobwork_in' && d.kind === 'damaged' ? GODOWNS.damaged : jw, to: GODOWNS.loss }], narration: `${s.id} (${s.ref}): ${d.qty} ${it.unit} ${it.name} ${d.kind === 'damaged' ? 'damaged' : 'lost'} on job work with ${PARTIES[s.party].name}. Owner took the loss.` };
     if (action === 'correct_list') return { ...base, type: 'stock_journal', moves: [{ item: d.item, qty: d.qty, from: godownOf(s.fromUnit), to: jw }], narration: `${s.id} (${s.ref}): ${d.qty} ${it.unit} ${it.name} loaded but not on the list; recorded as sent for job work.` };
     if (action === 'keep_returned') return { ...base, type: 'stock_journal', moves: [{ item: d.item, qty: d.qty, from: jw, to: godownOf(s.toUnit) }], narration: `${s.id} (${s.ref}): ${d.qty} ${it.unit} ${it.name} more than the job worker's challan; recorded as returned.` };
     return null;
   }
   if (action === 'write_off' && s.flow === 'transfer') {
     const from = d.kind === 'damaged' ? GODOWNS.damaged : GODOWNS.transit;
-    return { ...base, type: 'stock_journal', moves: [{ item: d.item, qty: d.qty, from, to: GODOWNS.loss }], narration: `${s.id} (${s.ref}): ${d.qty} ${it.unit} ${it.name} ${d.kind === 'damaged' ? 'damaged' : 'lost'} in transit, ${route(s)}. Written off by the owner.` };
+    return { ...base, type: 'stock_journal', moves: [{ item: d.item, qty: d.qty, from, to: GODOWNS.loss }], narration: `${s.id} (${s.ref}): ${d.qty} ${it.unit} ${it.name} ${d.kind === 'damaged' ? 'damaged' : 'lost'} on the way, ${route(s)}. Owner took the loss.` };
   }
   if (action === 'correct_list') {
     return { ...base, type: 'stock_journal', moves: [{ item: d.item, qty: d.qty, from: godownOf(s.fromUnit), to: godownOf(s.toUnit) }], narration: `${s.id} (${s.ref}): ${d.qty} ${it.unit} ${it.name} loaded but not on the list; recorded as sent.` };
+  }
+  if (action === 'adjust_next_bill' && s.flow === 'inbound') {
+    return { ...base, type: 'debit_note', party: s.party, ref: s.ref, lines: [priced(d.item, d.qty)], narration: `${loadName(s.id)}: ${d.qty} ${it.unit} ${it.name} ${d.kind === 'damaged' ? 'received damaged' : 'not received'} against bill ${s.ref}. To be adjusted in the supplier's next bill.` };
+  }
+  if (action === 'adjust_next_bill' && s.flow === 'outbound') {
+    return { ...base, type: 'credit_note', party: s.party, ref: s.ref, lines: [priced(d.item, d.qty)], narration: `${loadName(s.id)}: ${d.qty} ${it.unit} ${it.name} ${d.kind === 'damaged' ? 'received damaged' : 'short'} by the customer on invoice ${s.ref}. To be adjusted in the customer's next bill.` };
   }
   if (action === 'debit_note') {
     return { ...base, type: 'debit_note', party: s.party, ref: s.ref, lines: [priced(d.item, d.qty)], narration: `${s.id}: ${d.qty} ${it.unit} ${it.name} ${d.kind === 'damaged' ? 'received damaged' : 'not received'} against supplier bill ${s.ref}.` };
@@ -267,6 +274,8 @@ export function reducer(state: any, action: any): any {
         // Default follows the units' GSTINs as set by the owner.
         docs: (action.docs || []).filter((d: any) => d && d.id).map((d: any) => ({ id: d.id, name: String(d.name || 'photo'), kind: d.kind || 'document', by: actor, at })),
         parentId: action.parentId || null,
+        // promises this load keeps (a supplier's replacement, goods we owe a customer, a job worker's balance)
+        fulfils: (action.fulfils || []).filter((id: string) => { const d = diffOf(state, id); return d && d.status === 'waiting' && (action.lines || []).some((l: any) => l.item === d.item); }),
         billing: flow.startsWith('jobwork') ? 'none' : flow === 'transfer' ? (['none', 'invoice'].includes(action.billing) ? action.billing : (sameGstin(state, action.fromUnit, action.toUnit) ? 'none' : 'invoice')) : 'invoice',
       };
       s = audit(s, at, actor, 'LISTED', `${lines.length} line(s), ${lines.reduce((a: number, l: any) => a + l.qty, 0)} units, ${FLOW_LABEL[flow].toLowerCase()}, ref ${s.ref}.`);
@@ -284,8 +293,37 @@ export function reducer(state: any, action: any): any {
 
     case 'CANCEL_SHIPMENT': {
       const s = shipmentOf(state, action.id);
-      if (!s || s.sentAt || s.cancelledAt) return state;
-      return putShipment(state, audit({ ...s, cancelledAt: at }, at, actor, 'CANCELLED', action.note || 'Cancelled before dispatch.'));
+      if (!s || s.receipt || s.cancelledAt) return state;
+      if (!s.sentAt) return putShipment(state, audit({ ...s, cancelledAt: at }, at, actor, 'CANCELLED', action.note || 'Cancelled before dispatch.'));
+      // After it left: the truck came back or never reached. A reason is required; the dispatch entry is undone.
+      const reason = String(action.note || '').trim();
+      if (!reason) return state;
+      let next = putShipment(state, audit({ ...s, cancelledAt: at, cameBack: true }, at, actor, 'CAME_BACK', `Truck came back / did not reach: ${reason}`));
+      const disp = next.drafts.find((x: any) => x.shipmentId === s.id && x.purpose === 'dispatch' && x.status !== 'rejected');
+      if (disp && disp.status === 'pending') {
+        next = { ...next, drafts: next.drafts.map((x: any) => (x.id === disp.id ? { ...x, status: 'rejected', rejectedAt: at, rejectNote: `Truck came back: ${reason}` } : x)) };
+      } else if (disp && disp.moves) {
+        next = addDraft(next, { type: 'stock_journal', purpose: 'reversal', createdAt: at, shipmentId: s.id, moves: disp.moves.map((m: any) => ({ ...m, from: m.to, to: m.from })), narration: `${loadName(s.id)} (${s.ref}): truck came back, goods returned to stock. ${reason}` });
+      } else if (disp && disp.type === 'branch_invoice') {
+        next = addDraft(next, { type: 'credit_note', purpose: 'reversal', createdAt: at, shipmentId: s.id, partyInfo: disp.partyInfo, fromState: disp.fromState, ref: s.ref, lines: disp.lines, narration: `${loadName(s.id)} (${s.ref}): truck came back, branch bill cancelled. ${reason}` });
+      }
+      return next;
+    }
+
+    // The owner corrects a wrong count, before anything was decided or sent to the accountant.
+    // The receiver's link opens again for a fresh count.
+    case 'REOPEN_COUNT': {
+      const s = shipmentOf(state, action.id);
+      const reason = String(action.note || '').trim();
+      if (!s || !s.receipt || s.cancelledAt || actor !== 'Owner' || !reason) return state;
+      const ds = state.diffs.filter((d: any) => d.shipmentId === s.id);
+      if (ds.some((d: any) => d.status !== 'open')) return state;
+      const rec = state.drafts.filter((x: any) => x.shipmentId === s.id && x.purpose === 'receipt');
+      if (rec.some((x: any) => x.status !== 'pending')) return state;
+      if ((s.fulfils || []).some((id: string) => diffOf(state, id)?.history.some((h: any) => h.text.includes(loadName(s.id))))) return state;
+      const recIds = new Set(rec.map((x: any) => x.id));
+      let next = { ...state, diffs: state.diffs.filter((d: any) => d.shipmentId !== s.id), drafts: state.drafts.map((x: any) => (recIds.has(x.id) ? { ...x, status: 'rejected', rejectedAt: at, rejectNote: `Count reopened: ${reason}` } : x)) };
+      return putShipment(next, audit({ ...s, receipt: null, previousReceipts: [...(s.previousReceipts || []), s.receipt] }, at, actor, 'COUNT_REOPENED', `Count by ${s.receipt.by} reopened by the owner: ${reason}`));
     }
 
     case 'LOADING': {
@@ -380,6 +418,15 @@ export function reducer(state: any, action: any): any {
         }
         if (moves.length) next = addDraft(next, { type: 'stock_journal', purpose: 'receipt', createdAt: at, shipmentId: s.id, moves, narration: `${s.id} (${s.ref}): back from job work at ${PARTIES[s.party].name} for ${s.parentId}, counted by ${receipt.by}.` });
       }
+      // promises kept by this load close themselves when enough good units arrive
+      for (const id of s.fulfils || []) {
+        const d = diffOf(next, id);
+        if (!d || d.status !== 'waiting') continue;
+        const good = s.lines.filter((l: any) => l.item === d.item).reduce((a: number, l: any) => a + counts[l.id].counted - counts[l.id].damaged, 0);
+        next = putDiff(next, good >= d.qty
+          ? { ...d, status: 'settled', settledAt: at, history: [...d.history, { at, by: 'LoadMatch', text: `Arrived on ${loadName(s.id)}: ${good} good, counted by ${receipt.by}. Closed.` }] }
+          : { ...d, history: [...d.history, { at, by: 'LoadMatch', text: `Only ${good} of ${d.qty} arrived on ${loadName(s.id)}. Still waiting.` }] });
+      }
       if (s.flow === 'inbound') {
         const lines = s.lines.map((l: any) => ({ ...priced(l.item, counts[l.id].counted - counts[l.id].damaged), godown: godownOf(s.toUnit) })).filter((l: any) => l.qty > 0);
         if (lines.length) next = addDraft(next, { type: 'receipt_note', purpose: 'receipt', createdAt: at, shipmentId: s.id, party: s.party, ref: s.ref, lines, narration: `${s.id}: goods received against supplier bill ${s.ref}, truck ${s.truckNo}; good units only, counted at the gate by ${receipt.by}.` });
@@ -406,7 +453,7 @@ export function reducer(state: any, action: any): any {
     case 'SETTLE': {
       const d = diffOf(state, action.diffId);
       if (!d || d.status !== 'waiting') return state;
-      return putDiff(state, { ...d, status: 'settled', settledAt: at, history: [...d.history, { at, by: actor, text: `Settled${action.note ? `: ${action.note}` : ''}` }] });
+      return putDiff(state, { ...d, status: 'settled', settledAt: at, history: [...d.history, { at, by: actor, text: `Done${action.note ? `: ${action.note}` : ''}` }] });
     }
 
     case 'ATTACH_CLIP': {
@@ -444,7 +491,7 @@ export function reducer(state: any, action: any): any {
       // an undone decision goes back to the owner's list
       if (x.diffId) {
         const d = diffOf(next, x.diffId);
-        next = putDiff(next, { ...d, status: 'open', decision: null, settledAt: null, history: [...d.history, { at, by: actor, text: `${DRAFT_LABEL[x.type]} ${x.id} withdrawn: ${note}. Decide again.` }] });
+        next = putDiff(next, { ...d, status: 'open', decision: null, settledAt: null, history: [...d.history, { at, by: actor, text: `Decision undone: ${note}. Decide again.` }] });
       }
       return next;
     }

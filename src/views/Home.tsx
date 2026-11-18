@@ -57,7 +57,7 @@ export default function Home({ go }: { go: Go }) {
         <ol className="text-xs text-slate-600 grid sm:grid-cols-3 gap-2 pt-1">
           <li className="bg-slate-50 border border-slate-200 rounded-lg p-2.5"><span className="font-bold text-slate-900 block">1. Upload Excel</span>Your item list, branches, customers, suppliers and staff, in your own column names.</li>
           <li className="bg-slate-50 border border-slate-200 rounded-lg p-2.5"><span className="font-bold text-slate-900 block">2. Choose your rules</span>A few yes/no choices on the web page, changeable any time.</li>
-          <li className="bg-slate-50 border border-slate-200 rounded-lg p-2.5"><span className="font-bold text-slate-900 block">3. Use it on the phone</span>Dispatch and receivers work from WhatsApp links; the owner and accountant from phone or laptop.</li>
+          <li className="bg-slate-50 border border-slate-200 rounded-lg p-2.5"><span className="font-bold text-slate-900 block">3. Use it on the phone</span>Dispatch and receivers work from WhatsApp links; the owner from phone or laptop; the accountant gets a report.</li>
         </ol>
         <div className="text-[11px] text-slate-500">This demo runs with sample data from a plywood business.</div>
       </div>

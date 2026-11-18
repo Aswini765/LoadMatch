@@ -101,7 +101,12 @@ function Stat({ n, label, cls }: { n: number; label: string; cls: string }) {
 }
 
 function TruckHead({ s }: { s: any }) {
-  const { state } = useStore();
+  const { state, dispatch } = useStore();
+  const [fixing, setFixing] = useState(false);
+  const [why, setWhy] = useState('');
+  // a wrong count can be reopened only before anything was decided or sent to the accountant
+  const canFix = diffsOf(state, s.id).every((d: any) => d.status === 'open')
+    && state.drafts.filter((x: any) => x.shipmentId === s.id && x.purpose === 'receipt').every((x: any) => x.status === 'pending');
   const refWord = s.flow === 'outbound' ? 'Invoice' : s.flow === 'inbound' ? 'Bill' : 'Challan';
   return (
     <div className="bg-slate-50 px-3 py-2.5 flex flex-col sm:flex-row sm:items-start justify-between gap-2 border-b border-slate-200">
@@ -113,6 +118,18 @@ function TruckHead({ s }: { s: any }) {
         <div className="text-slate-500">Counted by <b className="text-slate-700">{s.receipt.by}</b>, {when(s.receipt.at)}</div>
         {s.receipt.note && <div className="text-slate-700 italic">“{s.receipt.note}”</div>}
         <div className="pt-1"><Chain s={s} lang="en" /></div>
+        {canFix && !fixing && <button id={`fix-count-${s.id}`} onClick={() => setFixing(true)} className="text-[11px] font-bold text-slate-600 underline cursor-pointer">Count looks wrong? Ask for a recount</button>}
+        {fixing && (
+          <div className="mt-1 p-2 rounded-lg border border-slate-300 bg-white space-y-1.5">
+            <div className="font-semibold text-slate-800">Reopen the count. The receiver's link will work again for a fresh count.</div>
+            <input id={`fix-why-${s.id}`} value={why} onChange={(e) => setWhy(e.target.value)} placeholder="Why? e.g. typed 10 instead of 100" className="w-full p-1.5 rounded border border-slate-300" />
+            <div className="flex gap-2">
+              <button id={`fix-ok-${s.id}`} disabled={!why.trim()} onClick={() => { dispatch({ type: 'REOPEN_COUNT', id: s.id, note: why.trim(), actor: 'Owner' }); window.open(shareWhatsApp(`Please count ${loadName(s.id)} (truck ${s.truckNo}, ${route(s)}) again and submit. Reason: ${why.trim()}\n${appLink(receiverPath(s))}`), '_blank'); setFixing(false); }} className="px-2.5 py-1 rounded-md bg-slate-900 disabled:opacity-40 text-white font-bold cursor-pointer">Reopen and send link</button>
+              <button onClick={() => setFixing(false)} className="px-2.5 py-1 rounded-md border border-slate-300 cursor-pointer">Keep</button>
+            </div>
+            {!why.trim() && <div className="text-[10px] text-slate-500">Write why first.</div>}
+          </div>
+        )}
         {((s.docs || []).length + (s.receipt.photos || []).length) > 0 && (
           <div className="pt-1.5"><PhotoStrip photos={[...(s.docs || []), ...(s.receipt.photos || []).map((p: any) => (typeof p === 'string' ? { id: p, name: p, kind: 'photo' } : p))]} /></div>
         )}
@@ -174,6 +191,7 @@ function DiffCard({ d, s, startOpen }: { d: any; s: any; startOpen?: boolean }) 
               <span>This loss of {inr0(d.value)} is more than your limit of {inr0(state.settings.writeOffLimit)}. I agree to take it.</span>
             </label>
           )}
+          {!can && <div id={`why-${d.id}`} className="text-[11px] text-amber-900">{a.due && !(new Date(due).getTime() > Date.now()) ? 'Pick a date and time in the future.' : 'Tick the box above to confirm this loss.'}</div>}
           <button id={`decide-${d.id}`} disabled={!can} onClick={decide} className="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-bold cursor-pointer">Confirm</button>
         </div>
       )}

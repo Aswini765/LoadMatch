@@ -1,7 +1,7 @@
 // LoadMatch flow checks through the real reducer. Run: npm test
 import assert from 'node:assert/strict';
 import {
-  jobworkBalance, jobworkDueAt, jobworkOpen, childrenOf, parentOf, JOBWORK_DAYS,
+  OPTIONS, jobworkBalance, jobworkDueAt, jobworkOpen, childrenOf, parentOf, JOBWORK_DAYS,
   reducer, buildInitialState, shipmentOf, diffsOf, diffOf, shipmentStatus, receiptOverdue, diffOverdue, truckSummary, evidenceText, importOrder,
 } from '../src/core.ts';
 import { voucherXml } from '../src/lib/tally.ts';
@@ -323,6 +323,75 @@ test('job work: sent out, comes back in parts, balance and one-year date', () =>
   assert.ok(jobworkOpen(s).some((x: any) => x.id === out));
   assert.equal(parentOf(s, shipmentOf(s, back)).id, out);
   assert.deepEqual(childrenOf(s, shipmentOf(s, out)).map((x: any) => x.id), [back]);
+});
+
+test('adjust in the next bill: what the factory does with supplier and customer differences', () => {
+  let s = buildInitialState();
+  const d = diffsOf(s, 'TRK-1015')[0]; // customer got 3 extra: not offered there
+  assert.ok(!OPTIONS.outbound.excess.includes('adjust_next_bill'));
+  assert.ok(OPTIONS.inbound.short.includes('adjust_next_bill') && OPTIONS.outbound.short.includes('adjust_next_bill'));
+  s = run(s, { type: 'CREATE_SHIPMENT', flow: 'inbound', toUnit: 'MYS', party: 'coastal', truckNo: 'KA 3', ref: 'SB-9', lines: [{ item: 'BRP-1148', qty: 50 }] });
+  const id = lastShip(s).id;
+  s = run(s, { type: 'SEND_TO_RECEIVER', id, token: 'tokadj1' }, { type: 'SUBMIT_RECEIPT', id, token: 'tokadj1', by: 'Gate', lines: { L1: { counted: 46, damaged: 0 } } });
+  const short = diffsOf(s, id)[0];
+  s = run(s, { type: 'DECIDE', diffId: short.id, action: 'adjust_next_bill' });
+  assert.equal(diffOf(s, short.id).status, 'settled');
+  const dn = draftsFor(s, id).find((x: any) => x.diffId === short.id);
+  assert.equal(dn.type, 'debit_note');
+  assert.match(dn.narration, /next bill/);
+  void d;
+});
+
+test('a promised replacement closes itself when it arrives on a later truck', () => {
+  let s = buildInitialState();
+  const promise = diffsOf(s, 'TRK-1014')[0];
+  assert.equal(promise.status, 'waiting');
+  // a later delivery from the same supplier carries only 6 of the 10
+  s = run(s, { type: 'CREATE_SHIPMENT', flow: 'inbound', toUnit: 'MYS', party: 'lakshmi', truckNo: 'KA 7', ref: 'SB-0990', fulfils: [promise.id], lines: [{ item: promise.item, qty: 6 }] });
+  let id = lastShip(s).id;
+  assert.deepEqual(lastShip(s).fulfils, [promise.id]);
+  s = run(s, { type: 'SEND_TO_RECEIVER', id, token: 'tokr111' }, { type: 'SUBMIT_RECEIPT', id, token: 'tokr111', by: 'Gate', lines: { L1: { counted: 6, damaged: 0 } } });
+  assert.equal(diffOf(s, promise.id).status, 'waiting', 'only 6 of 10');
+  assert.match(diffOf(s, promise.id).history.at(-1).text, /Only 6 of 10/);
+  // the next one carries 10
+  s = run(s, { type: 'CREATE_SHIPMENT', flow: 'inbound', toUnit: 'MYS', party: 'lakshmi', truckNo: 'KA 7', ref: 'SB-0991', fulfils: [promise.id], lines: [{ item: promise.item, qty: 10 }] });
+  id = lastShip(s).id;
+  s = run(s, { type: 'SEND_TO_RECEIVER', id, token: 'tokr222' }, { type: 'SUBMIT_RECEIPT', id, token: 'tokr222', by: 'Gate', lines: { L1: { counted: 10, damaged: 0 } } });
+  assert.equal(diffOf(s, promise.id).status, 'settled');
+  // a load cannot claim a promise for an item it does not carry
+  s = run(buildInitialState(), { type: 'CREATE_SHIPMENT', flow: 'inbound', toUnit: 'MYS', party: 'lakshmi', truckNo: 'KA 8', ref: 'SB-1', fulfils: [promise.id], lines: [{ item: 'PLY-12', qty: 1 }] });
+  assert.deepEqual(lastShip(s).fulfils, []);
+});
+
+test('truck came back after leaving: needs a reason, the dispatch entry is undone', () => {
+  let [s, id] = sentTransfer(buildInitialState());
+  assert.equal(run(s, { type: 'CANCEL_SHIPMENT', id }), s, 'reason required once it has left');
+  s = run(s, { type: 'CANCEL_SHIPMENT', id, note: 'Truck broke down at Mandya, came back' });
+  assert.ok(shipmentOf(s, id as string).cameBack);
+  assert.equal(draftsFor(s, id as string).find((x: any) => x.purpose === 'dispatch').status, 'rejected', 'not yet sent, so withdrawn');
+  assert.equal(run(s, { type: 'SUBMIT_RECEIPT', id, token: 'tok123', by: 'X', lines: { L1: { counted: 1, damaged: 0 } } }), s, 'link no longer works');
+  // if the entry already went to the accountant, a reversing entry is made
+  let [t, id2] = sentTransfer(buildInitialState());
+  const disp = draftsFor(t, id2 as string).find((x: any) => x.purpose === 'dispatch');
+  t = run(t, { type: 'SEND_TO_ACCOUNTANT', ids: [disp.id] }, { type: 'CANCEL_SHIPMENT', id: id2, note: 'Did not reach' });
+  const rev = draftsFor(t, id2 as string).find((x: any) => x.purpose === 'reversal');
+  assert.equal(rev.moves[0].to, disp.moves[0].from);
+});
+
+test('owner can correct a wrong count before deciding anything', () => {
+  let [s, id] = sentTransfer(buildInitialState(), [{ item: 'BRP-1148', qty: 100 }]);
+  s = run(s, { type: 'SUBMIT_RECEIPT', id, token: 'tok123', by: 'Ravi', lines: { L1: { counted: 10, damaged: 0 } } });
+  assert.equal(diffsOf(s, id as string).length, 1);
+  assert.equal(run(s, { type: 'REOPEN_COUNT', id, note: 'typed 10 instead of 100', actor: 'Receiver' }), s, 'owner only');
+  assert.equal(run(s, { type: 'REOPEN_COUNT', id, actor: 'Owner' }), s, 'reason required');
+  const r = run(s, { type: 'REOPEN_COUNT', id, note: 'typed 10 instead of 100', actor: 'Owner' });
+  assert.equal(shipmentOf(r, id as string).receipt, null);
+  assert.equal(diffsOf(r, id as string).length, 0);
+  const again = run(r, { type: 'SUBMIT_RECEIPT', id, token: 'tok123', by: 'Ravi', lines: { L1: { counted: 100, damaged: 0 } } });
+  assert.equal(status(again, id as string), 'MATCHED');
+  // not after a decision
+  const decided = run(s, { type: 'DECIDE', diffId: diffsOf(s, id as string)[0].id, action: 'investigate' });
+  assert.equal(run(decided, { type: 'REOPEN_COUNT', id, note: 'x', actor: 'Owner' }), decided);
 });
 
 console.log(`\n${passed} tests passed`);

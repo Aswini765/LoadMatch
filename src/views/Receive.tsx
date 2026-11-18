@@ -184,6 +184,7 @@ export default function Receive({ id, token }: { id: string; token: string }) {
               </div>
             </div>
           </div>
+          {bad && <div id="r-dmg-msg" className="text-xs font-bold text-rose-700">{t('dmgTooMany', lang)}</div>}
         </div>
 
         <div className="grid grid-cols-2 gap-2">
@@ -210,7 +211,7 @@ export default function Receive({ id, token }: { id: string; token: string }) {
           );
         })}
       </div>
-      <PhotoStrip photos={photos} onAdd={(r) => setPhotos([...photos, ...r])} label={t('addPhoto', lang)} kinds={['damage', 'unloading', 'delivery note', 'bill']} />
+      <PhotoStrip photos={photos} onAdd={(r) => setPhotos([...photos, ...r])} label={t('addPhoto', lang)} lang={lang} kinds={['damage', 'unloading', 'delivery note', 'bill']} />
       <div className="text-[10px] text-slate-400">{t('photosHere', lang)}</div>
       <label className="block text-[11px] font-bold text-slate-700">{t('note', lang)}
         <textarea id="r-note" value={note} onChange={(e) => setNote(e.target.value)} rows={2} className="mt-1 w-full p-2 rounded-lg border border-slate-300 text-sm" />
@@ -218,6 +219,7 @@ export default function Receive({ id, token }: { id: string; token: string }) {
       <label className="block text-[11px] font-bold text-slate-700">{t('yourName', lang)}
         <input id="r-name" value={by} onChange={(e) => setBy(e.target.value)} className="mt-1 w-full p-2.5 rounded-lg border border-slate-300 text-sm" />
       </label>
+      {!ready && <div id="r-missing" className="text-[11px] text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-2">{t('stillNeeded', lang)}: {[left ? `${left} ${t('linesLeft', lang)}` : '', !by.trim() ? t('yourName', lang) : ''].filter(Boolean).join(' · ')}</div>}
       {!confirming ? (
         <button id="btn-submit-count" disabled={!ready} onClick={() => setConfirming(true)} className="w-full min-h-[52px] rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-sm font-bold cursor-pointer shadow-md">
           {t('submit', lang)}{left ? ` · ${left} ${t('linesLeft', lang)}` : ''}
@@ -266,14 +268,14 @@ function Done({ s, lang, setLang, head }: { s: any; lang: string; setLang: (l: s
               <div className="text-slate-800">{item(l.item).name}</div>
               <div className="flex items-center justify-between font-mono mt-0.5">
                 <span className="text-slate-500">{t('sentQty', lang)} {l.qty} → {t('counted', lang)} <b className="text-slate-900">{r.counted}</b>{r.damaged ? ` (${r.damaged} ${t('damagedWord', lang)})` : ''}</span>
-                <span className={`font-sans font-bold ${same ? 'text-emerald-700' : 'text-amber-700'}`}>{same ? `✓ ${t('matchedLine', lang)}` : r.counted < l.qty ? `${l.qty - r.counted} ${t('short', lang)}` : r.counted > l.qty ? `${r.counted - l.qty} ${t('excess', lang)}` : `${r.damaged} ${t('damagedWord', lang)}`}</span>
+                <span className={`font-sans font-bold text-right ${same ? 'text-emerald-700' : 'text-amber-700'}`}>{same ? `✓ ${t('matchedLine', lang)}` : [r.counted < l.qty ? `${l.qty - r.counted} ${t('short', lang)}` : '', r.counted > l.qty ? `${r.counted - l.qty} ${t('excess', lang)}` : '', r.damaged ? `${r.damaged} ${t('damagedWord', lang)}` : ''].filter(Boolean).join(', ')}</span>
               </div>
             </div>
           );
         })}
       </div>}
       {!matched && s.flow !== 'outbound' && <Note tone="warn">{t('lrTip', lang)}</Note>}
-      {!matched && <PhotoStrip photos={(s.docs || []).filter((d: any) => d.by === 'Receiver')} onAdd={(r) => dispatch({ type: 'ATTACH_DOC', id: s.id, docs: r, actor: 'Receiver' })} label={t('addPhoto', lang)} kinds={['signed lorry receipt (bilty)', 'damage']} />}
+      {!matched && <PhotoStrip photos={(s.docs || []).filter((d: any) => d.by === 'Receiver')} onAdd={(r) => dispatch({ type: 'ATTACH_DOC', id: s.id, docs: r, actor: 'Receiver' })} label={t('addPhoto', lang)} lang={lang} kinds={['signed lorry receipt (bilty)', 'damage']} />}
       <a id="btn-tell-sender" href={shareWhatsApp(resultText(state, s, lang))} target="_blank" rel="noreferrer" className="w-full min-h-[48px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center"><MessageCircle className="w-5 h-5 mr-2" />{t('tellSender', lang)}</a>
       <Note><Lock className="w-4 h-4 inline mr-1" />{t('locked', lang)} {s.receipt.by}, {when(s.receipt.at)}</Note>
     </PhoneFrame>

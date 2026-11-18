@@ -39,7 +39,7 @@ const T: Record<string, Tr> = {
   speakCount: { en: 'Speak the number', hi: 'संख्या बोलें', kn: 'ಸಂಖ್ಯೆ ಹೇಳಿ', te: 'సంఖ్య చెప్పండి' },
   // dispatch
   trucks: { en: 'Trucks', hi: 'गाड़ियाँ', kn: 'ವಾಹನಗಳು', te: 'వాహనాలు' },
-  newTransfer: { en: 'To our other unit', hi: 'हमारी दूसरी यूनिट को', kn: 'ನಮ್ಮ ಇನ್ನೊಂದು ಘಟಕಕ್ಕೆ', te: 'మా మరో యూనిట్‌కు' },
+  newTransfer: { en: 'To our other unit (next job)', hi: 'हमारी दूसरी यूनिट को', kn: 'ನಮ್ಮ ಇನ್ನೊಂದು ಘಟಕಕ್ಕೆ', te: 'మా మరో యూనిట్‌కు' },
   newCustomer: { en: 'To a customer', hi: 'ग्राहक को', kn: 'ಗ್ರಾಹಕರಿಗೆ', te: 'కస్టమర్‌కు' },
   supplierDelivery: { en: 'Supplier delivery at the gate', hi: 'गेट पर सप्लायर का माल', kn: 'ಗೇಟ್‌ನಲ್ಲಿ ಪೂರೈಕೆದಾರರ ಸರಕು', te: 'గేటు వద్ద సరఫరాదారు సరుకు' },
   customer: { en: 'Customer', hi: 'ग्राहक', kn: 'ಗ್ರಾಹಕ', te: 'కస్టమర్' },
@@ -127,6 +127,30 @@ const T: Record<string, Tr> = {
   optional: { en: 'optional', hi: 'वैकल्पिक', kn: 'ಐಚ್ಛಿಕ', te: 'ఐచ్ఛికం' },
   load: { en: 'Load', hi: 'माल', kn: 'ಸರಕು', te: 'సరుకు' },
   lrTip: { en: 'Before the driver leaves: write the shortage or damage on his lorry receipt (bilty), get it signed, and take a photo. Transport claims need this.', hi: 'ड्राइवर के जाने से पहले: कमी या खराबी उसकी बिल्टी (LR) पर लिखें, साइन करवाएँ और फोटो लें। ट्रांसपोर्ट क्लेम के लिए यह ज़रूरी है।', kn: 'ಚಾಲಕ ಹೋಗುವ ಮೊದಲು: ಕೊರತೆ ಅಥವಾ ಹಾನಿಯನ್ನು ಅವನ ಬಿಲ್ಟಿ (LR) ಮೇಲೆ ಬರೆದು, ಸಹಿ ಪಡೆದು, ಫೋಟೋ ತೆಗೆಯಿರಿ. ಸಾರಿಗೆ ಕ್ಲೇಮ್‌ಗೆ ಇದು ಬೇಕು.', te: 'డ్రైవర్ వెళ్లే ముందు: తక్కువ లేదా పాడైన వాటిని అతని బిల్టీ (LR) పై రాసి, సంతకం తీసుకుని, ఫోటో తీయండి. ట్రాన్స్‌పోర్ట్ క్లెయిమ్‌కు ఇది అవసరం.' },
+  newTransferSub: { en: 'Goods stay ours, e.g. Mysuru → Bengaluru for the next step', hi: 'माल हमारा ही रहता है, जैसे मैसूरु → बेंगलुरु अगले काम के लिए', kn: 'ಸರಕು ನಮ್ಮದೇ, ಉದಾ. ಮೈಸೂರು → ಬೆಂಗಳೂರು ಮುಂದಿನ ಕೆಲಸಕ್ಕೆ', te: 'సరుకు మనదే, ఉదా. మైసూరు → బెంగళూరు తదుపరి పనికి' },
+  newCustomerSub: { en: 'A sale; the customer counts it when it arrives', hi: 'बिक्री; ग्राहक पहुँचने पर गिनता है', kn: 'ಮಾರಾಟ; ತಲುಪಿದಾಗ ಗ್ರಾಹಕರು ಎಣಿಸುತ್ತಾರೆ', te: 'అమ్మకం; చేరినప్పుడు కస్టమర్ లెక్కిస్తారు' },
+  otherLabel: { en: 'Other', hi: 'अन्य', kn: 'ಇತರೆ', te: 'ఇతర' },
+  newJobworkSub: { en: 'send to another company for processing; it comes back to us (job work)', hi: 'दूसरी कंपनी को काम के लिए भेजें; माल वापस आएगा (जॉब वर्क)', kn: 'ಕೆಲಸಕ್ಕಾಗಿ ಬೇರೆ ಕಂಪನಿಗೆ ಕಳುಹಿಸಿ; ಸರಕು ವಾಪಸ್ ಬರುತ್ತದೆ (ಜಾಬ್ ವರ್ಕ್)', te: 'పనికోసం వేరే కంపెనీకి పంపండి; సరుకు తిరిగి వస్తుంది (జాబ్ వర్క్)' },
+  sameUnit: { en: 'Choose a different unit to send to', hi: 'भेजने के लिए दूसरी यूनिट चुनें', kn: 'ಕಳುಹಿಸಲು ಬೇರೆ ಘಟಕ ಆಯ್ಕೆಮಾಡಿ', te: 'పంపడానికి వేరే యూనిట్ ఎంచుకోండి' },
+  needItem: { en: 'at least one item with a quantity', hi: 'कम से कम एक सामान और उसकी मात्रा', kn: 'ಕನಿಷ್ಠ ಒಂದು ವಸ್ತು ಮತ್ತು ಪ್ರಮಾಣ', te: 'కనీసం ఒక వస్తువు, దాని సంఖ్య' },
+  fixLines: { en: 'finish or remove the half-filled line', hi: 'अधूरी लाइन पूरी करें या हटाएँ', kn: 'ಅರ್ಧ ತುಂಬಿದ ಸಾಲು ಪೂರ್ಣಗೊಳಿಸಿ ಅಥವಾ ತೆಗೆಯಿರಿ', te: 'సగం నింపిన లైన్ పూర్తి చేయండి లేదా తీసేయండి' },
+  stillNeeded: { en: 'Still needed', hi: 'अभी चाहिए', kn: 'ಇನ್ನೂ ಬೇಕು', te: 'ఇంకా కావాలి' },
+  itemWord: { en: 'item', hi: 'सामान', kn: 'ವಸ್ತು', te: 'వస్తువు' },
+  itemsWord: { en: 'items', hi: 'सामान', kn: 'ವಸ್ತುಗಳು', te: 'వస్తువులు' },
+  cancelSure: { en: 'Cancel this truck? This cannot be undone.', hi: 'यह गाड़ी रद्द करें? इसे वापस नहीं किया जा सकता।', kn: 'ಈ ವಾಹನ ರದ್ದು ಮಾಡುವುದೇ? ಇದನ್ನು ಹಿಂಪಡೆಯಲು ಆಗುವುದಿಲ್ಲ.', te: 'ఈ వాహనం రద్దు చేయాలా? దీన్ని వెనక్కి తీసుకోలేరు.' },
+  keepTruck: { en: 'No, keep it', hi: 'नहीं, रखें', kn: 'ಬೇಡ, ಇರಲಿ', te: 'వద్దు, ఉంచండి' },
+  yesCancel: { en: 'Yes, cancel', hi: 'हाँ, रद्द करें', kn: 'ಹೌದು, ರದ್ದು', te: 'అవును, రద్దు' },
+  truckCameBack: { en: 'Truck came back / did not reach', hi: 'गाड़ी वापस आई / नहीं पहुँची', kn: 'ವಾಹನ ವಾಪಸ್ ಬಂತು / ತಲುಪಲಿಲ್ಲ', te: 'వాహనం తిరిగి వచ్చింది / చేరలేదు' },
+  cameBackQ: { en: 'The truck came back or never reached. What happened?', hi: 'गाड़ी वापस आई या पहुँची नहीं। क्या हुआ?', kn: 'ವಾಹನ ವಾಪಸ್ ಬಂತು ಅಥವಾ ತಲುಪಲಿಲ್ಲ. ಏನಾಯಿತು?', te: 'వాహనం తిరిగి వచ్చింది లేదా చేరలేదు. ఏమైంది?' },
+  cameBackReason: { en: 'e.g. truck broke down, goods unloaded back', hi: 'जैसे गाड़ी खराब हुई, माल वापस उतारा', kn: 'ಉದಾ. ವಾಹನ ಕೆಟ್ಟಿತು, ಸರಕು ವಾಪಸ್ ಇಳಿಸಲಾಯಿತು', te: 'ఉదా. వాహనం పాడైంది, సరుకు తిరిగి దించారు' },
+  cameBackNote: { en: 'This truck came back. The receiver link no longer works.', hi: 'यह गाड़ी वापस आ गई। रिसीवर लिंक अब काम नहीं करेगा।', kn: 'ಈ ವಾಹನ ವಾಪಸ್ ಬಂದಿದೆ. ಸ್ವೀಕರಿಸುವವರ ಲಿಂಕ್ ಈಗ ಕೆಲಸ ಮಾಡುವುದಿಲ್ಲ.', te: 'ఈ వాహనం తిరిగి వచ్చింది. రిసీవర్ లింక్ ఇక పనిచేయదు.' },
+  reasonNeeded: { en: 'Write what happened first.', hi: 'पहले लिखें क्या हुआ।', kn: 'ಮೊದಲು ಏನಾಯಿತು ಬರೆಯಿರಿ.', te: 'ముందు ఏమైందో రాయండి.' },
+  confirmWord: { en: 'Confirm', hi: 'पुष्टि करें', kn: 'ದೃಢೀಕರಿಸಿ', te: 'నిర్ధారించండి' },
+  promisesTheyOwe: { en: 'Does this load bring something they promised?', hi: 'क्या इस माल में उनका वादा किया सामान है?', kn: 'ಈ ಸರಕಿನಲ್ಲಿ ಅವರು ಭರವಸೆ ನೀಡಿದ್ದು ಇದೆಯೇ?', te: 'ఈ సరుకులో వారు హామీ ఇచ్చింది ఉందా?' },
+  promisesWeOwe: { en: 'Does this load carry goods we promised them?', hi: 'क्या इस माल में हमारा वादा किया सामान है?', kn: 'ಈ ಸರಕಿನಲ್ಲಿ ನಾವು ಭರವಸೆ ನೀಡಿದ್ದು ಇದೆಯೇ?', te: 'ఈ సరుకులో మనం హామీ ఇచ్చింది ఉందా?' },
+  promiseHint: { en: 'Tick it: when the count shows it arrived, the promise closes by itself.', hi: 'टिक करें: गिनती में पहुँचा दिखे तो वादा अपने आप बंद हो जाएगा।', kn: 'ಟಿಕ್ ಮಾಡಿ: ಎಣಿಕೆಯಲ್ಲಿ ಬಂದಿದೆ ಎಂದು ಕಂಡರೆ ಭರವಸೆ ತಾನಾಗಿ ಮುಗಿಯುತ್ತದೆ.', te: 'టిక్ చేయండి: లెక్కలో వచ్చినట్టు కనిపిస్తే హామీ దానంతట అదే ముగుస్తుంది.' },
+  dmgTooMany: { en: 'Damaged cannot be more than counted.', hi: 'खराब, गिने हुए से ज़्यादा नहीं हो सकते।', kn: 'ಹಾಳಾದವು ಎಣಿಸಿದವುಗಳಿಗಿಂತ ಹೆಚ್ಚಿರಬಾರದು.', te: 'పాడైనవి లెక్కించిన వాటికంటే ఎక్కువ ఉండకూడదు.' },
+  cameBackShort: { en: 'Came back', hi: 'वापस आई', kn: 'ವಾಪಸ್ ಬಂತು', te: 'తిరిగి వచ్చింది' },
   // statuses on the phone
   st_LOADING: { en: 'Loading', hi: 'लोडिंग', kn: 'ಲೋಡಿಂಗ್', te: 'లోడింగ్' },
   st_IN_TRANSIT: { en: 'On the way', hi: 'गिनती का इंतज़ार', kn: 'ಎಣಿಕೆಗೆ ಕಾಯುತ್ತಿದೆ', te: 'లెక్క కోసం వేచి ఉంది' },
@@ -145,3 +169,19 @@ const UNITS: Record<string, Tr> = {
 };
 export const unitWord = (unit: string, lang: string) => (UNITS[unit] as any)?.[lang] || unit;
 export const fill = (str: string, vars: Record<string, any>) => str.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '');
+
+// Kinds of photo, shown in the phone's language (stored in English)
+const KINDS: Record<string, Tr> = {
+  'dispatch list': { en: 'dispatch list', hi: 'डिस्पैच सूची', kn: 'ಡಿಸ್ಪ್ಯಾಚ್ ಪಟ್ಟಿ', te: 'డిస్పాచ్ జాబితా' },
+  challan: { en: 'challan', hi: 'चालान', kn: 'ಚಲನ್', te: 'చలాన్' },
+  order: { en: 'order', hi: 'ऑर्डर', kn: 'ಆರ್ಡರ್', te: 'ఆర్డర్' },
+  'supplier bill': { en: 'supplier bill', hi: 'सप्लायर बिल', kn: 'ಪೂರೈಕೆದಾರರ ಬಿಲ್', te: 'సరఫరాదారు బిల్' },
+  'delivery note': { en: 'delivery note', hi: 'डिलीवरी नोट', kn: 'ಡೆಲಿವರಿ ನೋಟ್', te: 'డెలివరీ నోట్' },
+  'job worker challan': { en: 'job worker challan', hi: 'जॉब वर्कर चालान', kn: 'ಜಾಬ್ ವರ್ಕರ್ ಚಲನ್', te: 'జాబ్ వర్కర్ చలాన్' },
+  damage: { en: 'damage', hi: 'खराबी', kn: 'ಹಾನಿ', te: 'పాడైనవి' },
+  unloading: { en: 'unloading', hi: 'माल उतारना', kn: 'ಇಳಿಸುವಿಕೆ', te: 'దించడం' },
+  bill: { en: 'bill', hi: 'बिल', kn: 'ಬಿಲ್', te: 'బిల్' },
+  'signed lorry receipt (bilty)': { en: 'signed lorry receipt (bilty)', hi: 'साइन की हुई बिल्टी (LR)', kn: 'ಸಹಿ ಮಾಡಿದ ಬಿಲ್ಟಿ (LR)', te: 'సంతకం చేసిన బిల్టీ (LR)' },
+  photo: { en: 'photo', hi: 'फोटो', kn: 'ಫೋಟೋ', te: 'ఫోటో' },
+};
+export const kindWord = (k: string, lang = 'en') => (KINDS[k] as any)?.[lang] || KINDS[k]?.en || k;
