@@ -1,7 +1,6 @@
 -- LoadMatch shared data: one append-only event log per workspace.
 -- Every device replays these events through the same reducer, so all phones and laptops agree.
 -- Run this once in Supabase: Dashboard -> SQL Editor -> New query -> paste -> Run.
--- (The older stocktrace_events table is left alone; the StockTrace site keeps using it.)
 
 create table if not exists public.loadmatch_events (
   id bigint generated always as identity primary key,

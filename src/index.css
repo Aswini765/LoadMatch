@@ -1,5 +1,5 @@
 @import "tailwindcss";
 
-/* Same system font stack and Tailwind v4 defaults as StockTrace v1 */
+/* System font stack and Tailwind v4 defaults */
 .scrollbar-none { scrollbar-width: none; }
 .scrollbar-none::-webkit-scrollbar { display: none; }
