@@ -674,6 +674,8 @@ create policy log_read on public.activity_log for select to authenticated using 
 -- people not logged in (link users) get nothing directly; only these two actions
 revoke all on all tables in schema public from anon;
 revoke execute on all functions in schema public from public, anon;
+-- keep the stage-0 demo table usable by today's app
+grant select, insert on public.loadmatch_events to anon, authenticated;
 grant execute on function public.load_for_link(text) to anon, authenticated;
 grant execute on function public.submit_receipt(uuid, text, text, jsonb, text) to anon, authenticated;
 grant execute on function public.create_company(text, text, text, text, text, text), public.claim_membership(text), public.find_company(text),
