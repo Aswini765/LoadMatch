@@ -15,8 +15,8 @@ const LOCAL_KEY = `loadmatch-events-${WORKSPACE}`;
 const OUTBOX_KEY = `loadmatch-outbox-${WORKSPACE}`;
 
 export const sharedMode = Boolean(URL && KEY);
-let client: SupabaseClient | null = null;
-if (sharedMode) client = createClient(URL!, KEY!, { auth: { persistSession: false } });
+export let client: SupabaseClient | null = null;
+if (sharedMode) client = createClient(URL!, KEY!, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } });
 
 export type Ev = { id: number; action: any };
 

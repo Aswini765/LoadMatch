@@ -7,6 +7,7 @@ import Receive, { ReceiveTab, CountBack } from './views/Receive.tsx';
 import Owner, { EvidenceView } from './views/Owner.tsx';
 import { useStore, receiptOverdue, countedByUs, atGate } from './store.tsx';
 import Reports from './views/Reports.tsx';
+import Setup from './views/Setup.tsx';
 import SopModal from './views/SopModal.tsx';
 import SettingsModal from './views/SettingsModal.tsx';
 import type { Go } from './views/ui.tsx';
@@ -17,6 +18,7 @@ const ROLES = [
   ['receive', 'Receive'],
   ['owner', 'Owner'],
   ['reports', 'Reports'],
+  ['setup', 'Company setup'],
 ];
 
 function SyncChip() {
@@ -136,6 +138,7 @@ export default function App() {
             {view === 'owner' && <Owner go={go} initialId={openId} key={`${openId || 'list'}-${nav}`} />}
             {view === 'receive' && <ReceiveTab key={nav} />}
             {view === 'reports' && <Reports go={go} />}
+            {view === 'setup' && <Setup />}
           </>}
         </main>
       </div>
