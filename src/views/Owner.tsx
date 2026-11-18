@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { MessageCircle, Film, Share2, CheckCircle2, Clock, AlertTriangle, Truck, ChevronDown, ChevronRight, ShieldCheck, Link2, HelpCircle, Printer, FileCode, Send, Undo2 } from 'lucide-react';
-import { useStore, item, route, shipmentOf, diffsOf, lineOf, shipmentStatus, receiptOverdue, diffOverdue, receiverPath, evidencePath, evidenceText, truckSummary, importOrder, ACTIONS, OPTIONS, KIND_LABEL, FLOW_LABEL, DRAFT_LABEL } from '../store.tsx';
+import { useStore, item, party, route, atGate, jobworkOpen, jobworkBalance, jobworkDueAt, shipmentOf, diffsOf, lineOf, shipmentStatus, receiptOverdue, diffOverdue, receiverPath, evidencePath, evidenceText, truckSummary, importOrder, ACTIONS, OPTIONS, KIND_LABEL, FLOW_LABEL, DRAFT_LABEL } from '../store.tsx';
 import { reportHtml, printReport, packSummary, entryAmount, entryLines } from '../lib/report.ts';
 import { batchXml, download } from '../lib/tally.ts';
 import { tallyDate } from '../lib/format.ts';
+import { Chain } from './Dispatch.tsx';
 import { PageHeader, Panel, StatusBadge, Note, PhotoStrip, shareWhatsApp, appLink, newToken, type Go } from './ui.tsx';
 import { inr, inr0, when, duration, dateTime, time } from '../lib/format.ts';
 
@@ -73,6 +74,8 @@ export default function Owner({ go, initialId }: { go: Go; initialId?: string | 
         </Panel>
       </div>
 
+      <JobworkPanel />
+
       <AccountantPanel />
 
       <Panel eyebrow="Last 36 hours" title="Truck messages">
@@ -106,6 +109,7 @@ function TruckHead({ s }: { s: any }) {
         <div className="text-slate-500 mt-0.5">{FLOW_LABEL[s.flow]}{s.flow === 'transfer' ? (s.billing === 'invoice' ? ' (with invoice)' : ' (no money)') : ''} · {s.truckNo} · ref {s.ref} · counted by {s.receipt.by}, {when(s.receipt.at)}{s.receipt.photos?.length ? ` · ${s.receipt.photos.length} photo(s)` : ''}</div>
         {s.loading && <div className="text-slate-500">Loading {s.loading.point}, {time(s.loading.startAt)}–{time(s.loading.endAt)}</div>}
         {s.receipt.note && <div className="text-slate-700 italic">“{s.receipt.note}”</div>}
+        <div className="pt-1"><Chain s={s} lang="en" /></div>
         {((s.docs || []).length + (s.receipt.photos || []).length) > 0 && (
           <div className="pt-1.5"><PhotoStrip photos={[...(s.docs || []), ...(s.receipt.photos || []).map((p: any) => (typeof p === 'string' ? { id: p, name: p, kind: 'photo' } : p))]} /></div>
         )}
@@ -171,7 +175,7 @@ function DiffCard({ d, s, startOpen }: { d: any; s: any; startOpen?: boolean }) 
         </div>
       )}
 
-      {s.flow !== 'inbound' && <a id={`ask-${d.id}`} href={shareWhatsApp(`Please explain this difference on ${s.id} (${s.truckNo}, ${route(s)}, ref ${s.ref}):\n${it.name}: sent ${l.qty}, counted ${r.counted}${r.damaged ? `, damaged ${r.damaged}` : ''} → ${KIND_LABEL[d.kind].toLowerCase()} ${d.qty} ${it.unit}.${s.loading ? `\nLoaded at ${s.loading.point}, ${time(s.loading.startAt)}–${time(s.loading.endAt)}.` : ''}`)} target="_blank" rel="noreferrer" className="inline-flex text-[11px] font-bold text-emerald-800 border border-emerald-200 bg-white px-2 py-1 rounded-md items-center mr-2"><HelpCircle className="w-3.5 h-3.5 mr-1" />Ask sender to explain</a>}
+      {!atGate(s.flow) && <a id={`ask-${d.id}`} href={shareWhatsApp(`Please explain this difference on ${s.id} (${s.truckNo}, ${route(s)}, ref ${s.ref}):\n${it.name}: sent ${l.qty}, counted ${r.counted}${r.damaged ? `, damaged ${r.damaged}` : ''} → ${KIND_LABEL[d.kind].toLowerCase()} ${d.qty} ${it.unit}.${s.loading ? `\nLoaded at ${s.loading.point}, ${time(s.loading.startAt)}–${time(s.loading.endAt)}.` : ''}`)} target="_blank" rel="noreferrer" className="inline-flex text-[11px] font-bold text-emerald-800 border border-emerald-200 bg-white px-2 py-1 rounded-md items-center mr-2"><HelpCircle className="w-3.5 h-3.5 mr-1" />Ask sender to explain</a>}
       <button onClick={() => setEvOpen(!evOpen)} className="text-[11px] font-bold text-slate-600 inline-flex items-center cursor-pointer">{evOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}Evidence pack{d.evidence.clips.length ? ` · ${d.evidence.clips.length} clip(s)` : ''}{d.evidence.shares.length ? ` · shared ${d.evidence.shares.length}×` : ''}</button>
       {evOpen && <Evidence d={d} />}
       {d.history.length > 0 && <div className="text-[10px] text-slate-500 space-y-0.5">{d.history.map((h: any, i: number) => <div key={i}>{dateTime(h.at)} · {h.by}: {h.text}</div>)}</div>}
@@ -304,6 +308,41 @@ function AccountantPanel() {
           ))}
         </div>
       )}
+    </Panel>
+  );
+}
+
+// Goods with other companies for processing. Inputs must come back within a year of being sent,
+// or GST treats them as supplied; the warning starts 30 days before.
+function JobworkPanel() {
+  const { state } = useStore();
+  const open = jobworkOpen(state).sort((a: any, b: any) => jobworkDueAt(a) - jobworkDueAt(b));
+  if (!open.length) return null;
+  const now = Date.now();
+  return (
+    <Panel eyebrow="Job work" title={`With job workers · ${open.length} load${open.length > 1 ? 's' : ''}`}>
+      <div className="space-y-2">
+        {open.map((s: any) => {
+          const bal = jobworkBalance(state, s).filter((b: any) => b.pending > 0);
+          const days = Math.ceil((jobworkDueAt(s) - now) / 86400000);
+          const tone = days < 0 ? 'border-rose-300 bg-rose-50/60' : days <= 30 ? 'border-amber-300 bg-amber-50/60' : 'border-slate-200';
+          const msg = `Reminder from Kaveri Wood Products: please return the goods sent for job work on ${s.id} (challan ${s.ref}, ${dateTime(s.sentAt)}):\n${bal.map((b: any) => `• ${b.pending} ${item(b.item).unit} ${item(b.item).name}`).join('\n')}`;
+          return (
+            <div key={s.id} id={`jw-${s.id}`} className={`rounded-lg border p-2.5 text-xs space-y-1 ${tone}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-bold text-slate-900"><span className="font-mono">{s.id}</span> · {party(s.party).name}</div>
+                  <div className="text-slate-500">Sent {dateTime(s.sentAt)} on challan {s.ref}</div>
+                </div>
+                <div className={`text-right shrink-0 font-bold ${days < 0 ? 'text-rose-700' : days <= 30 ? 'text-amber-800' : 'text-slate-700'}`}>{days < 0 ? `${-days} days past the one-year limit` : `${days} days left`}</div>
+              </div>
+              {bal.map((b: any) => <div key={b.item} className="text-slate-700">Still with them: <b>{b.pending}</b> {item(b.item).unit} {item(b.item).name} <span className="text-slate-400">(sent {b.sent}, back {b.returned}{b.lost ? `, written off ${b.lost}` : ''})</span></div>)}
+              {days <= 30 && <div className="text-[11px] text-slate-600">{days < 0 ? 'GST treats inputs not back within a year as supplied on the day they were sent: talk to your accountant.' : 'Bring these back before the date, or ask your accountant about an extension.'}</div>}
+              <a href={shareWhatsApp(msg)} target="_blank" rel="noreferrer" className="inline-flex text-[11px] font-bold text-emerald-800 border border-emerald-200 bg-white px-2 py-1 rounded-md items-center"><MessageCircle className="w-3.5 h-3.5 mr-1" />Remind job worker</a>
+            </div>
+          );
+        })}
+      </div>
     </Panel>
   );
 }

@@ -14,7 +14,16 @@ export const FLOW_LABEL: Record<string, string> = {
   transfer: 'Transfer between units',
   inbound: 'Supplier delivery',
   outbound: 'Customer dispatch',
+  jobwork_out: 'Sent for job work',
+  jobwork_in: 'Back from job work',
 };
+// Loads that our own gate records when they arrive (no loading window at our end)
+export const atGate = (flow: string) => flow === 'inbound' || flow === 'jobwork_in';
+// Loads our own staff count (the rest are counted by the customer or the job worker through the link)
+export const countedByUs = (s: any) => atGate(s.flow) || s.flow === 'transfer';
+// Job work: goods sent to another company to process and bring back. Inputs must come back within a year.
+export const JOBWORK_DAYS = 365;
+const DAY = 24 * 3600000;
 export const KIND_LABEL: Record<string, string> = { short: 'Short', excess: 'Excess', damaged: 'Damaged' };
 
 // What the owner can do with a difference. due = stays open until a date; settles = closed at once;
@@ -32,12 +41,17 @@ export const ACTIONS: Record<string, { label: string; due?: boolean; settles?: b
   credit_note: { label: 'Credit note to the customer', settles: true, loss: true, draft: 'Credit note' },
   bill_extra: { label: 'Bill the extra to the customer', settles: true, draft: 'Sales invoice' },
   customer_returns: { label: 'Customer returns the extra', due: true },
+  jobworker_sends_rest: { label: 'Job worker sends the rest', due: true },
+  jobworker_replaces: { label: 'Job worker replaces the damaged ones', due: true },
+  keep_returned: { label: 'Record the extra as returned', settles: true, draft: 'Stock journal from the job worker' },
   investigate: { label: 'Investigate first (CCTV, driver, sender)' },
 };
 export const OPTIONS: Record<string, Record<string, string[]>> = {
   transfer: { short: ['write_off', 'investigate'], damaged: ['write_off', 'investigate'], excess: ['correct_list', 'investigate'] },
   inbound: { short: ['replace', 'debit_note', 'accept', 'investigate'], damaged: ['replace', 'debit_note', 'accept', 'investigate'], excess: ['keep_extra', 'return_extra', 'investigate'] },
   outbound: { short: ['send_rest', 'credit_note', 'investigate'], damaged: ['send_replacement', 'credit_note', 'investigate'], excess: ['bill_extra', 'customer_returns', 'investigate'] },
+  jobwork_out: { short: ['write_off', 'investigate'], damaged: ['write_off', 'investigate'], excess: ['correct_list', 'investigate'] },
+  jobwork_in: { short: ['jobworker_sends_rest', 'write_off', 'investigate'], damaged: ['jobworker_replaces', 'write_off', 'investigate'], excess: ['keep_returned', 'investigate'] },
 };
 
 export const DRAFT_LABEL: Record<string, string> = {
@@ -60,7 +74,7 @@ export const lineOf = (s: any, lineId: string) => s.lines.find((l: any) => l.id 
 // "Mysuru unit → Bengaluru unit", "Sri Lakshmi Timbers → Mysuru unit", "Bengaluru unit → Deccan Pumps Ltd"
 export function route(s: any) {
   if (s.flow === 'transfer') return `${UNITS[s.fromUnit].name.split(' (')[0]} → ${UNITS[s.toUnit].name.split(' (')[0]}`;
-  if (s.flow === 'inbound') return `${PARTIES[s.party].name} → ${UNITS[s.toUnit].name.split(' (')[0]}`;
+  if (s.flow === 'inbound' || s.flow === 'jobwork_in') return `${PARTIES[s.party].name} → ${UNITS[s.toUnit].name.split(' (')[0]}`;
   return `${UNITS[s.fromUnit].name.split(' (')[0]} → ${PARTIES[s.party].name}`;
 }
 
@@ -86,6 +100,27 @@ export const STATUS_META: Record<string, { label: string; cls: string }> = {
 export const receiptOverdue = (state: any, s: any, now = Date.now()) => Boolean(s.sentAt && !s.receipt && !s.cancelledAt && now - s.sentAt > state.settings.receiptHours * HOUR);
 export const diffOverdue = (d: any, now = Date.now()) => d.status === 'waiting' && d.decision?.dueAt && now > d.decision.dueAt;
 export const lossValue = (d: any) => (d.decision && ACTIONS[d.decision.action]?.loss ? d.value : 0);
+
+// What is still with the job worker for one job work load: sent − came back − written off, per item
+export function jobworkBalance(state: any, out: any) {
+  const back = state.shipments.filter((x: any) => x.flow === 'jobwork_in' && x.parentId === out.id && x.receipt);
+  return out.lines.map((l: any) => {
+    const returned = back.reduce((a: number, b: any) => a + b.lines.filter((x: any) => x.item === l.item).reduce((q: number, x: any) => q + (b.receipt.lines[x.id]?.counted || 0), 0), 0);
+    // written off while with the job worker: damaged on arrival there, or short on a return. (A shortage found
+    // when the job worker counted on arrival never reached them, so it is already out of "arrived".)
+    const lost = state.diffs.filter((d: any) => d.item === l.item && d.decision?.action === 'write_off'
+      && ((d.shipmentId === out.id && d.kind === 'damaged') || (d.kind === 'short' && back.some((b: any) => b.id === d.shipmentId)))).reduce((a: number, d: any) => a + d.qty, 0);
+    // what the job worker counted on arrival is what they hold; before they count, the list quantity
+    const arrived = out.receipt ? out.receipt.lines[l.id].counted : l.qty;
+    return { item: l.item, sent: l.qty, arrived, returned, lost, pending: Math.max(0, arrived - returned - lost) };
+  });
+}
+export const jobworkDueAt = (out: any) => (out.sentAt || out.createdAt) + JOBWORK_DAYS * DAY;
+export const jobworkOpen = (state: any) => state.shipments.filter((s: any) => s.flow === 'jobwork_out' && s.sentAt && !s.cancelledAt && jobworkBalance(state, s).some((b: any) => b.pending > 0));
+
+// Loads linked by "made from": the earlier load this one came from, and loads made from this one
+export const parentOf = (state: any, s: any) => (s.parentId ? shipmentOf(state, s.parentId) : null);
+export const childrenOf = (state: any, s: any) => state.shipments.filter((x: any) => x.parentId === s.id && !x.cancelledAt);
 
 // The receiver's link: opens one truck, no login
 export const receiverPath = (s: any) => `#/r/${s.id}/${s.token}`;
@@ -127,6 +162,7 @@ const putShipment = (state: any, s: any) => ({ ...state, shipments: state.shipme
 const putDiff = (state: any, d: any) => ({ ...state, diffs: state.diffs.map((x: any) => (x.id === d.id ? d : x)) });
 const isInt = (n: any) => Number.isInteger(n) && n >= 0;
 const godownOf = (unitId: string) => UNITS[unitId].godown;
+export const jobworkerGodown = (partyId: string) => `At job worker: ${PARTIES[partyId].name}`;
 const unitTax = (state: any, unitId: string) => state.settings.units?.[unitId] || { gstin: COMPANY.gstin, state: COMPANY.state };
 // Two units are one registration unless the owner gave them different GSTINs (used to suggest the paperwork)
 export const sameGstin = (state: any, a: string, b: string) => unitTax(state, a).gstin === unitTax(state, b).gstin;
@@ -150,6 +186,13 @@ function decisionDraft(state: any, s: any, d: any, action: string, at: number) {
     const branch = { partyInfo: branchParty(state, s.toUnit), fromState: unitTax(state, s.fromUnit).state, ref: s.ref, lines: [priced(d.item, d.qty)] };
     if (action === 'write_off') return { ...base, ...branch, type: 'credit_note', narration: `${s.id} (${s.ref}): ${d.qty} ${it.unit} ${it.name} ${d.kind === 'damaged' ? 'damaged' : 'lost'} in transit, ${route(s)}. Written off by the owner against the branch transfer invoice.` };
     if (action === 'correct_list') return { ...base, ...branch, type: 'branch_invoice', narration: `${s.id} (${s.ref}): ${d.qty} ${it.unit} ${it.name} loaded but not on the list; invoiced to the branch as sent.` };
+  }
+  if (s.flow === 'jobwork_out' || s.flow === 'jobwork_in') {
+    const jw = jobworkerGodown(s.party);
+    if (action === 'write_off') return { ...base, type: 'stock_journal', moves: [{ item: d.item, qty: d.qty, from: s.flow === 'jobwork_in' && d.kind === 'damaged' ? GODOWNS.damaged : jw, to: GODOWNS.loss }], narration: `${s.id} (${s.ref}): ${d.qty} ${it.unit} ${it.name} ${d.kind === 'damaged' ? 'damaged' : 'lost'} on job work with ${PARTIES[s.party].name}. Written off by the owner.` };
+    if (action === 'correct_list') return { ...base, type: 'stock_journal', moves: [{ item: d.item, qty: d.qty, from: godownOf(s.fromUnit), to: jw }], narration: `${s.id} (${s.ref}): ${d.qty} ${it.unit} ${it.name} loaded but not on the list; recorded as sent for job work.` };
+    if (action === 'keep_returned') return { ...base, type: 'stock_journal', moves: [{ item: d.item, qty: d.qty, from: jw, to: godownOf(s.toUnit) }], narration: `${s.id} (${s.ref}): ${d.qty} ${it.unit} ${it.name} more than the job worker's challan; recorded as returned.` };
+    return null;
   }
   if (action === 'write_off' && s.flow === 'transfer') {
     const from = d.kind === 'damaged' ? GODOWNS.damaged : GODOWNS.transit;
@@ -193,6 +236,13 @@ export function reducer(state: any, action: any): any {
       if (flow === 'transfer' && (!UNITS[action.fromUnit] || !UNITS[action.toUnit] || action.fromUnit === action.toUnit)) return state;
       if (flow === 'outbound' && (!UNITS[action.fromUnit] || PARTIES[action.party]?.kind !== 'customer')) return state;
       if (flow === 'inbound' && (!UNITS[action.toUnit] || PARTIES[action.party]?.kind !== 'supplier')) return state;
+      if (flow === 'jobwork_out' && (!UNITS[action.fromUnit] || PARTIES[action.party]?.kind !== 'jobworker')) return state;
+      if (flow === 'jobwork_in') {
+        const out = shipmentOf(state, action.parentId);
+        if (!UNITS[action.toUnit] || PARTIES[action.party]?.kind !== 'jobworker' || !out || out.flow !== 'jobwork_out' || out.party !== action.party) return state;
+      }
+      // "made from" link to an earlier load (optional, except a job work return must name what it returns)
+      if (action.parentId && !shipmentOf(state, action.parentId)) return state;
       const n = state.counters.trk + 1;
       const id = action.id || `TRK-${1000 + n}`;
       if (shipmentOf(state, id)) return state;
@@ -204,7 +254,8 @@ export function reducer(state: any, action: any): any {
         // between own units the sender chooses: 'none' = stock transfer, no money; 'invoice' = branch invoice with GST.
         // Default follows the units' GSTINs as set by the owner.
         docs: (action.docs || []).filter((d: any) => d && d.id).map((d: any) => ({ id: d.id, name: String(d.name || 'photo'), kind: d.kind || 'document', by: actor, at })),
-        billing: flow === 'transfer' ? (['none', 'invoice'].includes(action.billing) ? action.billing : (sameGstin(state, action.fromUnit, action.toUnit) ? 'none' : 'invoice')) : 'invoice',
+        parentId: action.parentId || null,
+        billing: flow.startsWith('jobwork') ? 'none' : flow === 'transfer' ? (['none', 'invoice'].includes(action.billing) ? action.billing : (sameGstin(state, action.fromUnit, action.toUnit) ? 'none' : 'invoice')) : 'invoice',
       };
       s = audit(s, at, actor, 'LISTED', `${lines.length} line(s), ${lines.reduce((a: number, l: any) => a + l.qty, 0)} units, ${FLOW_LABEL[flow].toLowerCase()}, ref ${s.ref}.`);
       return { ...state, counters: { ...state.counters, trk: Math.max(state.counters.trk, Number(id.slice(4)) - 1000) }, shipments: [...state.shipments, s] };
@@ -227,7 +278,7 @@ export function reducer(state: any, action: any): any {
 
     case 'LOADING': {
       const s = shipmentOf(state, action.id);
-      if (!s || s.sentAt || s.cancelledAt || s.flow === 'inbound') return state;
+      if (!s || s.sentAt || s.cancelledAt || atGate(s.flow)) return state;
       if (action.phase === 'start') {
         if (s.loading?.startAt) return state;
         return putShipment(state, audit({ ...s, loading: { point: action.point || 'Dock 1', startAt: at, endAt: null } }, at, actor, 'LOADING_STARTED', `Loading started at ${action.point || 'Dock 1'}.`));
@@ -242,15 +293,21 @@ export function reducer(state: any, action: any): any {
     case 'SEND_TO_RECEIVER': {
       const s = shipmentOf(state, action.id);
       if (!s || s.sentAt || s.cancelledAt) return state;
-      if (s.flow !== 'inbound' && !s.loading?.endAt) return state; // the loading window is the CCTV evidence
+      if (!atGate(s.flow) && !s.loading?.endAt) return state; // the loading window is the CCTV evidence
       if (!action.token || String(action.token).length < 6) return state;
-      let next = putShipment(state, audit({ ...s, sentAt: at, token: action.token }, at, actor, s.flow === 'inbound' ? 'COUNT_STARTED' : 'SENT', s.flow === 'inbound' ? 'Gate count opened.' : 'Truck left; receiver link shared.'));
+      let next = putShipment(state, audit({ ...s, sentAt: at, token: action.token }, at, actor, atGate(s.flow) ? 'COUNT_STARTED' : 'SENT', atGate(s.flow) ? 'Gate count opened.' : 'Truck left; receiver link shared.'));
       if (s.flow === 'transfer' && s.billing === 'invoice') {
         next = addDraft(next, {
           type: 'branch_invoice', purpose: 'dispatch', createdAt: at, shipmentId: s.id, ref: s.ref,
           partyInfo: branchParty(state, s.toUnit), fromState: unitTax(state, s.fromUnit).state,
           lines: s.lines.map((l: any) => priced(l.item, l.qty)),
           narration: `${s.id} (${s.ref}), truck ${s.truckNo}: branch transfer ${route(s)}, invoiced with GST.`,
+        });
+      } else if (s.flow === 'jobwork_out') {
+        next = addDraft(next, {
+          type: 'stock_journal', purpose: 'dispatch', createdAt: at, shipmentId: s.id,
+          moves: s.lines.map((l: any) => ({ item: l.item, qty: l.qty, from: godownOf(s.fromUnit), to: jobworkerGodown(s.party) })),
+          narration: `${s.id} (${s.ref}), truck ${s.truckNo}: sent for job work, ${route(s)}, on delivery challan ${s.ref}. To come back by ${new Date(at + JOBWORK_DAYS * DAY).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}.`,
         });
       } else if (s.flow === 'transfer') {
         next = addDraft(next, {
@@ -301,6 +358,15 @@ export function reducer(state: any, action: any): any {
           if (bad) moves.push({ item: l.item, qty: bad, from: GODOWNS.transit, to: GODOWNS.damaged });
         }
         if (moves.length) next = addDraft(next, { type: 'stock_journal', purpose: 'receipt', createdAt: at, shipmentId: s.id, moves, narration: `${s.id} (${s.ref}): received at ${UNITS[s.toUnit].name.split(' (')[0]}, counted by ${receipt.by}.` });
+      }
+      if (s.flow === 'jobwork_in') {
+        const moves: any[] = [];
+        for (const l of s.lines) {
+          const { counted, damaged } = counts[l.id];
+          if (counted - damaged > 0) moves.push({ item: l.item, qty: counted - damaged, from: jobworkerGodown(s.party), to: godownOf(s.toUnit) });
+          if (damaged > 0) moves.push({ item: l.item, qty: damaged, from: jobworkerGodown(s.party), to: GODOWNS.damaged });
+        }
+        if (moves.length) next = addDraft(next, { type: 'stock_journal', purpose: 'receipt', createdAt: at, shipmentId: s.id, moves, narration: `${s.id} (${s.ref}): back from job work at ${PARTIES[s.party].name} for ${s.parentId}, counted by ${receipt.by}.` });
       }
       if (s.flow === 'inbound') {
         const lines = s.lines.map((l: any) => ({ ...priced(l.item, counts[l.id].counted - counts[l.id].damaged), godown: godownOf(s.toUnit) })).filter((l: any) => l.qty > 0);

@@ -1,6 +1,7 @@
 // LoadMatch flow checks through the real reducer. Run: npm test
 import assert from 'node:assert/strict';
 import {
+  jobworkBalance, jobworkDueAt, jobworkOpen, childrenOf, parentOf, JOBWORK_DAYS,
   reducer, buildInitialState, shipmentOf, diffsOf, diffOf, shipmentStatus, receiptOverdue, diffOverdue, truckSummary, evidenceText, importOrder,
 } from '../src/core.ts';
 import { voucherXml } from '../src/lib/tally.ts';
@@ -38,7 +39,10 @@ test('seed: one truck to decide, one promise waiting, one in transit, one loadin
   // last month's entries already went to the accountant; only this week's trucks are waiting
   const pending = s.drafts.filter((d: any) => d.status === 'pending');
   assert.deepEqual([...new Set(pending.map((d: any) => d.shipmentId))].sort(), ['TRK-1013', 'TRK-1014', 'TRK-1016']);
-  assert.equal(s.drafts.filter((d: any) => d.status === 'sent').length, 13);
+  assert.equal(s.drafts.filter((d: any) => d.status === 'sent').length, 15);
+  // the job work example: 50 of 200 still with the job worker, due within the year
+  assert.equal(jobworkBalance(s, shipmentOf(s, 'TRK-1018'))[0].pending, 50);
+  assert.equal(parentOf(s, shipmentOf(s, 'TRK-1016')).id, 'TRK-1014');
   assert.equal(s.packs.length, 1);
   // sending marks entries so the next pack never repeats them
   const ids = pending.map((d: any) => d.id);
@@ -286,6 +290,39 @@ test('photos of challans and bills stay with the truck and show in the evidence'
   assert.equal(run(s, { type: 'ATTACH_DOC', id, docs: [] }), s, 'nothing to add');
   s = run(s, { type: 'SEND_TO_RECEIVER', id, token: 'tok777', actor: 'Gate' }, { type: 'SUBMIT_RECEIPT', id, token: 'tok777', by: 'Gate', lines: { L1: { counted: 45, damaged: 0 } } });
   assert.match(evidenceText(s, diffsOf(s, id)[0]), /Papers: supplier bill, order \(2 photos\)/);
+});
+
+test('job work: sent out, comes back in parts, balance and one-year date', () => {
+  let s = buildInitialState();
+  s = run(s, { type: 'CREATE_SHIPMENT', flow: 'jobwork_out', fromUnit: 'MYS', party: 'ganesh', truckNo: 'KA 9', ref: 'JW-1', lines: [{ item: 'PLY-12', qty: 100 }] });
+  const out = lastShip(s).id;
+  assert.equal(lastShip(s).billing, 'none', 'job work is not a sale');
+  assert.equal(run(s, { type: 'SEND_TO_RECEIVER', id: out, token: 'tokjw1' }), s, 'needs the loading window');
+  s = run(s, { type: 'LOADING', id: out, phase: 'start' }, { type: 'LOADING', id: out, phase: 'end' }, { type: 'SEND_TO_RECEIVER', id: out, token: 'tokjw1' });
+  const sj = draftsFor(s, out)[0];
+  assert.equal(sj.moves[0].to, 'At job worker: Sri Ganesh Wood Finishers');
+  // the job worker counts 98 good + 2 damaged on arrival
+  s = run(s, { type: 'SUBMIT_RECEIPT', id: out, token: 'tokjw1', by: 'Ganesh stores', lines: { L1: { counted: 100, damaged: 2 } } });
+  assert.equal(jobworkBalance(s, shipmentOf(s, out))[0].pending, 100);
+  // a return must name the load it returns
+  assert.equal(run(s, { type: 'CREATE_SHIPMENT', flow: 'jobwork_in', toUnit: 'MYS', party: 'ganesh', truckNo: 'X', ref: 'R', lines: [{ item: 'PLY-12', qty: 1 }] }), s);
+  s = run(s, { type: 'CREATE_SHIPMENT', flow: 'jobwork_in', parentId: out, toUnit: 'MYS', party: 'ganesh', truckNo: 'KA 9', ref: 'GL-55', lines: [{ item: 'PLY-12', qty: 60 }] });
+  const back = lastShip(s).id;
+  s = run(s, { type: 'SEND_TO_RECEIVER', id: back, token: 'tokjw2' }, { type: 'SUBMIT_RECEIPT', id: back, token: 'tokjw2', by: 'Stores', lines: { L1: { counted: 57, damaged: 0 } } });
+  const bal = jobworkBalance(s, shipmentOf(s, out))[0];
+  assert.equal(bal.returned, 57);
+  assert.equal(bal.pending, 43);
+  const rj = draftsFor(s, back).find((d: any) => d.purpose === 'receipt');
+  assert.equal(rj.moves[0].from, 'At job worker: Sri Ganesh Wood Finishers');
+  // 3 short on the return: written off reduces what is still with them
+  const short = diffsOf(s, back)[0];
+  assert.deepEqual(short.kind, 'short');
+  s = run(s, { type: 'DECIDE', diffId: short.id, action: 'write_off' });
+  assert.equal(jobworkBalance(s, shipmentOf(s, out))[0].pending, 40);
+  assert.equal(jobworkDueAt(shipmentOf(s, out)), shipmentOf(s, out).sentAt + JOBWORK_DAYS * 24 * 3600000);
+  assert.ok(jobworkOpen(s).some((x: any) => x.id === out));
+  assert.equal(parentOf(s, shipmentOf(s, back)).id, out);
+  assert.deepEqual(childrenOf(s, shipmentOf(s, out)).map((x: any) => x.id), [back]);
 });
 
 console.log(`\n${passed} tests passed`);

@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Mic, MicOff, Camera, Lock, CheckCircle2, AlertTriangle, Minus, Plus, ChevronLeft, ChevronRight, MessageCircle, PackageCheck, Warehouse, ArrowRight } from 'lucide-react';
-import { useStore, item, route, shipmentOf, diffsOf, shipmentStatus, receiverPath, FLOW_LABEL } from '../store.tsx';
+import { Mic, MicOff, Camera, Lock, CheckCircle2, AlertTriangle, Minus, Plus, ChevronLeft, ChevronRight, MessageCircle, PackageCheck, Warehouse, ArrowRight, Wrench } from 'lucide-react';
+import { useStore, item, route, shipmentOf, diffsOf, shipmentStatus, receiverPath, countedByUs, jobworkOpen, FLOW_LABEL } from '../store.tsx';
 import { t, fill, unitWord } from '../i18n.ts';
 import { useVoice, parseCount } from '../lib/voice.ts';
 import { PhoneFrame, Note, PhotoStrip, savedLang, saveLang, shareWhatsApp, newToken } from './ui.tsx';
-import { NewList } from './Dispatch.tsx';
+import { NewList, Chain } from './Dispatch.tsx';
 import { when } from '../lib/format.ts';
 
 // ---------- the Receive tab: your own floor staff ----------
@@ -13,9 +13,9 @@ export function ReceiveTab() {
   const { state, dispatch } = useStore();
   const [lang, setLangState] = useState(savedLang);
   const setLang = (l: string) => { setLangState(l); saveLang(l); };
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState<string | null>(null);
   const open = state.shipments
-    .filter((s: any) => !s.receipt && !s.cancelledAt && (s.flow === 'inbound' ? true : s.flow === 'transfer' && s.sentAt))
+    .filter((s: any) => !s.receipt && !s.cancelledAt && countedByUs(s) && (s.flow !== 'transfer' || s.sentAt))
     .sort((a: any, b: any) => (a.sentAt || a.createdAt) - (b.sentAt || b.createdAt));
   const start = (s: any) => {
     if (s.sentAt) { window.location.hash = receiverPath(s); return; }
@@ -24,14 +24,19 @@ export function ReceiveTab() {
     window.location.hash = `#/r/${s.id}/${token}`;
   };
   return (
-    <PhoneFrame title={`LoadMatch · ${t('receive', lang)}`} sub={adding ? t('supplierDelivery', lang) : t('toCount', lang)} lang={lang} setLang={setLang}>
+    <PhoneFrame title={`LoadMatch · ${t('receive', lang)}`} sub={adding ? t(adding === 'jobwork_in' ? 'backFromJobwork' : 'supplierDelivery', lang) : t('toCount', lang)} lang={lang} setLang={setLang}>
       {adding ? (
-        <NewList lang={lang} flow="inbound" onBack={() => setAdding(false)} onSaved={(id) => { setAdding(false); const s = state.shipments.find((x: any) => x.id === id); start(s || { id, sentAt: null }); }} />
+        <NewList lang={lang} flow={adding} onBack={() => setAdding(null)} onSaved={(id) => { setAdding(null); const s = state.shipments.find((x: any) => x.id === id); start(s || { id, sentAt: null }); }} />
       ) : (
         <div className="space-y-3">
-          <button id="btn-new-inbound" onClick={() => setAdding(true)} className="w-full py-3 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-left text-sm font-bold text-slate-900 flex items-center justify-between cursor-pointer shadow-2xs">
+          <button id="btn-new-inbound" onClick={() => setAdding('inbound')} className="w-full py-3 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-left text-sm font-bold text-slate-900 flex items-center justify-between cursor-pointer shadow-2xs">
             <span className="flex items-center"><Warehouse className="w-4 h-4 mr-2 text-emerald-700" />{t('supplierDelivery', lang)}</span><Plus className="w-4 h-4 text-slate-400" />
           </button>
+          {jobworkOpen(state).length > 0 && (
+            <button id="btn-new-jobwork-in" onClick={() => setAdding('jobwork_in')} className="w-full py-3 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-left text-sm font-bold text-slate-900 flex items-center justify-between cursor-pointer shadow-2xs">
+              <span className="flex items-center"><Wrench className="w-4 h-4 mr-2 text-emerald-700" />{t('backFromJobwork', lang)}</span><Plus className="w-4 h-4 text-slate-400" />
+            </button>
+          )}
           <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wide pt-1">{t('toCount', lang)}</div>
           {!open.length && <Note>{t('nothingToCount', lang)}</Note>}
           {open.map((s: any) => (

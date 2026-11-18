@@ -1,6 +1,6 @@
 import React from 'react';
 import { Truck, PackageCheck, Scale, FileCode, ArrowRight, BarChart3, Settings2 } from 'lucide-react';
-import { useStore, shipmentStatus, receiptOverdue } from '../store.tsx';
+import { useStore, shipmentStatus, receiptOverdue, countedByUs, atGate } from '../store.tsx';
 import { COMPANY } from '../data/seed.ts';
 import type { Go } from './ui.tsx';
 
@@ -13,9 +13,9 @@ export default function Home({ go }: { go: Go }) {
   const late = state.shipments.filter((s: any) => receiptOverdue(state, s, now)).length;
   const decide = state.diffs.filter((d: any) => d.status === 'open' || d.status === 'investigating').length;
   const drafts = state.drafts.filter((d: any) => d.status === 'pending').length;
-  const firstLink = state.shipments.find((s: any) => s.sentAt && !s.receipt && !s.cancelledAt && s.flow !== 'inbound');
+  const firstLink = state.shipments.find((s: any) => s.sentAt && !s.receipt && !s.cancelledAt && !atGate(s.flow));
 
-  const toCount = state.shipments.filter((s: any) => !s.receipt && !s.cancelledAt && (s.flow === 'inbound' || (s.flow === 'transfer' && s.sentAt))).length;
+  const toCount = state.shipments.filter((s: any) => !s.receipt && !s.cancelledAt && countedByUs(s) && (s.flow !== 'transfer' || s.sentAt)).length;
   const roles = [
     { id: 'dispatch', icon: Truck, title: 'Dispatch', who: 'Sender, on the phone', what: 'Lists what is going (typed, spoken or pasted from Excel), records loading start and end, chooses whether money is involved between units, and sends the receiver a WhatsApp link. Sees the result when the count comes back.', n: loading, nLabel: 'loading' },
     { id: 'receive', icon: PackageCheck, title: 'Receive', who: 'Floor staff, by voice', what: 'Counts one line at a time by speaking: “48, 2 damaged”. The sent quantity stays hidden until the count is submitted; then the app shows sent vs counted and tells the sender. Supplier deliveries are counted here too.', n: toCount + transit, nLabel: late ? `to count · ${late} late` : 'to count' },

@@ -5,7 +5,7 @@ import Home from './views/Home.tsx';
 import Dispatch from './views/Dispatch.tsx';
 import Receive, { ReceiveTab } from './views/Receive.tsx';
 import Owner, { EvidenceView } from './views/Owner.tsx';
-import { useStore, receiptOverdue } from './store.tsx';
+import { useStore, receiptOverdue, countedByUs, atGate } from './store.tsx';
 import Reports from './views/Reports.tsx';
 import SopModal from './views/SopModal.tsx';
 import SettingsModal from './views/SettingsModal.tsx';
@@ -37,8 +37,8 @@ function useBadges() {
   const now = Date.now();
   const owner = state.diffs.filter((d: any) => d.status === 'open' || d.status === 'investigating').length;
   const late = state.shipments.filter((s: any) => receiptOverdue(state, s, now)).length;
-  const loading = state.shipments.filter((s: any) => !s.sentAt && !s.cancelledAt && s.flow !== 'inbound').length;
-  const toCount = state.shipments.filter((s: any) => !s.receipt && !s.cancelledAt && (s.flow === 'inbound' || (s.flow === 'transfer' && s.sentAt))).length;
+  const loading = state.shipments.filter((s: any) => !s.sentAt && !s.cancelledAt && !atGate(s.flow)).length;
+  const toCount = state.shipments.filter((s: any) => !s.receipt && !s.cancelledAt && countedByUs(s) && (s.flow !== 'transfer' || s.sentAt)).length;
   return {
     dispatch: late ? { n: late, cls: 'bg-rose-600' } : loading ? { n: loading, cls: 'bg-slate-400' } : null,
     receive: toCount ? { n: toCount, cls: 'bg-sky-600' } : null,

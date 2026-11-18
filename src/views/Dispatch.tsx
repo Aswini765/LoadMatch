@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { ArrowRight, ChevronLeft, Plus, Trash2, Truck, Play, Square, Send, Copy, MessageCircle, ClipboardPaste, PackageCheck, AlertTriangle, Mic, CheckCircle2 } from 'lucide-react';
-import { useStore, item, party, route, shipmentStatus, receiptOverdue, receiverPath, sameGstin, FLOW_LABEL, STATUS_META } from '../store.tsx';
+import { ArrowRight, ChevronLeft, Plus, Trash2, Truck, Play, Square, Send, Copy, MessageCircle, ClipboardPaste, PackageCheck, AlertTriangle, Mic, CheckCircle2, Wrench, Link2 } from 'lucide-react';
+import { useStore, item, party, route, shipmentStatus, receiptOverdue, receiverPath, sameGstin, atGate, jobworkOpen, jobworkBalance, parentOf, childrenOf, FLOW_LABEL, STATUS_META } from '../store.tsx';
 import { useVoice, findNumber } from '../lib/voice.ts';
 import { resultText } from './Receive.tsx';
 import { ITEMS, PARTIES, UNITS, LOADING_POINTS } from '../data/seed.ts';
@@ -15,7 +15,7 @@ export default function Dispatch({ go, initialId }: { go: Go; initialId?: string
   const [lang, setLangState] = useState(savedLang);
   const setLang = (l: string) => { setLangState(l); saveLang(l); };
   const [screen, setScreen] = useState<string>(initialId ? `truck:${initialId}` : 'list');
-  const sub = screen.startsWith('truck:') ? screen.slice(6) : screen.startsWith('new:') ? t(screen === 'new:transfer' ? 'newTransfer' : 'newCustomer', lang) : t('trucks', lang);
+  const sub = screen.startsWith('truck:') ? screen.slice(6) : screen.startsWith('new:') ? t(screen === 'new:transfer' ? 'newTransfer' : screen === 'new:jobwork_out' ? 'newJobwork' : 'newCustomer', lang) : t('trucks', lang);
   return (
     <PhoneFrame title="LoadMatch · Dispatch" sub={sub} lang={lang} setLang={setLang}>
       {screen === 'list' && <TruckList lang={lang} open={(id) => setScreen(`truck:${id}`)} create={(f) => setScreen(`new:${f}`)} />}
@@ -30,14 +30,14 @@ function TruckList({ lang, open, create }: { lang: string; open: (id: string) =>
   const now = Date.now();
   const rank: Record<string, number> = { LOADING: 0, IN_TRANSIT: 1, TO_DECIDE: 2, WAITING: 3, MATCHED: 4, SETTLED: 5, CANCELLED: 6 };
   const list = state.shipments
-    .filter((s: any) => s.flow !== 'inbound')
+    .filter((s: any) => !atGate(s.flow))
     .filter((s: any) => !s.receipt || now - s.receipt.at < 48 * 3600000)
     .filter((s: any) => !s.cancelledAt || now - s.cancelledAt < 12 * 3600000)
     .sort((a: any, b: any) => rank[shipmentStatus(state, a)] - rank[shipmentStatus(state, b)] || b.createdAt - a.createdAt);
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-1 gap-2">
-        {([['transfer', 'newTransfer', Truck], ['outbound', 'newCustomer', Send]] as const).map(([f, k, Icon]) => (
+        {([['transfer', 'newTransfer', Truck], ['outbound', 'newCustomer', Send], ['jobwork_out', 'newJobwork', Wrench]] as const).map(([f, k, Icon]) => (
           <button key={f} id={`btn-new-${f}`} onClick={() => create(f)} className="w-full py-3 px-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-left text-sm font-bold text-slate-900 flex items-center justify-between cursor-pointer shadow-2xs">
             <span className="flex items-center"><Icon className="w-4 h-4 mr-2 text-emerald-700" />{t(k, lang)}</span><Plus className="w-4 h-4 text-slate-400" />
           </button>
@@ -84,9 +84,25 @@ export function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: s
   const { state, dispatch } = useStore();
   const customers = Object.values(PARTIES).filter((p) => p.kind === 'customer');
   const suppliers = Object.values(PARTIES).filter((p) => p.kind === 'supplier');
+  const jobworkers = Object.values(PARTIES).filter((p) => p.kind === 'jobworker');
+  const partyList = flow === 'outbound' ? customers : flow === 'inbound' ? suppliers : jobworkers;
+  const gate = atGate(flow);
+  const hasFrom = !gate;
+  const hasTo = flow === 'transfer' || gate;
   const [fromUnit, setFrom] = useState(flow === 'outbound' ? 'BLR' : 'MYS');
-  const [toUnit, setTo] = useState(flow === 'inbound' ? 'MYS' : 'BLR');
-  const [partyId, setParty] = useState(flow === 'outbound' ? customers[0].id : suppliers[0].id);
+  const [toUnit, setTo] = useState(gate ? 'MYS' : 'BLR');
+  const [partyId, setParty] = useState(partyList[0]?.id || '');
+  // "made from": the earlier load this one continues (a job work return must say which load it returns)
+  const [parentId, setParentId] = useState('');
+  const openJobwork = flow === 'jobwork_in' ? jobworkOpen(state) : [];
+  const madeFromOptions = hasFrom ? state.shipments.filter((x: any) => x.receipt && !x.cancelledAt && x.toUnit === fromUnit && Date.now() - x.receipt.at < 60 * 24 * 3600000).sort((a: any, b: any) => b.receipt.at - a.receipt.at) : [];
+  const pickReturn = (id: string) => {
+    setParentId(id);
+    const out = state.shipments.find((x: any) => x.id === id);
+    if (!out) return;
+    setParty(out.party); setTo(out.fromUnit);
+    setLines(jobworkBalance(state, out).filter((b: any) => b.pending > 0).map((b: any) => ({ item: b.item, qty: String(b.pending) })));
+  };
   const [truckNo, setTruck] = useState('');
   const [ref, setRef] = useState('');
   const [lines, setLines] = useState<any[]>([{ item: '', qty: '' }]);
@@ -109,10 +125,10 @@ export function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: s
   const [pasted, setPasted] = useState('');
   const parsed = useMemo(() => parsePasted(pasted), [pasted]);
   const clean = lines.filter((l) => l.item && Number(l.qty) > 0).map((l) => ({ item: l.item, qty: Math.floor(Number(l.qty)) }));
-  const valid = clean.length > 0 && clean.length === lines.filter((l) => l.item || l.qty).length && truckNo.trim() && ref.trim() && (flow !== 'transfer' || fromUnit !== toUnit);
+  const valid = clean.length > 0 && clean.length === lines.filter((l) => l.item || l.qty).length && truckNo.trim() && ref.trim() && (flow !== 'transfer' || fromUnit !== toUnit) && (flow !== 'jobwork_in' || parentId);
   const save = () => {
     const id = `TRK-${1000 + state.counters.trk + 1}`;
-    dispatch({ type: 'CREATE_SHIPMENT', id, flow, fromUnit: flow === 'inbound' ? null : fromUnit, toUnit: flow === 'outbound' ? null : toUnit, party: flow === 'transfer' ? null : partyId, truckNo, ref, lines: clean, billing: flow === 'transfer' ? billing : undefined, docs, actor: flow === 'inbound' ? 'Gate' : 'Dispatch staff' });
+    dispatch({ type: 'CREATE_SHIPMENT', id, flow, fromUnit: hasFrom ? fromUnit : null, toUnit: hasTo ? toUnit : null, party: flow === 'transfer' ? null : partyId, parentId: parentId || undefined, truckNo, ref, lines: clean, billing: flow === 'transfer' ? billing : undefined, docs, actor: gate ? 'Gate' : 'Dispatch staff' });
     onSaved(id);
   };
   const sel = 'mt-1 w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm';
@@ -120,12 +136,28 @@ export function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: s
     <div className="space-y-3">
       <button onClick={onBack} className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 flex items-center cursor-pointer"><ChevronLeft className="w-3.5 h-3.5" />{t('back', lang)}</button>
       <div className="grid grid-cols-2 gap-2 text-[11px] font-bold text-slate-700">
-        {flow !== 'inbound' && <label className={flow === 'outbound' ? 'col-span-1' : ''}>{t('fromUnit', lang)}<select id="f-from" value={fromUnit} onChange={(e) => setFrom(e.target.value)} className={sel}>{Object.values(UNITS).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></label>}
-        {flow !== 'outbound' && <label>{t('toUnit', lang)}<select id="f-to" value={toUnit} onChange={(e) => setTo(e.target.value)} className={sel}>{Object.values(UNITS).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></label>}
-        {flow !== 'transfer' && <label className={flow === 'inbound' ? '' : ''}>{t(flow === 'outbound' ? 'customer' : 'supplier', lang)}<select id="f-party" value={partyId} onChange={(e) => setParty(e.target.value)} className={sel}>{(flow === 'outbound' ? customers : suppliers).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}
+        {flow === 'jobwork_in' && (
+          <label className="col-span-2">{t('whichJobwork', lang)}
+            <select id="f-parent" value={parentId} onChange={(e) => pickReturn(e.target.value)} className={sel}>
+              <option value="">…</option>
+              {openJobwork.map((x: any) => <option key={x.id} value={x.id}>{x.id} · {party(x.party).name} · {jobworkBalance(state, x).reduce((a: number, b: any) => a + b.pending, 0)} {t('stillThere', lang)}</option>)}
+            </select>
+          </label>
+        )}
+        {hasFrom && <label>{t('fromUnit', lang)}<select id="f-from" value={fromUnit} onChange={(e) => setFrom(e.target.value)} className={sel}>{Object.values(UNITS).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></label>}
+        {hasTo && <label>{t('toUnit', lang)}<select id="f-to" value={toUnit} onChange={(e) => setTo(e.target.value)} className={sel}>{Object.values(UNITS).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></label>}
+        {flow !== 'transfer' && <label>{t(flow === 'outbound' ? 'customer' : flow === 'inbound' ? 'supplier' : 'jobworker', lang)}<select id="f-party" disabled={flow === 'jobwork_in'} value={partyId} onChange={(e) => setParty(e.target.value)} className={sel}>{partyList.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}
         <label>{t('truckNo', lang)}<input id="f-truck" value={truckNo} onChange={(e) => setTruck(e.target.value)} placeholder="KA 40 A 2541" className={sel} /></label>
-        <label className="col-span-2">{t(flow === 'transfer' ? 'challanNo' : flow === 'outbound' ? 'invoiceNo' : 'billNo', lang)}<input id="f-ref" value={ref} onChange={(e) => setRef(e.target.value)} className={sel} /></label>
+        <label className="col-span-2">{t(flow === 'transfer' || flow === 'jobwork_out' ? 'challanNo' : flow === 'outbound' ? 'invoiceNo' : flow === 'jobwork_in' ? 'jwChallanNo' : 'billNo', lang)}<input id="f-ref" value={ref} onChange={(e) => setRef(e.target.value)} className={sel} /></label>
       </div>
+      {hasFrom && madeFromOptions.length > 0 && (
+        <label className="block text-[11px] font-bold text-slate-700">{t('madeFrom', lang)}
+          <select id="f-madefrom" value={parentId} onChange={(e) => setParentId(e.target.value)} className={sel}>
+            <option value="">—</option>
+            {madeFromOptions.map((x: any) => <option key={x.id} value={x.id}>{x.id} · {route(x)}</option>)}
+          </select>
+        </label>
+      )}
       {flow === 'transfer' && fromUnit === toUnit && <Note tone="warn">{t('fromUnit', lang)} = {t('toUnit', lang)}</Note>}
       {flow === 'transfer' && fromUnit !== toUnit && (
         <div className="space-y-1.5">
@@ -140,7 +172,7 @@ export function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: s
       )}
 
       <div className="flex items-center justify-between pt-1">
-        <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">{t(flow === 'inbound' ? 'billedQty' : 'qty', lang)}</div>
+        <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">{t(gate ? 'billedQty' : 'qty', lang)}</div>
         <button id="btn-paste" onClick={() => setPasting(!pasting)} className="text-[11px] font-bold text-emerald-800 flex items-center cursor-pointer"><ClipboardPaste className="w-3.5 h-3.5 mr-1" />{t('paste', lang)}</button>
       </div>
       {pasting && (
@@ -167,7 +199,7 @@ export function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: s
         ))}
         <button id="btn-add-line" onClick={() => setLines([...lines, { item: '', qty: '' }])} className="text-[11px] font-bold text-slate-700 flex items-center cursor-pointer"><Plus className="w-3.5 h-3.5 mr-1" />{t('addLine', lang)}</button>
       </div>
-      <PhotoStrip photos={docs} onAdd={(r) => setDocs([...docs, ...r])} label={t('addPaper', lang)} kinds={flow === 'inbound' ? ['supplier bill', 'order', 'delivery note'] : ['dispatch list', 'challan', 'order']} />
+      <PhotoStrip photos={docs} onAdd={(r) => setDocs([...docs, ...r])} label={t('addPaper', lang)} kinds={flow === 'inbound' ? ['supplier bill', 'order', 'delivery note'] : flow === 'jobwork_in' ? ['job worker challan', 'delivery note'] : ['dispatch list', 'challan', 'order']} />
       <button id="btn-save-list" disabled={!valid} onClick={save} className="w-full min-h-[48px] rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-sm font-bold cursor-pointer">{t('saveList', lang)} ({clean.reduce((a, l) => a + l.qty, 0)})</button>
     </div>
   );
@@ -185,8 +217,8 @@ function TruckDetail({ lang, id, onBack }: { lang: string; id: string; onBack: (
   const msg = `${t('linkMessage', lang)} ${s.id} · ${s.truckNo} · ${route(s)}\n${link}`;
   const sendOrCount = () => {
     const token = newToken();
-    dispatch({ type: 'SEND_TO_RECEIVER', id: s.id, token, actor: s.flow === 'inbound' ? 'Gate' : 'Dispatch staff' });
-    if (s.flow === 'inbound') window.location.hash = `#/r/${s.id}/${token}`;
+    dispatch({ type: 'SEND_TO_RECEIVER', id: s.id, token, actor: atGate(s.flow) ? 'Gate' : 'Dispatch staff' });
+    if (atGate(s.flow)) window.location.hash = `#/r/${s.id}/${token}`;
   };
   return (
     <div className="space-y-3">
@@ -211,9 +243,10 @@ function TruckDetail({ lang, id, onBack }: { lang: string; id: string; onBack: (
       <div className="space-y-1">
         <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">{t('papers', lang)}</div>
         <PhotoStrip photos={s.docs || []} onAdd={(r) => dispatch({ type: 'ATTACH_DOC', id: s.id, docs: r, actor: s.flow === 'inbound' ? 'Gate' : 'Dispatch staff' })} label={t('addPaper', lang)} kinds={s.flow === 'inbound' ? ['supplier bill', 'order', 'delivery note'] : ['dispatch list', 'challan', 'order']} />
-        {s.flow === 'transfer' && s.billing === 'none' && <button id="btn-challan" onClick={() => printReport(challanHtml(state, s))} className="w-full py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 cursor-pointer">{t('printChallan', lang)}</button>}
+        {((s.flow === 'transfer' && s.billing === 'none') || s.flow === 'jobwork_out') && <button id="btn-challan" onClick={() => printReport(challanHtml(state, s))} className="w-full py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 cursor-pointer">{t('printChallan', lang)}</button>}
       </div>
-      {st === 'LOADING' && s.flow !== 'inbound' && (
+      <Chain s={s} lang={lang} />
+      {st === 'LOADING' && !atGate(s.flow) && (
         <div className="space-y-2">
           <Note>{t('loadingFirst', lang)}</Note>
           <label className="block text-[11px] font-bold text-slate-700">{t('loadingPoint', lang)}
@@ -227,8 +260,8 @@ function TruckDetail({ lang, id, onBack }: { lang: string; id: string; onBack: (
       )}
       {st === 'LOADING' && (
         <>
-          <button id="btn-send" disabled={s.flow !== 'inbound' && !s.loading?.endAt} onClick={sendOrCount} className="w-full min-h-[52px] rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-sm font-bold flex items-center justify-center cursor-pointer shadow-md">
-            {s.flow === 'inbound' ? <><PackageCheck className="w-5 h-5 mr-2" />{t('countNow', lang)}</> : <><Send className="w-5 h-5 mr-2" />{t('sendReceiver', lang)}</>}
+          <button id="btn-send" disabled={!atGate(s.flow) && !s.loading?.endAt} onClick={sendOrCount} className="w-full min-h-[52px] rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-sm font-bold flex items-center justify-center cursor-pointer shadow-md">
+            {atGate(s.flow) ? <><PackageCheck className="w-5 h-5 mr-2" />{t('countNow', lang)}</> : <><Send className="w-5 h-5 mr-2" />{t('sendReceiver', lang)}</>}
           </button>
           <button onClick={() => { dispatch({ type: 'CANCEL_SHIPMENT', id: s.id, actor: 'Dispatch staff' }); onBack(); }} className="w-full py-2 text-[11px] font-bold text-rose-700 cursor-pointer">{t('cancelTruck', lang)}</button>
         </>
@@ -236,7 +269,7 @@ function TruckDetail({ lang, id, onBack }: { lang: string; id: string; onBack: (
       {st === 'IN_TRANSIT' && (
         <div className="space-y-2">
           {receiptOverdue(state, s, now) && <Note tone="stop"><AlertTriangle className="w-4 h-4 inline mr-1" />{duration(now - s.sentAt)}</Note>}
-          {s.flow === 'inbound'
+          {atGate(s.flow)
             ? <a id="btn-count" href={receiverPath(s)} className="w-full min-h-[52px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center cursor-pointer"><PackageCheck className="w-5 h-5 mr-2" />{t('countNow', lang)}</a>
             : <>
               <div className="text-[11px] text-slate-500 break-all bg-slate-50 border border-slate-200 rounded-lg p-2 font-mono">{link}</div>
@@ -253,6 +286,20 @@ function TruckDetail({ lang, id, onBack }: { lang: string; id: string; onBack: (
           <pre className="whitespace-pre-wrap font-sans leading-relaxed">{resultText(state, s, lang).split('\n').slice(1).join('\n')}</pre>
         </div>
       )}
+    </div>
+  );
+}
+
+// Where this load came from and what was made from it
+export function Chain({ s, lang }: { s: any; lang: string }) {
+  const { state } = useStore();
+  const parent = parentOf(state, s);
+  const kids = childrenOf(state, s);
+  if (!parent && !kids.length) return null;
+  return (
+    <div id="chain" className="rounded-lg bg-slate-50 border border-slate-200 p-2 text-[11px] text-slate-700 space-y-0.5">
+      {parent && <div><Link2 className="w-3 h-3 inline mr-1" />{t(s.flow === 'jobwork_in' ? 'returnOf' : 'madeFromShort', lang)} <b className="font-mono">{parent.id}</b> · {route(parent)}</div>}
+      {kids.map((k: any) => <div key={k.id}><Link2 className="w-3 h-3 inline mr-1" />{t(k.flow === 'jobwork_in' ? 'cameBack' : 'nextLoad', lang)} <b className="font-mono">{k.id}</b> · {route(k)}</div>)}
     </div>
   );
 }

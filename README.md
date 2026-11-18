@@ -13,6 +13,8 @@ It came out of a factory visit: two units with the same GSTIN, a handwritten dis
 | Owner | Phone or laptop | Sees only short, extra or damaged lines, already compared, with the papers and photos. Decides each one with options that fit the move, asks the sender to explain with one tap, attaches the CCTV clip and shares an evidence pack. |
 | Accountant | No login | Gets the owner's pack: a printable report and one Tally file, in import order. Until it is sent, the owner can undo a decision. |
 
+**Job work and load chains.** Goods sent to another company for processing ("Send for job work") move on a delivery challan, no sale. When they come back ("Back from job work" in Receive), the app fills in what is still with the job worker and counts it like any load. The owner sees, per job worker, what is still out and how many days are left of the one-year limit for inputs, with a reminder button. Any outgoing load can be marked "made from" an earlier one, so the owner can follow supplier → unit → unit → customer.
+
 Settings: whether the receiver counts blind, who sees the details of a difference (owner and sender, or owner only), each unit's GSTIN, the loss limit, how many hours a count may take, and the phone languages.
 
 ### Owner options by flow
@@ -26,6 +28,7 @@ Settings: whether the receiver counts blind, who sees the details of a differenc
 ### Tally entries prepared
 
 - **Between units, no money:** a Stock Journal from the sending unit to *Goods in Transit* when the truck leaves. On receipt, good units go from *Goods in Transit* to the receiving unit, and damaged units go to *Damaged Goods*. A write-off moves them to *Transit Loss*.
+- **Job work:** a stock journal from the unit to an "At job worker" godown when it leaves, and back to the unit (or Damaged Goods) when it returns.
 - **Between units, with invoice** (usually units with different GSTINs): a branch transfer invoice with GST when the truck leaves, a receipt note for the good units at the receiving unit, and a credit note for anything written off.
 - **From a supplier:** a Receipt Note for the good units counted, plus a Debit Note if the owner chooses one.
 - **To a customer:** a Credit Note or a Sales invoice for the extra, with GST split CGST+SGST or IGST by the customer's state.

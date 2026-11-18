@@ -32,11 +32,13 @@ export const ITEMS: Record<string, Item> = {
   'LOG-SIL': { code: 'LOG-SIL', name: 'Silver oak logs, bundle', unit: 'bundles', hsn: '4403', rate: 2100, gst: 18 },
 };
 
-export const PARTIES: Record<string, { id: string; name: string; kind: 'supplier' | 'customer'; city: string; state: string; gstin: string }> = {
+export const PARTIES: Record<string, { id: string; name: string; kind: 'supplier' | 'customer' | 'jobworker'; city: string; state: string; gstin: string }> = {
   lakshmi: { id: 'lakshmi', name: 'Sri Lakshmi Timbers', kind: 'supplier', city: 'Hunsur', state: 'Karnataka', gstin: '29BBBBB1111B1Z2' },
   coastal: { id: 'coastal', name: 'Coastal Veneers', kind: 'supplier', city: 'Mangaluru', state: 'Karnataka', gstin: '29CCCCC2222C1Z9' },
   deccan: { id: 'deccan', name: 'Deccan Pumps Ltd', kind: 'customer', city: 'Hosur', state: 'Tamil Nadu', gstin: '33DDDDD3333D1Z4' },
   sunrise: { id: 'sunrise', name: 'Sunrise Ceramics', kind: 'customer', city: 'Bengaluru', state: 'Karnataka', gstin: '29EEEEE4444E1Z7' },
+  // another company that processes your goods and sends them back (no sale)
+  ganesh: { id: 'ganesh', name: 'Sri Ganesh Wood Finishers', kind: 'jobworker', city: 'Mandya', state: 'Karnataka', gstin: '29FFFFF5555F1Z3' },
 };
 
 export const LOADING_POINTS = ['Dock 1', 'Dock 2', 'Gate'];
@@ -81,7 +83,17 @@ export function makeSeed(anchor: number) {
   });
   // The owner already sent those entries to the accountant (transfers make two stock journals, supplier deliveries one receipt note)
   const routineDrafts = routine.reduce((n, r) => n + (r.flow === 'transfer' ? 2 : r.flow === 'inbound' ? 1 : 0), 0);
-  const routineIds = Array.from({ length: routineDrafts }, (_, i) => `D-${String(i + 1).padStart(4, '0')}`);
+  // Job work: 200 plywood sheets sent for sanding 340 days ago; 150 came back. 50 are still with the job worker,
+  // and inputs must come back within a year, so this shows as due soon.
+  ev.push({ type: 'CREATE_SHIPMENT', id: 'TRK-1018', flow: 'jobwork_out', fromUnit: 'MYS', party: 'ganesh', truckNo: 'KA 11 B 2207', ref: 'JW-0107', at: anchor - 340 * D, actor: 'Dispatch staff', lines: [{ item: 'PLY-12', qty: 200 }] });
+  ev.push({ type: 'LOADING', id: 'TRK-1018', point: 'Dock 1', phase: 'start', at: anchor - 340 * D + 20 * M, actor: 'Dispatch staff' });
+  ev.push({ type: 'LOADING', id: 'TRK-1018', point: 'Dock 1', phase: 'end', at: anchor - 340 * D + 70 * M, actor: 'Dispatch staff' });
+  ev.push({ type: 'SEND_TO_RECEIVER', id: 'TRK-1018', token: 'demo18k', at: anchor - 340 * D + 75 * M, actor: 'Dispatch staff' });
+  ev.push({ type: 'SUBMIT_RECEIPT', id: 'TRK-1018', token: 'demo18k', by: 'Ganesh stores', at: anchor - 340 * D + 5 * H, actor: 'Receiver', lines: { L1: { counted: 200, damaged: 0 } } });
+  ev.push({ type: 'CREATE_SHIPMENT', id: 'TRK-1019', flow: 'jobwork_in', parentId: 'TRK-1018', toUnit: 'MYS', party: 'ganesh', truckNo: 'KA 11 B 2207', ref: 'GW-0231', at: anchor - 200 * D, actor: 'Gate (Mysuru)', lines: [{ item: 'PLY-12', qty: 150 }] });
+  ev.push({ type: 'SEND_TO_RECEIVER', id: 'TRK-1019', token: 'demo19k', at: anchor - 200 * D, actor: 'Gate (Mysuru)' });
+  ev.push({ type: 'SUBMIT_RECEIPT', id: 'TRK-1019', token: 'demo19k', by: 'Gate (Mysuru)', at: anchor - 200 * D + 40 * M, actor: 'Receiver', lines: { L1: { counted: 150, damaged: 0 } } });
+  const routineIds = Array.from({ length: routineDrafts + 2 }, (_, i) => `D-${String(i + 1).padStart(4, '0')}`);
   ev.push({ type: 'SEND_TO_ACCOUNTANT', ids: routineIds, at: anchor - 2 * D, actor: 'Owner' });
 
   // TRK-1013: last night's transfer, like the dispatch list from the field visit. 5 short, 2 damaged.
@@ -108,7 +120,7 @@ export function makeSeed(anchor: number) {
   ev.push({ type: 'SUBMIT_RECEIPT', id: 'TRK-1015', token: 'demo15k', by: 'Sunrise stores', at: at(-2), actor: 'Receiver', lines: { L1: { counted: 303, damaged: 0 } } });
 
   // TRK-1016: transfer that left 3 hours ago, still on the road
-  ev.push({ type: 'CREATE_SHIPMENT', id: 'TRK-1016', flow: 'transfer', fromUnit: 'MYS', toUnit: 'BLR', truckNo: 'KA 09 B 4471', ref: 'DC-0419', at: at(-4), actor: 'Dispatch staff', lines: [{ item: 'PLY-12', qty: 80 }, { item: 'PLY-18', qty: 45 }] });
+  ev.push({ type: 'CREATE_SHIPMENT', id: 'TRK-1016', parentId: 'TRK-1014', flow: 'transfer', fromUnit: 'MYS', toUnit: 'BLR', truckNo: 'KA 09 B 4471', ref: 'DC-0419', at: at(-4), actor: 'Dispatch staff', lines: [{ item: 'PLY-12', qty: 80 }, { item: 'PLY-18', qty: 45 }] });
   ev.push({ type: 'LOADING', id: 'TRK-1016', point: 'Dock 1', phase: 'start', at: at(-3, -50), actor: 'Dispatch staff' });
   ev.push({ type: 'LOADING', id: 'TRK-1016', point: 'Dock 1', phase: 'end', at: at(-3, -10), actor: 'Dispatch staff' });
   ev.push({ type: 'SEND_TO_RECEIVER', id: 'TRK-1016', token: 'demo16k', at: at(-3), actor: 'Dispatch staff' });

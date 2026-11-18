@@ -7,9 +7,11 @@ const SOPS: [string, string[]][] = [
     'Between your own units, choose "No money (stock transfer)" or "With invoice and GST". The app suggests one from the units\' GSTINs; you decide. For no money, print the delivery challan from the app.',
     'Tap "Loading started" and "Loading finished" and pick the dock or gate. This time window is how the owner finds the CCTV footage.',
     'When the truck leaves, send the receiver link on WhatsApp. You will see the result here when they submit.',
+    'If this load was made from an earlier one (for example plywood from the logs that came in), pick it under "Made from". The owner can then follow the chain.',
+    'Sending goods to another company to process and send back: use "Send for job work". It is not a sale; print the challan from the app. The job worker counts on arrival through the link.',
   ]],
   ['2 · Receive (floor staff)', [
-    'Open the link, or the Receive tab for trucks coming to your unit and supplier deliveries at the gate.',
+    'Open the link, or the Receive tab for trucks coming to your unit, supplier deliveries at the gate, and goods coming back from job work (pick the load; what is still with the job worker is filled in).',
     'Count one line at a time. Tap the mic and say the number, e.g. "48" or "48, 2 damaged", in your language. Check what was heard; fix with + and −.',
     'The sent quantity is hidden while you count. Your count is saved on the phone as you go.',
     'Add photos of damage or the delivery note, then submit once. The count locks; you then see sent vs counted and can tell the sender on WhatsApp.',
@@ -18,6 +20,7 @@ const SOPS: [string, string[]][] = [
     'You see only differences, already compared. Decide each one: write off, replacement, debit or credit note, bill the extra, or investigate first.',
     'Ask the sender to explain with one tap. Attach the CCTV clip and share the evidence pack only with the people who need it.',
     'Losses above your limit need a tick to confirm. Promises get a due date; mark them done when they happen.',
+    'Job work: see what is still with each job worker and how many days are left of the one-year limit. Send a reminder from there.',
   ]],
   ['4 · Accountant (no login)', [
     'The owner sends the ready entries as a printable report and one Tally file, already in import order. Until they are sent, the owner can undo a decision.',
