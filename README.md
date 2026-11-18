@@ -28,6 +28,10 @@ It came out of a factory visit: two units with the same GSTIN, a handwritten dis
 - **To a customer:** a Credit Note or a Sales invoice for the extra, with GST split CGST+SGST or IGST by the customer's state.
 - No voucher numbers are set, because Tally numbers vouchers itself. Ledger and godown names must match the company's own Tally masters, so import into a test company first.
 
+## Set up for your company (planned)
+
+LoadMatch will have a web setup page. A company uploads its own Excel (or a Tally export) with items and units, its branches or units, customers, suppliers and staff phone numbers, matching its own column names to LoadMatch's once. It then chooses its rules on the page: blind count on or off, who hears about differences (owner only, or owner and sender), the loss limit, languages and the accounting software. The app is set up for that company, and the staff use it on their mobile phones. The demo runs with sample data from a plywood business.
+
 ## Built on open standards
 
 LoadMatch keeps an append-only event log (who did what, when, on which truck) in JSON. It runs in the phone's browser, shares by plain links, and exports Tally XML and CSV. That keeps it cheap and easy to connect to later (scales, barcode or RFID readers, an ERP). It does **not** claim conformance with any Industry 4.0 standard.

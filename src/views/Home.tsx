@@ -1,5 +1,5 @@
 import React from 'react';
-import { Truck, PackageCheck, Scale, FileCode, ArrowRight, BarChart3 } from 'lucide-react';
+import { Truck, PackageCheck, Scale, FileCode, ArrowRight, BarChart3, Settings2 } from 'lucide-react';
 import { useStore, shipmentStatus, receiptOverdue } from '../store.tsx';
 import { COMPANY } from '../data/seed.ts';
 import type { Go } from './ui.tsx';
@@ -44,6 +44,20 @@ export default function Home({ go }: { go: Go }) {
             <div className="text-[11px] font-bold text-emerald-800 flex items-center">Open<ArrowRight className="w-3.5 h-3.5 ml-1" /></div>
           </button>
         ))}
+      </div>
+      <div id="home-setup" className="bg-white border border-dashed border-slate-300 rounded-xl p-4 sm:p-5 space-y-2">
+        <div className="flex items-center gap-2">
+          <Settings2 className="w-5 h-5 text-emerald-700" />
+          <span className="font-bold text-slate-900">Set up for your company</span>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 uppercase tracking-wide">Planned</span>
+        </div>
+        <p className="text-xs text-slate-700 leading-relaxed">LoadMatch will have a web setup page. A company uploads its own Excel (or a Tally export) with items and units, its branches or units, customers, suppliers and staff phone numbers. It then chooses its rules: whether receivers count without seeing the sent quantity, who hears about differences, the loss limit, languages and the accounting software. The app is set up for that company, and the staff use it on their mobile phones.</p>
+        <ol className="text-xs text-slate-600 grid sm:grid-cols-3 gap-2 pt-1">
+          <li className="bg-slate-50 border border-slate-200 rounded-lg p-2.5"><span className="font-bold text-slate-900 block">1. Upload Excel</span>Your item list, branches, customers, suppliers and staff, in your own column names.</li>
+          <li className="bg-slate-50 border border-slate-200 rounded-lg p-2.5"><span className="font-bold text-slate-900 block">2. Choose your rules</span>A few yes/no choices on the web page, changeable any time.</li>
+          <li className="bg-slate-50 border border-slate-200 rounded-lg p-2.5"><span className="font-bold text-slate-900 block">3. Use it on the phone</span>Dispatch and receivers work from WhatsApp links; the owner and accountant from phone or laptop.</li>
+        </ol>
+        <div className="text-[11px] text-slate-500">This demo runs with sample data from a plywood business.</div>
       </div>
       <button onClick={() => go('reports')} className="w-full bg-white border border-slate-200 rounded-xl p-3 text-xs font-bold text-slate-700 flex items-center justify-center cursor-pointer hover:bg-slate-50"><BarChart3 className="w-4 h-4 mr-1.5" />Reports: match rate, time to count, lost vs recovered</button>
     </div>
