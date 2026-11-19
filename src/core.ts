@@ -48,6 +48,7 @@ export const ACTIONS: Record<string, { label: string; due?: boolean; settles?: b
   jobworker_replaces: { label: 'Job worker replaces the damaged ones', due: true },
   keep_returned: { label: 'They sent back more: add it to our stock', settles: true, draft: 'Stock journal from the job worker' },
   investigate: { label: 'Check first (CCTV, driver, sender)' },
+  claim: { label: 'Claim from the transporter or insurance', due: true },
 };
 export const OPTIONS: Record<string, Record<string, string[]>> = {
   transfer: { short: ['write_off', 'investigate'], damaged: ['write_off', 'investigate'], excess: ['correct_list', 'investigate'] },
@@ -56,6 +57,9 @@ export const OPTIONS: Record<string, Record<string, string[]>> = {
   jobwork_out: { short: ['write_off', 'investigate'], damaged: ['write_off', 'investigate'], excess: ['correct_list', 'investigate'] },
   jobwork_in: { short: ['jobworker_sends_rest', 'write_off', 'investigate'], damaged: ['jobworker_replaces', 'write_off', 'investigate'], excess: ['keep_returned', 'investigate'] },
 };
+
+// What the owner can choose for one difference. After an accident on the way: claim, take the loss, or check first.
+export const optionsFor = (s: any, d: any): string[] => (d.cause === 'accident' ? ['claim', 'write_off', 'investigate'] : OPTIONS[s.flow][d.kind]);
 
 export const DRAFT_LABEL: Record<string, string> = {
   stock_journal: 'Stock Journal',
@@ -349,6 +353,50 @@ export function reducer(state: any, action: any): any {
       return putShipment(next, audit({ ...s, receipt: null, previousReceipts: [...(s.previousReceipts || []), s.receipt] }, at, actor, 'COUNT_REOPENED', `Count by ${s.receipt.by} reopened by the owner: ${reason}`));
     }
 
+    // Staff cannot change a load that has left. They ask the owner: new truck or driver, truck came back, or accident.
+    case 'REQUEST_CHANGE': {
+      const s = shipmentOf(state, action.id);
+      const reason = String(action.note || '').trim();
+      if (!s || !s.sentAt || s.receipt || s.cancelledAt || s.returning || !reason) return state;
+      if (!['details', 'came_back', 'accident'].includes(action.kind)) return state;
+      if ((state.requests || []).some((r: any) => r.shipmentId === s.id && r.status === 'pending')) return state;
+      const d = action.details || {};
+      if (action.kind === 'details' && !['truckNo', 'driver', 'driverPhone', 'ewayBill'].some((k) => String(d[k] || '').trim())) return state;
+      if (action.kind === 'accident' && !['moved', 'returned'].includes(action.outcome)) return state;
+      if (action.kind === 'accident' && action.outcome === 'moved' && !String(d.truckNo || '').trim()) return state;
+      const n = ((state.counters.req) || 0) + 1;
+      const req = { id: `REQ-${pad(n)}`, shipmentId: s.id, kind: action.kind, outcome: action.outcome || null, details: d, note: reason, place: String(action.place || '').trim(), photos: action.photos || [], by: action.by || actor, at, status: 'pending', decidedAt: null, decidedNote: '' };
+      const what = action.kind === 'details' ? 'change the truck or driver' : action.kind === 'came_back' ? 'mark the truck as came back' : action.outcome === 'moved' ? 'report an accident (good pieces moved to another truck)' : 'report an accident (goods collected, coming back)';
+      const next = { ...state, requests: [...(state.requests || []), req], counters: { ...state.counters, req: n } };
+      return putShipment(next, audit(s, at, req.by, 'CHANGE_ASKED', `Asked the owner to ${what}: ${reason}`));
+    }
+
+    // Only the owner approves or rejects. Approving makes the change and keeps the history.
+    case 'DECIDE_REQUEST': {
+      const r = (state.requests || []).find((x: any) => x.id === action.reqId);
+      if (!r || r.status !== 'pending' || actor !== 'Owner') return state;
+      const s = shipmentOf(state, r.shipmentId);
+      const done = (status: string, st: any) => ({ ...st, requests: st.requests.map((x: any) => (x.id === r.id ? { ...x, status, decidedAt: at, decidedNote: String(action.note || '') } : x)) });
+      if (!action.approve) return putShipment(done('rejected', state), audit(s, at, actor, 'CHANGE_REJECTED', `Owner said no: ${r.note}${action.note ? ` (${action.note})` : ''}`));
+      if (!s || s.receipt || s.cancelledAt) return state;
+      const pick = (o: any) => Object.fromEntries(['truckNo', 'driver', 'driverPhone', 'ewayBill'].filter((k) => String(o?.[k] || '').trim()).map((k) => [k, String(o[k]).trim()]));
+      if (r.kind === 'came_back') return done('approved', reducer(state, { type: 'CANCEL_SHIPMENT', id: s.id, note: r.note, at, actor }));
+      if (r.kind === 'details') {
+        const ch = pick(r.details);
+        const said = Object.entries(ch).map(([k, v]) => `${k === 'truckNo' ? 'truck' : k === 'driverPhone' ? 'driver phone' : k === 'ewayBill' ? 'e-way bill' : 'driver'} ${(s as any)[k] || '—'} → ${v}`).join(', ');
+        return putShipment(done('approved', state), audit({ ...s, ...ch }, at, actor, 'DETAILS_CHANGED', `Owner approved: ${said}. Reason: ${r.note}`));
+      }
+      // accident
+      const accident = { at: r.at, place: r.place, note: r.note, outcome: r.outcome, photos: r.photos, by: r.by };
+      if (r.outcome === 'moved') {
+        const ch = pick(r.details);
+        return putShipment(done('approved', state), audit({ ...s, ...ch, accident }, at, actor, 'ACCIDENT', `Accident${r.place ? ` near ${r.place}` : ''}: ${r.note}. Good pieces moved to truck ${ch.truckNo}; the receiver counts what arrives.`));
+      }
+      // goods collected and sent back: the old receiver link stops; the sender counts what came back
+      if (String(action.token || '').length < 6) return state;
+      return putShipment(done('approved', state), audit({ ...s, accident, returning: true, token: action.token }, at, actor, 'ACCIDENT', `Accident${r.place ? ` near ${r.place}` : ''}: ${r.note}. Goods collected and coming back to ${s.fromUnit ? UNITS[s.fromUnit].name.split(' (')[0] : 'the sender'}; count them there.`));
+    }
+
     case 'LOADING': {
       const s = shipmentOf(state, action.id);
       if (!s || s.sentAt || s.cancelledAt || atGate(s.flow)) return state;
@@ -410,7 +458,7 @@ export function reducer(state: any, action: any): any {
         const { counted, damaged } = counts[l.id];
         const add = (kind: string, qty: number) => {
           dn += 1;
-          diffs.push({ id: `DIF-${pad(dn)}`, shipmentId: s.id, lineId: l.id, item: l.item, kind, qty, value: qty * ITEMS[l.item].rate, status: 'open', createdAt: at, decision: null, settledAt: null, evidence: { clips: [], shares: [] }, evidenceToken: null, history: [] });
+          diffs.push({ id: `DIF-${pad(dn)}`, shipmentId: s.id, lineId: l.id, item: l.item, kind, qty, cause: s.accident ? 'accident' : null, value: qty * ITEMS[l.item].rate, status: 'open', createdAt: at, decision: null, settledAt: null, evidence: { clips: [], shares: [] }, evidenceToken: null, history: [] });
         };
         if (damaged > 0) add('damaged', damaged);
         if (counted < l.qty) add('short', l.qty - counted);
@@ -418,7 +466,18 @@ export function reducer(state: any, action: any): any {
       }
       next = { ...next, diffs: [...next.diffs, ...diffs], counters: { ...next.counters, dif: dn } };
       // the normal Tally entry for what arrived
-      if (s.flow === 'transfer' && s.billing === 'invoice') {
+      if (s.returning) {
+        // after an accident the goods came back to the sender: good ones back into the sender's stock
+        const moves: any[] = [];
+        for (const l of s.lines) {
+          const { counted, damaged } = counts[l.id];
+          const good = Math.min(counted - damaged, l.qty);
+          const bad = Math.min(damaged, l.qty - good);
+          if (good) moves.push({ item: l.item, qty: good, from: GODOWNS.transit, to: godownOf(s.fromUnit) });
+          if (bad) moves.push({ item: l.item, qty: bad, from: GODOWNS.transit, to: GODOWNS.damaged });
+        }
+        if (moves.length) next = addDraft(next, { type: 'stock_journal', purpose: 'receipt', createdAt: at, shipmentId: s.id, moves, narration: `${loadName(s.id)} (${s.ref}): accident on the way; goods collected and brought back, counted by ${receipt.by}.` });
+      } else if (s.flow === 'transfer' && s.billing === 'invoice') {
         const lines = s.lines.map((l: any) => ({ ...priced(l.item, Math.min(counts[l.id].counted - counts[l.id].damaged, l.qty)), godown: godownOf(s.toUnit) })).filter((l: any) => l.qty > 0);
         if (lines.length) next = addDraft(next, { type: 'receipt_note', purpose: 'receipt', createdAt: at, shipmentId: s.id, partyInfo: branchParty(state, s.fromUnit), ref: s.ref, lines, narration: `${s.id}: received from ${UNITS[s.fromUnit].name.split(' (')[0]} against branch transfer invoice ${s.ref}; good units only, counted by ${receipt.by}.` });
       } else if (s.flow === 'transfer') {
@@ -462,7 +521,7 @@ export function reducer(state: any, action: any): any {
       if (!d || !['open', 'investigating'].includes(d.status)) return state;
       const s = shipmentOf(state, d.shipmentId);
       const a = ACTIONS[action.action];
-      if (!a || !OPTIONS[s.flow][d.kind].includes(action.action)) return state;
+      if (!a || !optionsFor(s, d).includes(action.action)) return state;
       if (a.due && !(Number(action.dueAt) > at)) return state;
       if (a.loss && d.value > state.settings.writeOffLimit && !action.confirm) return state;
       const decision = { action: action.action, dueAt: a.due ? Number(action.dueAt) : null, note: action.note || '', at, by: actor };
@@ -532,8 +591,8 @@ export function buildInitialState(anchor = Date.now()): any {
   const base = {
     version: VERSION, anchor,
     settings: { ...DEFAULT_SETTINGS, languages: { ...DEFAULT_SETTINGS.languages }, units: JSON.parse(JSON.stringify(DEFAULT_SETTINGS.units)) },
-    settingsLog: [], shipments: [], diffs: [], drafts: [], packs: [],
-    counters: { trk: 0, dif: 0, draft: 0 },
+    settingsLog: [], shipments: [], diffs: [], drafts: [], packs: [], requests: [],
+    counters: { trk: 0, dif: 0, draft: 0, req: 0 },
   };
   return makeSeed(anchor).reduce((s: any, a: any) => reducer(s, a), base);
 }

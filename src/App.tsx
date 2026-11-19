@@ -35,7 +35,7 @@ function SyncChip() {
 function useBadges() {
   const { state } = useStore();
   const now = Date.now();
-  const owner = state.diffs.filter((d: any) => d.status === 'open' || d.status === 'investigating').length;
+  const owner = state.diffs.filter((d: any) => d.status === 'open' || d.status === 'investigating').length + (state.requests || []).filter((r: any) => r.status === 'pending').length;
   const late = state.shipments.filter((s: any) => receiptOverdue(state, s, now)).length;
   const loading = state.shipments.filter((s: any) => !s.sentAt && !s.cancelledAt && !atGate(s.flow)).length;
   const toCount = state.shipments.filter((s: any) => !s.receipt && !s.cancelledAt && countedByUs(s) && (s.flow !== 'transfer' || s.sentAt)).length;

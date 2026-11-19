@@ -124,6 +124,8 @@ export function makeSeed(anchor: number) {
   ev.push({ type: 'LOADING', id: 'TRK-1016', point: 'Dock 1', phase: 'start', at: at(-3, -50), actor: 'Dispatch staff' });
   ev.push({ type: 'LOADING', id: 'TRK-1016', point: 'Dock 1', phase: 'end', at: at(-3, -10), actor: 'Dispatch staff' });
   ev.push({ type: 'SEND_TO_RECEIVER', id: 'TRK-1016', token: 'demo16k', at: at(-3), actor: 'Dispatch staff' });
+  // ...and an hour ago the driver called: accident near Mandya. Staff asked the owner; waiting for a yes.
+  ev.push({ type: 'REQUEST_CHANGE', id: 'TRK-1016', kind: 'accident', outcome: 'returned', place: 'Mandya', note: 'Truck hit a divider near Mandya. Driver is safe. Some sheets broke; the rest are loaded into a tempo and coming back to Mysuru.', by: 'Ramesh (dispatch)', at: at(-1), actor: 'Dispatch staff' });
 
   // TRK-1017: customer dispatch being loaded now
   ev.push({ type: 'CREATE_SHIPMENT', id: 'TRK-1017', flow: 'outbound', fromUnit: 'BLR', party: 'deccan', truckNo: 'TN 70 K 3390', ref: 'INV-2520', driver: 'Selvam', driverPhone: '9443067890', ewayBill: '3410 2251 7788', at: at(0, -30), actor: 'Dispatch staff', lines: [{ item: 'BOX-NL', qty: 150 }, { item: 'BOX-RB', qty: 60 }] });

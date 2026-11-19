@@ -122,7 +122,7 @@ export default function Receive({ id, token, payload }: { id: string; token: str
   if (!ok) {
     return (
       <PhoneFrame title="LoadMatch" sub={id} lang={lang} setLang={setLang}>
-        <Note tone="stop"><AlertTriangle className="w-4 h-4 inline mr-1" />{t('invalidLink', lang)}</Note>
+        <Note tone="stop"><AlertTriangle className="w-4 h-4 inline mr-1" />{mine?.returning ? 'This truck had an accident on the way. The goods are going back to the sender, so there is nothing to count here.' : t('invalidLink', lang)}</Note>
       </PhoneFrame>
     );
   }

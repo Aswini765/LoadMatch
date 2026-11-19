@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {
   OPTIONS, jobworkBalance, jobworkDueAt, jobworkOpen, childrenOf, parentOf, JOBWORK_DAYS,
-  reducer, buildInitialState, shipmentOf, packLoad, unpackLoad, packCount, unpackCount, diffsOf, diffOf, shipmentStatus, receiptOverdue, diffOverdue, truckSummary, evidenceText, importOrder,
+  reducer, buildInitialState, shipmentOf, packLoad, unpackLoad, packCount, unpackCount, optionsFor, diffsOf, diffOf, shipmentStatus, receiptOverdue, diffOverdue, truckSummary, evidenceText, importOrder,
 } from '../src/core.ts';
 import { voucherXml } from '../src/lib/tally.ts';
 import { taxLines } from '../src/lib/tax.ts';
@@ -419,6 +419,57 @@ test('two phones, no database: the link carries the load, the count comes back b
   assert.equal(run(sender, { type: 'SUBMIT_RECEIPT', id, token: 'tok123', by: back.by, lines: back.lines }), sender);
   assert.equal(unpackLoad(id as string, 'tok123', link.slice(0, 10)), null);
   assert.equal(unpackCount('garbage'), null);
+});
+
+test('staff ask, owner approves: new driver after the truck left', () => {
+  let [s, id] = sentTransfer(buildInitialState());
+  // staff cannot change it directly, and a request needs a reason
+  assert.equal(run(s, { type: 'REQUEST_CHANGE', id, kind: 'details', details: { driver: 'Kumar' }, note: '' }), s);
+  s = run(s, { type: 'REQUEST_CHANGE', id, kind: 'details', details: { driver: 'Kumar', driverPhone: '9900112233' }, note: 'Prakash fell sick', by: 'Ramesh', actor: 'Dispatch staff' });
+  const req = s.requests.at(-1);
+  assert.equal(req.status, 'pending');
+  // only one open request per load; staff cannot approve
+  assert.equal(run(s, { type: 'REQUEST_CHANGE', id, kind: 'came_back', note: 'x' }), s);
+  assert.equal(run(s, { type: 'DECIDE_REQUEST', reqId: req.id, approve: true, actor: 'Dispatch staff' }), s);
+  s = run(s, { type: 'DECIDE_REQUEST', reqId: req.id, approve: true, actor: 'Owner' });
+  assert.equal(shipmentOf(s, id).driver, 'Kumar');
+  assert.equal(s.requests.at(-1).status, 'approved');
+  assert.ok(shipmentOf(s, id).audit.some((a: any) => a.detail.includes('Prakash fell sick')));
+});
+
+test('owner says no: nothing changes', () => {
+  let [s, id] = sentTransfer(buildInitialState());
+  s = run(s, { type: 'REQUEST_CHANGE', id, kind: 'came_back', note: 'gate closed' });
+  s = run(s, { type: 'DECIDE_REQUEST', reqId: s.requests.at(-1).id, approve: false, note: 'wait till morning', actor: 'Owner' });
+  assert.equal(shipmentOf(s, id).cancelledAt, null);
+  assert.equal(s.requests.at(-1).status, 'rejected');
+});
+
+test('accident: good pieces moved to another truck, receiver counts, differences are accident ones', () => {
+  let [s, id] = sentTransfer(buildInitialState());
+  s = run(s, { type: 'REQUEST_CHANGE', id, kind: 'accident', outcome: 'moved', details: { truckNo: 'KA 09 C 4410' }, place: 'Mandya', note: 'Truck tipped over' });
+  s = run(s, { type: 'DECIDE_REQUEST', reqId: s.requests.at(-1).id, approve: true, actor: 'Owner' });
+  assert.equal(shipmentOf(s, id).truckNo, 'KA 09 C 4410');
+  s = run(s, { type: 'SUBMIT_RECEIPT', id, token: 'tok123', by: 'Ravi', lines: { L1: { counted: 90, damaged: 5 }, L2: { counted: 50, damaged: 0 } } });
+  const ds = diffsOf(s, id);
+  assert.ok(ds.length && ds.every((d: any) => d.cause === 'accident'));
+  assert.deepEqual(optionsFor(shipmentOf(s, id), ds[0]), ['claim', 'write_off', 'investigate']);
+  s = run(s, { type: 'DECIDE', diffId: ds[0].id, action: 'claim', dueAt: Date.now() + 86400000, note: 'Insurance claim filed', actor: 'Owner' });
+  assert.equal(diffsOf(s, id)[0].status, 'waiting');
+});
+
+test('accident: goods collected and sent back; old link stops; sender counts what came back', () => {
+  let [s, id] = sentTransfer(buildInitialState());
+  s = run(s, { type: 'REQUEST_CHANGE', id, kind: 'accident', outcome: 'returned', note: 'Lorry crashed; loaded what was left into a tempo' });
+  const reqId = s.requests.at(-1).id;
+  assert.equal(run(s, { type: 'DECIDE_REQUEST', reqId, approve: true, actor: 'Owner' }), s, 'needs a new link token');
+  s = run(s, { type: 'DECIDE_REQUEST', reqId, approve: true, token: 'back999', actor: 'Owner' });
+  assert.ok(shipmentOf(s, id).returning);
+  assert.equal(run(s, { type: 'SUBMIT_RECEIPT', id, token: 'tok123', by: 'Ravi', lines: { L1: { counted: 100, damaged: 0 }, L2: { counted: 50, damaged: 0 } } }), s, 'receiver link no longer works');
+  s = run(s, { type: 'SUBMIT_RECEIPT', id, token: 'back999', by: 'Mysuru stores', lines: { L1: { counted: 70, damaged: 10 }, L2: { counted: 50, damaged: 0 } } });
+  const back = draftsFor(s, id).find((d: any) => d.purpose === 'receipt');
+  assert.ok(back.moves.some((m: any) => m.qty === 60 && m.to !== 'Damaged stock' && m.to.includes('Mysuru')), JSON.stringify(back.moves));
+  assert.deepEqual(diffsOf(s, id).map((d: any) => [d.kind, d.qty, d.cause]), [['damaged', 10, 'accident'], ['short', 30, 'accident']]);
 });
 
 console.log(`\n${passed} tests passed`);

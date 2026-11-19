@@ -4,6 +4,7 @@ import { useStore, item, party, route, shipmentStatus, receiptOverdue, receiverP
 import { useVoice, findNumber } from '../lib/voice.ts';
 import { resultText } from './Receive.tsx';
 import { ITEMS, PARTIES, UNITS, LOADING_POINTS } from '../data/seed.ts';
+import { AskOwner } from './Requests.tsx';
 import { inr0 } from '../lib/format.ts';
 import { t, unitWord } from '../i18n.ts';
 import { PhoneFrame, Note, PhotoStrip, savedLang, saveLang, shareWhatsApp, appLink, newToken, type Go } from './ui.tsx';
@@ -332,7 +333,7 @@ function TruckDetail({ lang, id, onBack }: { lang: string; id: string; onBack: (
       {st === 'IN_TRANSIT' && (
         <div className="space-y-2">
           {receiptOverdue(state, s, now) && <Note tone="stop"><AlertTriangle className="w-4 h-4 inline mr-1" />{duration(now - s.sentAt)}</Note>}
-          {atGate(s.flow)
+          {s.returning ? null : atGate(s.flow)
             ? <a id="btn-count" href={receiverPath(s, state.settings)} className="w-full min-h-[52px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center cursor-pointer"><PackageCheck className="w-5 h-5 mr-2" />{t('countNow', lang)}</a>
             : <>
               <div className="text-[11px] text-slate-500 break-all bg-slate-50 border border-slate-200 rounded-lg p-2 font-mono">{link}</div>
@@ -341,16 +342,7 @@ function TruckDetail({ lang, id, onBack }: { lang: string; id: string; onBack: (
                 <button onClick={() => { try { navigator.clipboard.writeText(link); setCopied(true); } catch { /* ignore */ } }} className="py-3 rounded-xl border border-slate-300 text-slate-700 text-xs font-bold flex items-center justify-center cursor-pointer"><Copy className="w-4 h-4 mr-1" />{copied ? t('copied', lang) : t('copyLink', lang)}</button>
               </div>
             </>}
-          {!cancelling ? <button id="btn-came-back" onClick={() => setCancelling(true)} className="w-full py-2 text-[11px] font-bold text-rose-700 cursor-pointer">{t('truckCameBack', lang)}</button> : (
-            <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 space-y-2 text-xs">
-              <div className="font-bold text-rose-950">{t('cameBackQ', lang)}</div>
-              <input id="f-came-back-reason" value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t('cameBackReason', lang)} className="w-full p-2 rounded-lg border border-slate-300 bg-white" />
-              <div className="grid grid-cols-2 gap-2">
-                <button onClick={() => setCancelling(false)} className="py-2.5 rounded-lg border border-slate-300 bg-white font-bold cursor-pointer">{t('goBack', lang)}</button>
-                <button id="btn-came-back-ok" disabled={!reason.trim()} onClick={() => { dispatch({ type: 'CANCEL_SHIPMENT', id: s.id, note: reason.trim(), actor: 'Dispatch staff' }); setCancelling(false); }} className="py-2.5 rounded-lg bg-rose-600 disabled:opacity-40 text-white font-bold cursor-pointer">{t('confirmWord', lang)}</button>
-              </div>
-              {!reason.trim() && <div className="text-[10px] text-rose-800">{t('reasonNeeded', lang)}</div>}
-            </div>)}
+          <AskOwner s={s} lang={lang} />
         </div>
       )}
     </div>

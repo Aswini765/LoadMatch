@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MessageCircle, Film, Share2, CheckCircle2, Clock, AlertTriangle, Truck, ChevronDown, ChevronRight, ShieldCheck, Link2, HelpCircle, Printer, FileCode, Send, Undo2 } from 'lucide-react';
-import { useStore, item, party, route, atGate, jobworkOpen, jobworkBalance, jobworkDueAt, shipmentOf, diffsOf, lineOf, shipmentStatus, receiptOverdue, diffOverdue, receiverPath, evidencePath, evidenceText, truckSummary, importOrder, ACTIONS, OPTIONS, KIND_LABEL, FLOW_LABEL, DRAFT_LABEL, DRAFT_PLAIN, loadName } from '../store.tsx';
+import { OwnerRequests } from './Requests.tsx';
+import { useStore, item, party, route, atGate, jobworkOpen, jobworkBalance, jobworkDueAt, shipmentOf, diffsOf, lineOf, shipmentStatus, receiptOverdue, diffOverdue, receiverPath, evidencePath, evidenceText, truckSummary, importOrder, ACTIONS, OPTIONS, optionsFor, KIND_LABEL, FLOW_LABEL, DRAFT_LABEL, DRAFT_PLAIN, loadName } from '../store.tsx';
 import { reportHtml, printReport, packSummary, entryAmount, entryLines } from '../lib/report.ts';
 import { batchXml, download } from '../lib/tally.ts';
 import { tallyDate } from '../lib/format.ts';
@@ -36,6 +37,7 @@ export default function Owner({ go, initialId }: { go: Go; initialId?: string | 
           <Stat n={unread.filter((s: any) => receiptOverdue(state, s, now)).length} label="trucks not counted" cls="text-sky-700" />
         </div>} />
 
+      <OwnerRequests />
       <Panel eyebrow="Needs your decision" title={open.length ? `${open.length} difference${open.length > 1 ? 's' : ''} on ${byTruck.length} truck${byTruck.length > 1 ? 's' : ''} · worth ${inr0(openValue)}` : 'Nothing to decide'}>
         {!open.length && <Note tone="go"><CheckCircle2 className="w-4 h-4 inline mr-1" />Every truck that was counted either matched or already has your decision.</Note>}
         <div className="space-y-4">
@@ -162,7 +164,7 @@ function DiffCard({ d, s, startOpen }: { d: any; s: any; startOpen?: boolean }) 
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
         <div className="text-xs">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${KIND_CLS[d.kind]}`}>{d.qty} {KIND_LABEL[d.kind].toUpperCase()}</span>
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${KIND_CLS[d.kind]}`}>{d.qty} {KIND_LABEL[d.kind].toUpperCase()}</span>{d.cause === 'accident' && <span className="ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded border border-rose-300 bg-rose-50 text-rose-800">ACCIDENT ON THE WAY</span>}
             <span className="font-bold text-slate-900">{it.name}</span>
             {d.status === 'investigating' && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-violet-50 text-violet-800 border-violet-200">CHECKING</span>}
           </div>
@@ -172,7 +174,7 @@ function DiffCard({ d, s, startOpen }: { d: any; s: any; startOpen?: boolean }) 
       </div>
 
       <div className="flex flex-wrap gap-1.5">
-        {OPTIONS[s.flow][d.kind].filter((o) => !(o === 'investigate' && d.status === 'investigating')).map((o) => (
+        {optionsFor(s, d).filter((o) => !(o === 'investigate' && d.status === 'investigating')).map((o) => (
           <button key={o} id={`opt-${d.id}-${o}`} onClick={() => { setChoice(choice === o ? null : o); setConfirm(false); }}
             className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-bold cursor-pointer transition-colors ${choice === o ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-800 border-slate-300 hover:bg-slate-50'}`}>{ACTIONS[o].label}</button>
         ))}
