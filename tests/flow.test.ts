@@ -472,4 +472,18 @@ test('accident: goods collected and sent back; old link stops; sender counts wha
   assert.deepEqual(diffsOf(s, id).map((d: any) => [d.kind, d.qty, d.cause]), [['damaged', 10, 'accident'], ['short', 30, 'accident']]);
 });
 
+test('customer counted our load: owner agrees or disagrees (with a reason), once', () => {
+  let s = buildInitialState();
+  const id = 'TRK-1015'; // Sunrise counted 303 of 300
+  assert.ok(shipmentOf(s, id).receipt);
+  assert.equal(run(s, { type: 'RESPOND_COUNT', id, agree: false, note: '', actor: 'Owner' }), s, 'a reason is needed to disagree');
+  assert.equal(run(s, { type: 'RESPOND_COUNT', id, agree: true, actor: 'Dispatch staff' }), s, 'only the owner answers');
+  s = run(s, { type: 'RESPOND_COUNT', id, agree: false, note: 'CCTV shows 300 loaded', actor: 'Owner' });
+  assert.equal(shipmentOf(s, id).response.agree, false);
+  assert.equal(run(s, { type: 'RESPOND_COUNT', id, agree: true, actor: 'Owner' }), s, 'answered once');
+  const [t2, own] = sentTransfer(buildInitialState());
+  const t3 = run(t2, { type: 'SUBMIT_RECEIPT', id: own, token: 'tok123', by: 'Ravi', lines: { L1: { counted: 99, damaged: 0 }, L2: { counted: 50, damaged: 0 } } });
+  assert.equal(run(t3, { type: 'RESPOND_COUNT', id: own, agree: true, actor: 'Owner' }), t3, 'own units: nothing to agree with');
+});
+
 console.log(`\n${passed} tests passed`);

@@ -3,7 +3,7 @@ import { ArrowRight, ChevronLeft, Plus, Trash2, Truck, Play, Square, Send, Copy,
 import { useStore, item, party, route, shipmentStatus, receiptOverdue, receiverPath, sameGstin, atGate, jobworkOpen, jobworkBalance, parentOf, childrenOf, loadName, FLOW_LABEL, STATUS_META } from '../store.tsx';
 import { useVoice, findNumber } from '../lib/voice.ts';
 import { resultText } from './Receive.tsx';
-import { ITEMS, PARTIES, UNITS, LOADING_POINTS } from '../data/seed.ts';
+import { ITEMS, PARTIES, UNITS, LOADING_POINTS, COMPANY } from '../data/seed.ts';
 import { AskOwner } from './Requests.tsx';
 import { inr0 } from '../lib/format.ts';
 import { t, unitWord } from '../i18n.ts';
@@ -262,7 +262,7 @@ function TruckDetail({ lang, id, onBack }: { lang: string; id: string; onBack: (
   const st = shipmentStatus(state, s);
   const now = Date.now();
   const link = s.token ? appLink(receiverPath(s, state.settings)) : '';
-  const msg = `${t('linkMessage', lang)} ${loadName(s.id)} · ${s.truckNo} · ${route(s)}${s.driver ? ` · ${s.driver}` : ''}${s.driverPhone ? ` ${s.driverPhone}` : ''}\n${link}`;
+  const msg = `${COMPANY.name}: ${t('linkMessage', lang)} ${loadName(s.id)} · ${s.truckNo} · ${route(s)}${s.driver ? ` · ${s.driver}` : ''}${s.driverPhone ? ` ${s.driverPhone}` : ''}\n${link}`;
   const sendOrCount = () => {
     const token = newToken();
     dispatch({ type: 'SEND_TO_RECEIVER', id: s.id, token, actor: atGate(s.flow) ? 'Gate' : 'Dispatch staff' });
@@ -300,7 +300,7 @@ function TruckDetail({ lang, id, onBack }: { lang: string; id: string; onBack: (
       <div className="space-y-1">
         <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">{t('papers', lang)}</div>
         <PhotoStrip photos={s.docs || []} onAdd={(r) => dispatch({ type: 'ATTACH_DOC', id: s.id, docs: r, actor: s.flow === 'inbound' ? 'Gate' : 'Dispatch staff' })} label={t('addPaper', lang)} lang={lang} kinds={s.flow === 'inbound' ? ['supplier bill', 'order', 'delivery note'] : ['dispatch list', 'challan', 'order']} />
-        {((s.flow === 'transfer' && s.billing === 'none') || s.flow === 'jobwork_out') && <button id="btn-challan" onClick={() => printReport(challanHtml(state, s))} className="w-full py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 cursor-pointer">{t('printChallan', lang)}</button>}
+        {((s.flow === 'transfer' && s.billing === 'none') || s.flow === 'jobwork_out') && <button id="btn-challan" onClick={async () => { const QR = (await import('qrcode')).default; const qr = s.token ? await QR.toDataURL(appLink(receiverPath(s, state.settings)), { margin: 1, width: 240 }) : ''; printReport(challanHtml(state, s, qr)); }} className="w-full py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 cursor-pointer">{t('printChallan', lang)}</button>}
       </div>
       <Chain s={s} lang={lang} />
       {st === 'LOADING' && !atGate(s.flow) && (
@@ -333,12 +333,14 @@ function TruckDetail({ lang, id, onBack }: { lang: string; id: string; onBack: (
       {st === 'IN_TRANSIT' && (
         <div className="space-y-2">
           {receiptOverdue(state, s, now) && <Note tone="stop"><AlertTriangle className="w-4 h-4 inline mr-1" />{duration(now - s.sentAt)}</Note>}
-          {s.returning ? null : atGate(s.flow)
+          {s.returning ? null : s.flow === 'transfer'
+            ? <div id="in-app-note" className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-950"><Truck className="w-4 h-4 inline mr-1" />{UNITS[s.toUnit]?.name.split(' (')[0]} sees this truck in its LoadMatch app (Receive), or scans the QR on the delivery challan. No WhatsApp needed.</div>
+            : atGate(s.flow)
             ? <a id="btn-count" href={receiverPath(s, state.settings)} className="w-full min-h-[52px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center cursor-pointer"><PackageCheck className="w-5 h-5 mr-2" />{t('countNow', lang)}</a>
             : <>
               <div className="text-[11px] text-slate-500 break-all bg-slate-50 border border-slate-200 rounded-lg p-2 font-mono">{link}</div>
               <div className="grid grid-cols-2 gap-2">
-                <a id="btn-share-link" href={shareWhatsApp(msg)} target="_blank" rel="noreferrer" className="py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center"><MessageCircle className="w-4 h-4 mr-1" />{t(s.sentAt && now - s.sentAt > 3600000 ? 'remind' : 'shareWhatsApp', lang)}</a>
+                <a id="btn-share-link" href={shareWhatsApp(msg)} target="_blank" rel="noreferrer" className="py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center justify-center"><MessageCircle className="w-4 h-4 mr-1" />{s.sentAt && now - s.sentAt > 3600000 ? t('remind', lang) : 'Send from company WhatsApp'}</a>
                 <button onClick={() => { try { navigator.clipboard.writeText(link); setCopied(true); } catch { /* ignore */ } }} className="py-3 rounded-xl border border-slate-300 text-slate-700 text-xs font-bold flex items-center justify-center cursor-pointer"><Copy className="w-4 h-4 mr-1" />{copied ? t('copied', lang) : t('copyLink', lang)}</button>
               </div>
             </>}

@@ -71,7 +71,7 @@ export function packSummary(state: any, drafts: any[], when: number) {
 
 // A delivery challan for a move with no money (goods moving between own units). Everything comes from the
 // dispatch list; the company checks the format against its own challan book.
-export function challanHtml(state: any, s: any) {
+export function challanHtml(state: any, s: any, qr = '') {
   const from = UNITS[s.fromUnit];
   const jw = s.flow === 'jobwork_out';
   const to = jw ? { name: PARTIES[s.party].name } : UNITS[s.toUnit];
@@ -87,7 +87,7 @@ export function challanHtml(state: any, s: any) {
 h1{font-size:18px;margin:0 0 2px}table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid #94a3b8;padding:6px;text-align:left;vertical-align:top}
 th{background:#f1f5f9}.r{text-align:right}.g{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}.b{border:1px solid #94a3b8;padding:8px}
 .s{margin-top:40px;display:grid;grid-template-columns:1fr 1fr;gap:40px}.s div{border-top:1px solid #0f172a;padding-top:4px}@media print{body{margin:10mm}}</style></head><body>
-<h1>Delivery challan</h1><div>${esc(COMPANY.name)} · ${jw ? `Goods sent for job work, to be returned within one year (by ${esc(new Date((s.sentAt || s.createdAt) + 365 * 86400000).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }))}). Not a sale.` : 'Transfer between own units, no sale'}</div>
+${qr ? `<div style="float:right;text-align:center;font-size:10px;color:#475569"><img src="${qr}" width="120" height="120" alt="QR"/><div>Receiver: scan to count</div></div>` : ''}<h1>Delivery challan</h1><div>${esc(COMPANY.name)} · ${jw ? `Goods sent for job work, to be returned within one year (by ${esc(new Date((s.sentAt || s.createdAt) + 365 * 86400000).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }))}). Not a sale.` : 'Transfer between own units, no sale'}</div>
 <div class="g">
   <div class="b"><b>Challan no.</b> ${esc(s.ref)}<br><b>Date</b> ${esc(d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }))}<br><b>Vehicle</b> ${esc(s.truckNo)}<br><b>LoadMatch ref</b> ${esc(s.id)}</div>
   <div class="b"><b>From</b> ${esc(from.name)}<br>GSTIN ${esc(tax(s.fromUnit).gstin)}, ${esc(tax(s.fromUnit).state)}<br><b>To</b> ${esc(to.name)}<br>GSTIN ${esc(jw ? PARTIES[s.party].gstin : tax(s.toUnit).gstin)}, ${esc(jw ? PARTIES[s.party].state : tax(s.toUnit).state)}</div>

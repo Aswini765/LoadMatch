@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { MessageCircle, Film, Share2, CheckCircle2, Clock, AlertTriangle, Truck, ChevronDown, ChevronRight, ShieldCheck, Link2, HelpCircle, Printer, FileCode, Send, Undo2 } from 'lucide-react';
 import { OwnerRequests } from './Requests.tsx';
-import { useStore, item, party, route, atGate, jobworkOpen, jobworkBalance, jobworkDueAt, shipmentOf, diffsOf, lineOf, shipmentStatus, receiptOverdue, diffOverdue, receiverPath, evidencePath, evidenceText, truckSummary, importOrder, ACTIONS, OPTIONS, optionsFor, KIND_LABEL, FLOW_LABEL, DRAFT_LABEL, DRAFT_PLAIN, loadName } from '../store.tsx';
+import { useStore, item, party, route, atGate, jobworkOpen, jobworkBalance, jobworkDueAt, shipmentOf, diffsOf, lineOf, shipmentStatus, receiptOverdue, diffOverdue, receiverPath, evidencePath, evidenceText, truckSummary, importOrder, ACTIONS, OPTIONS, optionsFor, countedByUs, KIND_LABEL, FLOW_LABEL, DRAFT_LABEL, DRAFT_PLAIN, loadName } from '../store.tsx';
 import { reportHtml, printReport, packSummary, entryAmount, entryLines } from '../lib/report.ts';
 import { batchXml, download } from '../lib/tally.ts';
 import { tallyDate } from '../lib/format.ts';
 import { Chain } from './Dispatch.tsx';
 import { PageHeader, Panel, StatusBadge, Note, PhotoStrip, shareWhatsApp, appLink, newToken, type Go } from './ui.tsx';
 import { inr, inr0, when, duration, dateTime, time } from '../lib/format.ts';
+import { COMPANY } from '../data/seed.ts';
 
 const KIND_CLS: Record<string, string> = {
   short: 'bg-amber-50 text-amber-800 border-amber-200',
@@ -37,6 +38,7 @@ export default function Owner({ go, initialId }: { go: Go; initialId?: string | 
           <Stat n={unread.filter((s: any) => receiptOverdue(state, s, now)).length} label="trucks not counted" cls="text-sky-700" />
         </div>} />
 
+      <TodaySummary />
       <OwnerRequests />
       <Panel eyebrow="Needs your decision" title={open.length ? `${open.length} difference${open.length > 1 ? 's' : ''} on ${byTruck.length} truck${byTruck.length > 1 ? 's' : ''} · worth ${inr0(openValue)}` : 'Nothing to decide'}>
         {!open.length && <Note tone="go"><CheckCircle2 className="w-4 h-4 inline mr-1" />Every truck that was counted either matched or already has your decision.</Note>}
@@ -118,6 +120,7 @@ function TruckHead({ s }: { s: any }) {
         <div className="text-slate-500">Truck <b className="text-slate-700">{s.truckNo}</b> · {refWord} {s.ref}{s.driver ? <> · Driver {s.driver}</> : null}{s.driverPhone ? <> · <a href={`tel:${s.driverPhone}`} className="font-bold text-emerald-800">{s.driverPhone}</a></> : null}</div>
         {s.loading && <div className="text-slate-500">Loaded at {s.loading.point}, {time(s.loading.startAt)}–{time(s.loading.endAt)}</div>}
         <div className="text-slate-500">Counted by <b className="text-slate-700">{s.receipt.by}</b>, {when(s.receipt.at)}</div>
+        <AgreeCount s={s} />
         {s.receipt.note && <div className="text-slate-700 italic">“{s.receipt.note}”</div>}
         <div className="pt-1"><Chain s={s} lang="en" /></div>
         {canFix && !fixing && <button id={`fix-count-${s.id}`} onClick={() => setFixing(true)} className="text-[11px] font-bold text-slate-600 underline cursor-pointer">Count looks wrong? Ask for a recount</button>}
@@ -368,5 +371,62 @@ function JobworkPanel() {
         })}
       </div>
     </Panel>
+  );
+}
+
+// The customer (or job worker) counted our load: do we agree? Like an e-way bill, silence for 72 hours = agreed.
+function AgreeCount({ s }: { s: any }) {
+  const { state, dispatch } = useStore();
+  const [why, setWhy] = React.useState('');
+  const [disagreeing, setDisagreeing] = React.useState(false);
+  if (countedByUs(s) || !diffsOf(state, s.id).length) return null;
+  if (s.response) return <div id={`resp-${s.id}`} className={`text-[11px] font-bold ${s.response.agree ? 'text-emerald-800' : 'text-rose-800'}`}>{s.response.agree ? '✓ We agreed with their count' : `✗ We disputed their count: ${s.response.note}`}</div>;
+  const left = 72 - Math.floor((Date.now() - s.receipt.at) / 3600000);
+  if (left <= 0) return <div className="text-[11px] font-bold text-emerald-800">✓ Agreed (no answer in 72 hours)</div>;
+  return (
+    <div id={`agree-${s.id}`} className="rounded-lg border border-sky-200 bg-sky-50 p-2 space-y-1.5 text-[11px] text-sky-950">
+      <div className="font-bold">{party(s.party)?.name || 'They'} counted this load. Do you agree? <span className="font-normal">({left} h left, then it counts as agreed)</span></div>
+      {!disagreeing ? (
+        <div className="flex gap-2">
+          <button id={`agree-yes-${s.id}`} onClick={() => dispatch({ type: 'RESPOND_COUNT', id: s.id, agree: true, actor: 'Owner' })} className="px-3 py-1.5 rounded-md bg-emerald-600 text-white font-bold cursor-pointer">Agree</button>
+          <button id={`agree-no-${s.id}`} onClick={() => setDisagreeing(true)} className="px-3 py-1.5 rounded-md border border-rose-300 bg-white text-rose-800 font-bold cursor-pointer">Disagree</button>
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <input id={`agree-why-${s.id}`} value={why} onChange={(e) => setWhy(e.target.value)} placeholder="Why? e.g. CCTV shows 50 loaded" className="flex-1 p-1.5 rounded-md border border-slate-300 bg-white" />
+          <button id={`agree-no-ok-${s.id}`} disabled={!why.trim()} onClick={() => dispatch({ type: 'RESPOND_COUNT', id: s.id, agree: false, note: why, actor: 'Owner' })} className="px-3 py-1.5 rounded-md bg-rose-600 disabled:opacity-40 text-white font-bold cursor-pointer">Send</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// The owner's day in one card, ready to send to their own WhatsApp in the evening
+function TodaySummary() {
+  const { state } = useStore();
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  const today = (t: any) => t && t >= start.getTime();
+  const sent = state.shipments.filter((s: any) => today(s.sentAt));
+  const counted = state.shipments.filter((s: any) => s.receipt && today(s.receipt.at));
+  const withDiff = counted.filter((s: any) => diffsOf(state, s.id).length);
+  const diffs = state.diffs.filter((d: any) => today(d.createdAt));
+  const value = diffs.reduce((a: number, d: any) => a + (d.value || 0), 0);
+  const open = state.diffs.filter((d: any) => d.status === 'open' || d.status === 'investigating').length;
+  const tomorrow = start.getTime() + 2 * 86400000;
+  const due = state.diffs.filter((d: any) => d.status === 'waiting' && d.decision?.dueAt && d.decision.dueAt < tomorrow).length;
+  const asks = (state.requests || []).filter((r: any) => r.status === 'pending').length;
+  const lines = [
+    `Today: ${sent.length} truck${sent.length === 1 ? '' : 's'} sent, ${counted.length} counted.`,
+    `${counted.length - withDiff.length} matched, ${withDiff.length} with a difference (${inr0(value)}).`,
+    `${open} difference${open === 1 ? '' : 's'} waiting for your decision.`,
+    due ? `${due} promise${due === 1 ? '' : 's'} due by tomorrow.` : '',
+    asks ? `${asks} staff request${asks === 1 ? '' : 's'} waiting.` : '',
+  ].filter(Boolean);
+  return (
+    <div id="today-summary" className="bg-slate-900 text-white rounded-xl p-4 space-y-2">
+      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-300">Your day</div>
+      {lines.map((l) => <div key={l} className="text-sm">{l}</div>)}
+      <a id="btn-summary-wa" href={shareWhatsApp(`LoadMatch · ${COMPANY.name}\n${lines.join('\n')}`)} target="_blank" rel="noreferrer" className="inline-flex items-center text-[11px] font-bold bg-emerald-500 hover:bg-emerald-600 px-2.5 py-1.5 rounded-md">Send this summary to my WhatsApp</a>
+    </div>
   );
 }

@@ -339,6 +339,16 @@ export function reducer(state: any, action: any): any {
 
     // The owner corrects a wrong count, before anything was decided or sent to the accountant.
     // The receiver's link opens again for a fresh count.
+    // A customer or job worker counted our load: our owner agrees with their count or disputes it (like accepting
+    // or rejecting an e-way bill). No answer in 72 hours counts as agreed.
+    case 'RESPOND_COUNT': {
+      const s = shipmentOf(state, action.id);
+      if (!s || !s.receipt || countedByUs(s) || s.response || actor !== 'Owner') return state;
+      const note = String(action.note || '').trim();
+      if (!action.agree && !note) return state;
+      return putShipment(state, audit({ ...s, response: { agree: !!action.agree, note, at } }, at, actor, action.agree ? 'COUNT_AGREED' : 'COUNT_DISPUTED', action.agree ? `We agree with ${s.receipt.by}'s count` : `We disagree with ${s.receipt.by}'s count: ${note}`));
+    }
+
     case 'REOPEN_COUNT': {
       const s = shipmentOf(state, action.id);
       const reason = String(action.note || '').trim();

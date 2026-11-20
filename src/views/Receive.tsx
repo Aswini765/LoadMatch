@@ -16,7 +16,7 @@ export function ReceiveTab() {
   const setLang = (l: string) => { setLangState(l); saveLang(l); };
   const [adding, setAdding] = useState<string | null>(null);
   const open = state.shipments
-    .filter((s: any) => !s.receipt && !s.cancelledAt && countedByUs(s) && (s.flow !== 'transfer' || s.sentAt))
+    .filter((s: any) => !s.receipt && !s.cancelledAt && !s.returning && countedByUs(s) && (s.flow !== 'transfer' || s.sentAt))
     .sort((a: any, b: any) => (a.sentAt || a.createdAt) - (b.sentAt || b.createdAt));
   const start = (s: any) => {
     if (s.sentAt) { window.location.hash = receiverPath(s, state.settings); return; }
@@ -305,7 +305,7 @@ function Done({ s, state, remote, lang, setLang, head }: { s: any; state: any; r
       {!matched && s.flow !== 'outbound' && <Note tone="warn">{t('lrTip', lang)}</Note>}
       {!sharedMode && <div id="r-send-back"><Note tone="warn">{t('sendBackNote', lang)}</Note></div>}
       {!matched && !remote && <PhotoStrip photos={(s.docs || []).filter((d: any) => d.by === 'Receiver')} onAdd={(r) => dispatch({ type: 'ATTACH_DOC', id: s.id, docs: r, actor: 'Receiver' })} label={t('addPhoto', lang)} lang={lang} kinds={['signed lorry receipt (bilty)', 'damage']} />}
-      <a id="btn-tell-sender" href={shareWhatsApp(message)} target="_blank" rel="noreferrer" className="w-full min-h-[48px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center"><MessageCircle className="w-5 h-5 mr-2" />{t(sharedMode ? 'tellSender' : 'sendCountToSender', lang)}</a>
+      {!countedByUs(s) &&       <a id="btn-tell-sender" href={shareWhatsApp(message)} target="_blank" rel="noreferrer" className="w-full min-h-[48px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center"><MessageCircle className="w-5 h-5 mr-2" />{t(sharedMode ? 'tellSender' : 'sendCountToSender', lang)}</a>}
       <Note><Lock className="w-4 h-4 inline mr-1" />{t('locked', lang)} {s.receipt.by}, {when(s.receipt.at)}</Note>
     </PhoneFrame>
   );

@@ -19,6 +19,30 @@ const ROLES = [
   ['reports', 'Reports'],
 ];
 
+// Who is using this phone. Each role sees only its own screens; the owner sees everything.
+// (Prototype: picked on the phone, no login. A real version uses a PIN set by the owner.)
+const WHO: Record<string, { label: string; sub: string; main: string; views: string[] }> = {
+  dispatch: { label: 'Dispatch', sub: 'I load and send trucks (Ramesh, Mysuru unit)', main: 'dispatch', views: ['dispatch'] },
+  receiver: { label: 'Receiver', sub: 'I count what arrives (Ravi, Bengaluru unit)', main: 'receive', views: ['receive'] },
+  owner: { label: 'Owner', sub: 'I see everything and decide', main: 'owner', views: ['home', 'dispatch', 'receive', 'owner', 'reports'] },
+};
+const savedWho = () => { try { const w = localStorage.getItem('loadmatch-role') || ''; return WHO[w] ? w : ''; } catch { return ''; } };
+
+function WhoAreYou({ pick }: { pick: (w: string) => void }) {
+  return (
+    <div className="max-w-md mx-auto space-y-3 pt-6">
+      <h1 className="text-xl font-bold text-slate-950">Who are you?</h1>
+      <p className="text-xs text-slate-600">Each person sees only their own work. In this demo you can switch any time from the top bar.</p>
+      {Object.entries(WHO).map(([id, w]) => (
+        <button key={id} id={`who-${id}`} onClick={() => pick(id)} className="w-full text-left bg-white border border-slate-200 hover:border-emerald-400 rounded-xl p-4 shadow-2xs cursor-pointer">
+          <div className="text-sm font-bold text-slate-950">{w.label}</div>
+          <div className="text-xs text-slate-600 mt-0.5">{w.sub}</div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function SyncChip() {
   const { sync } = useStore();
   const label = !sync.shared ? 'This device only' : !sync.online ? `Offline • ${sync.pending} waiting` : sync.pending ? `Syncing ${sync.pending}` : 'Shared • live';
@@ -55,7 +79,11 @@ function useHashRoute() {
 }
 
 export default function App() {
-  const [view, setView] = useState('home');
+  const [who, setWho] = useState(savedWho);
+  const [view, setView] = useState(() => (who ? WHO[who].main : 'home'));
+  const roles = ROLES.filter(([id]) => who && WHO[who].views.includes(id));
+  const pickWho = (w: string) => { try { localStorage.setItem('loadmatch-role', w); } catch { /* ignore */ } setWho(w); go(WHO[w].main); };
+  const switchWho = () => { try { localStorage.removeItem('loadmatch-role'); } catch { /* ignore */ } setWho(''); setMobileOpen(false); };
   const [openId, setOpenId] = useState<string | null>(null);
   const link = useHashRoute();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -90,7 +118,7 @@ export default function App() {
             </div>
           </div>
           {!link && <nav id="role-switcher-nav" className="hidden sm:flex items-center space-x-1" aria-label="Application Role Switcher">
-            {ROLES.map(([id, label]) => (
+            {roles.map(([id, label]) => (
               <button key={id} id={`role-btn-${id}`} onClick={() => go(id)}
                 className={`inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${!link && view === id ? 'text-slate-950 bg-slate-100 font-bold' : 'text-slate-600 hover:text-slate-950 hover:bg-slate-50'}`}>
                 {label}
@@ -106,7 +134,8 @@ export default function App() {
               <span className="text-slate-500 font-normal">Demo Environment</span>
             </div>
             <SyncChip />
-            {!['dispatch', 'receive'].includes(view) && <button id="btn-open-settings" onClick={() => setSettingsOpen(true)} className="text-slate-600 hover:text-slate-950 font-medium px-2 py-1 rounded hover:bg-slate-100 transition-colors cursor-pointer hidden sm:inline-flex items-center space-x-1">
+            {who && <button id="btn-switch-role" onClick={switchWho} className="text-slate-700 font-semibold px-2 py-1 rounded-md bg-emerald-50 border border-emerald-200 cursor-pointer" title="Demo: switch to another person">You: {WHO[who].label} · Switch</button>}
+            {who === 'owner' && <button id="btn-open-settings" onClick={() => setSettingsOpen(true)} className="text-slate-600 hover:text-slate-950 font-medium px-2 py-1 rounded hover:bg-slate-100 transition-colors cursor-pointer hidden sm:inline-flex items-center space-x-1">
               <Settings2 className="w-3.5 h-3.5 text-slate-400" />
               <span className="hidden md:inline">Settings</span>
             </button>}
@@ -119,10 +148,10 @@ export default function App() {
 
         {mobileOpen && !link && (
           <div className="sm:hidden bg-white border-b border-slate-200 px-4 py-2 space-y-1 shadow-xs z-20">
-            {ROLES.map(([id, label]) => (
+            {roles.map(([id, label]) => (
               <button key={id} id={`m-role-${id}`} onClick={() => go(id)} className={`block w-full text-left px-3 py-2 text-xs font-semibold rounded-md cursor-pointer ${view === id ? 'text-slate-950 bg-slate-100 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>{label}{badges[id] && <span className={`ml-1.5 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full text-[10px] font-bold text-white ${badges[id]!.cls}`}>{badges[id]!.n}</span>}</button>
             ))}
-            <button id="m-settings" onClick={() => { setSettingsOpen(true); setMobileOpen(false); }} className="block w-full text-left px-3 py-2 text-xs font-semibold rounded-md text-slate-600 hover:bg-slate-50 cursor-pointer border-t border-slate-100 mt-1 pt-2">Settings (owner)</button>
+            {who === 'owner' && <button id="m-settings" onClick={() => { setSettingsOpen(true); setMobileOpen(false); }} className="block w-full text-left px-3 py-2 text-xs font-semibold rounded-md text-slate-600 hover:bg-slate-50 cursor-pointer border-t border-slate-100 mt-1 pt-2">Settings (owner)</button>}
           </div>
         )}
 
@@ -131,11 +160,12 @@ export default function App() {
           {link?.kind === 'c' && <CountBack id={link.id} token={link.token} payload={link.payload} onOpen={(id) => go('dispatch', { id })} />}
           {link?.kind === 'e' && <EvidenceView id={link.id} token={link.token} />}
           {!link && <>
-            {view === 'home' && <Home go={go} />}
-            {view === 'dispatch' && <Dispatch go={go} initialId={openId} key={nav} />}
-            {view === 'owner' && <Owner go={go} initialId={openId} key={`${openId || 'list'}-${nav}`} />}
-            {view === 'receive' && <ReceiveTab key={nav} />}
-            {view === 'reports' && <Reports go={go} />}
+            {!who && <WhoAreYou pick={pickWho} />}
+            {who && view === 'home' && <Home go={go} />}
+            {who && view === 'dispatch' && <Dispatch go={go} initialId={openId} key={nav} />}
+            {who && view === 'owner' && <Owner go={go} initialId={openId} key={`${openId || 'list'}-${nav}`} />}
+            {who && view === 'receive' && <ReceiveTab key={nav} />}
+            {who && view === 'reports' && <Reports go={go} />}
           </>}
         </main>
       </div>

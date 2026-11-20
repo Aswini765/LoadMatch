@@ -142,7 +142,7 @@ export const DEFAULT_SETTINGS = {
   // the receiver counts without seeing the sent quantity
   blindCount: true,
   // who hears about a difference: 'owner_sender' (owner and the sending staff) or 'owner' (owner only)
-  differencesTo: 'owner_sender',
+  differencesTo: 'owner', // from the interview: the receiver reports to the owner, not to the sender (fraud worry)
   // GSTIN and state per unit (same as the company unless the owner changes it)
   units: {
     MYS: { gstin: '29AAAAA0000A1Z5', state: 'Karnataka' },
