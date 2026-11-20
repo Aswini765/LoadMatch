@@ -58,7 +58,11 @@ function useHashRoute() {
 export default function App() {
   const [who, setWho] = useState(getWho);
   const [view, setView] = useState(() => (getWho() ? WHO[getWho()].main : 'home'));
-  const roles = ROLES.filter(([id]) => who && WHO[who].views.includes(id));
+  // Top bar: Home · Dispatch · Store · Owner always (the order a truck moves). Tapping a person's tab becomes that person
+  // (demo); Reports shows next to Owner for the owner.
+  const roles = ROLES.filter(([id]) => id !== 'reports' || who === 'owner');
+  const TAB_WHO: Record<string, string> = { dispatch: 'dispatch', receive: 'store', owner: 'owner' };
+  const openTab = (id: string) => (TAB_WHO[id] && TAB_WHO[id] !== who ? pickWho(TAB_WHO[id]) : go(id));
   const pickWho = (w: string) => { setWhoSaved(w); setWho(w); go(WHO[w].main); };
   const switchWho = () => { setWhoSaved(''); setWho(''); go('home'); };
   const [openId, setOpenId] = useState<string | null>(null);
@@ -98,7 +102,7 @@ export default function App() {
           </div>
           {!bare && <nav id="role-switcher-nav" className="hidden sm:flex items-center space-x-1" aria-label="Application Role Switcher">
             {roles.map(([id, label]) => (
-              <button key={id} id={`role-btn-${id}`} onClick={() => go(id)}
+              <button key={id} id={`role-btn-${id}`} onClick={() => openTab(id)}
                 className={`inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${!bare && view === id ? 'text-slate-950 bg-slate-100 font-bold' : 'text-slate-600 hover:text-slate-950 hover:bg-slate-50'}`}>
                 {label}
                 {badges[id] && <span className={`ml-1.5 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full text-[10px] font-bold text-white ${badges[id]!.cls}`}>{badges[id]!.n}</span>}
@@ -113,7 +117,7 @@ export default function App() {
               <span className="text-slate-500 font-normal">Demo Environment</span>
             </div>
             <SyncChip />
-            {who && <button id="btn-switch-role" onClick={switchWho} className="text-slate-700 font-semibold px-2 py-1 rounded-md bg-emerald-50 border border-emerald-200 cursor-pointer" title="Demo: switch to another person">You: {WHO[who].label} · Switch</button>}
+            {who && <button id="btn-switch-role" onClick={switchWho} className="text-slate-700 font-semibold px-2 py-1 rounded-md bg-emerald-50 border border-emerald-200 cursor-pointer" title="Demo: switch to another person">You: {WHO[who].label}</button>}
             {who === 'owner' && <button id="btn-open-settings" onClick={() => setSettingsOpen(true)} className="text-slate-600 hover:text-slate-950 font-medium px-2 py-1 rounded hover:bg-slate-100 transition-colors cursor-pointer hidden sm:inline-flex items-center space-x-1">
               <Settings2 className="w-3.5 h-3.5 text-slate-400" />
               <span className="hidden md:inline">Settings</span>
@@ -128,7 +132,7 @@ export default function App() {
         {mobileOpen && !bare && (
           <div className="sm:hidden bg-white border-b border-slate-200 px-4 py-2 space-y-1 shadow-xs z-20">
             {roles.map(([id, label]) => (
-              <button key={id} id={`m-role-${id}`} onClick={() => go(id)} className={`block w-full text-left px-3 py-2 text-xs font-semibold rounded-md cursor-pointer ${view === id ? 'text-slate-950 bg-slate-100 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>{label}{badges[id] && <span className={`ml-1.5 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full text-[10px] font-bold text-white ${badges[id]!.cls}`}>{badges[id]!.n}</span>}</button>
+              <button key={id} id={`m-role-${id}`} onClick={() => openTab(id)} className={`block w-full text-left px-3 py-2 text-xs font-semibold rounded-md cursor-pointer ${view === id ? 'text-slate-950 bg-slate-100 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>{label}{badges[id] && <span className={`ml-1.5 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full text-[10px] font-bold text-white ${badges[id]!.cls}`}>{badges[id]!.n}</span>}</button>
             ))}
             {who === 'owner' && <button id="m-settings" onClick={() => { setSettingsOpen(true); setMobileOpen(false); }} className="block w-full text-left px-3 py-2 text-xs font-semibold rounded-md text-slate-600 hover:bg-slate-50 cursor-pointer border-t border-slate-100 mt-1 pt-2">Settings (owner)</button>}
           </div>
