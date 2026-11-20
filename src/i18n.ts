@@ -107,7 +107,7 @@ const T: Record<string, Tr> = {
   excess: { en: 'extra', hi: 'ज़्यादा', kn: 'ಹೆಚ್ಚು', te: 'ఎక్కువ' },
   damagedWord: { en: 'damaged', hi: 'खराब', kn: 'ಹಾಳಾದವು', te: 'పాడైనవి' },
   countThis: { en: 'Count', hi: 'गिनें', kn: 'ಎಣಿಸಿ', te: 'లెక్కించండి' },
-  receiverResult: { en: 'Receiver’s count', hi: 'रिसीवर की गिनती', kn: 'ಸ್ವೀಕರಿಸಿದವರ ಎಣಿಕೆ', te: 'రిసీవర్ లెక్క' },
+  receiverResult: { en: 'Count at arrival', hi: 'रिसीवर की गिनती', kn: 'ಸ್ವೀಕರಿಸಿದವರ ಎಣಿಕೆ', te: 'రిసీవర్ లెక్క' },
   moneyQ: { en: 'Is money involved in this move?', hi: 'क्या इस माल में पैसे का लेन-देन है?', kn: 'ಈ ಸಾಗಣೆಯಲ್ಲಿ ಹಣದ ವ್ಯವಹಾರ ಇದೆಯೇ?', te: 'ఈ తరలింపులో డబ్బు లావాదేవీ ఉందా?' },
   noMoney: { en: 'No money (stock transfer)', hi: 'पैसा नहीं (स्टॉक ट्रांसफर)', kn: 'ಹಣ ಇಲ್ಲ (ಸ್ಟಾಕ್ ವರ್ಗಾವಣೆ)', te: 'డబ్బు లేదు (స్టాక్ బదిలీ)' },
   withInvoice: { en: 'With invoice and GST', hi: 'बिल और GST के साथ', kn: 'ಬಿಲ್ ಮತ್ತು GST ಜೊತೆ', te: 'బిల్లు, GST తో' },

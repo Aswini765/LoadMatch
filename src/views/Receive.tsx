@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Mic, MicOff, Camera, Lock, CheckCircle2, AlertTriangle, Minus, Plus, ChevronLeft, ChevronRight, MessageCircle, PackageCheck, Warehouse, ArrowRight, Wrench } from 'lucide-react';
-import { useStore, item, route, shipmentOf, diffsOf, shipmentStatus, receiverPath, countBackPath, unpackLoad, unpackCount, reducer, countedByUs, jobworkOpen, loadName, FLOW_LABEL } from '../store.tsx';
+import { useStore, item, route, shipmentOf, diffsOf, shipmentStatus, receiverPath, countBackPath, unpackLoad, unpackCount, reducer, countedByUs, atGate, jobworkOpen, loadName, FLOW_LABEL } from '../store.tsx';
+import { LOADING_POINTS } from '../data/seed.ts';
 import { t, fill, unitWord } from '../i18n.ts';
 import { useVoice, parseCount } from '../lib/voice.ts';
 import { PhoneFrame, Note, PhotoStrip, savedLang, saveLang, shareWhatsApp, newToken, appLink } from './ui.tsx';
 import { NewList, Chain } from './Dispatch.tsx';
-import { when } from '../lib/format.ts';
+import { when, time } from '../lib/format.ts';
 import { sharedMode } from '../sync.ts';
 
 // ---------- the Receive tab: your own floor staff ----------
@@ -25,7 +26,7 @@ export function ReceiveTab() {
     window.location.hash = `#/r/${s.id}/${token}`;
   };
   return (
-    <PhoneFrame title={`LoadMatch · ${t('receive', lang)}`} sub={adding ? t(adding === 'jobwork_in' ? 'backFromJobwork' : 'supplierDelivery', lang) : t('toCount', lang)} lang={lang} setLang={setLang}>
+    <PhoneFrame title="LoadMatch · Store" sub={adding ? t(adding === 'jobwork_in' ? 'backFromJobwork' : 'supplierDelivery', lang) : t('toCount', lang)} lang={lang} setLang={setLang}>
       {adding ? (
         <NewList lang={lang} flow={adding} onBack={() => setAdding(null)} onSaved={(id) => { setAdding(null); const s = state.shipments.find((x: any) => x.id === id); start(s || { id, sentAt: null }); }} />
       ) : (
@@ -38,6 +39,7 @@ export function ReceiveTab() {
               <span className="flex items-center"><Wrench className="w-4 h-4 mr-2 text-emerald-700" />{t('backFromJobwork', lang)}</span><Plus className="w-4 h-4 text-slate-400" />
             </button>
           )}
+          <TrucksToLoad />
           <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wide pt-1">{t('toCount', lang)}</div>
           {!open.length && <Note>{t('nothingToCount', lang)}</Note>}
           {open.map((s: any) => (
@@ -338,4 +340,28 @@ export function CountBack({ id, token, payload, onOpen }: { id: string; token: s
     </>
   );
   return <PhoneFrame title="LoadMatch" sub={s ? `${loadName(s.id)} · ${s.truckNo}` : id} lang={lang} setLang={setLang}><div className="space-y-3">{body}</div></PhoneFrame>;
+}
+
+// Store person at the sending unit: trucks dispatch has listed, waiting to be loaded. Start and end times are the CCTV window.
+function TrucksToLoad() {
+  const { state, dispatch } = useStore();
+  const [points, setPoints] = useState<Record<string, string>>({});
+  const list = state.shipments.filter((s: any) => !s.sentAt && !s.cancelledAt && !atGate(s.flow) && !(s.loading && s.loading.endAt));
+  if (!list.length) return null;
+  return (
+    <div className="space-y-2">
+      <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wide pt-1">Trucks to load</div>
+      {list.map((s: any) => (
+        <div key={s.id} id={`load-${s.id}`} className="bg-white border border-slate-200 rounded-xl p-3 space-y-2 shadow-2xs">
+          <div className="text-xs"><b>{s.truckNo}</b> · {route(s)} · {loadName(s.id)}</div>
+          <div className="text-[11px] text-slate-600">{s.lines.map((l: any) => `${l.qty} ${item(l.item).name}`).join(' · ')}</div>
+          <select id={`load-point-${s.id}`} disabled={!!s.loading} value={s.loading?.point || points[s.id] || LOADING_POINTS[0]} onChange={(e) => setPoints({ ...points, [s.id]: e.target.value })} className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs">{LOADING_POINTS.map((p) => <option key={p}>{p}</option>)}</select>
+          <div className="grid grid-cols-2 gap-2">
+            <button id={`load-start-${s.id}`} disabled={!!s.loading} onClick={() => dispatch({ type: 'LOADING', id: s.id, point: points[s.id] || LOADING_POINTS[0], phase: 'start', actor: 'Store' })} className="py-2.5 rounded-lg border-2 border-slate-900 disabled:border-slate-200 disabled:text-slate-500 text-xs font-bold cursor-pointer">{s.loading ? `Started ${time(s.loading.startAt)}` : 'Loading started'}</button>
+            <button id={`load-end-${s.id}`} disabled={!s.loading} onClick={() => dispatch({ type: 'LOADING', id: s.id, phase: 'end', actor: 'Store' })} className="py-2.5 rounded-lg bg-slate-900 disabled:opacity-40 text-white text-xs font-bold cursor-pointer">Loading finished</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }

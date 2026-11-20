@@ -5,6 +5,7 @@ import { useVoice, findNumber } from '../lib/voice.ts';
 import { resultText } from './Receive.tsx';
 import { ITEMS, PARTIES, UNITS, LOADING_POINTS, COMPANY } from '../data/seed.ts';
 import { AskOwner } from './Requests.tsx';
+import { getWho } from '../lib/who.ts';
 import { inr0 } from '../lib/format.ts';
 import { t, unitWord } from '../i18n.ts';
 import { PhoneFrame, Note, PhotoStrip, savedLang, saveLang, shareWhatsApp, appLink, newToken, type Go } from './ui.tsx';
@@ -303,7 +304,12 @@ function TruckDetail({ lang, id, onBack }: { lang: string; id: string; onBack: (
         {((s.flow === 'transfer' && s.billing === 'none') || s.flow === 'jobwork_out') && <button id="btn-challan" onClick={async () => { const QR = (await import('qrcode')).default; const qr = s.token ? await QR.toDataURL(appLink(receiverPath(s, state.settings)), { margin: 1, width: 240 }) : ''; printReport(challanHtml(state, s, qr)); }} className="w-full py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 cursor-pointer">{t('printChallan', lang)}</button>}
       </div>
       <Chain s={s} lang={lang} />
-      {st === 'LOADING' && !atGate(s.flow) && (
+      {st === 'LOADING' && !atGate(s.flow) && getWho() === 'dispatch' && (
+        <div id="loading-status" className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-800">
+          <Truck className="w-4 h-4 inline mr-1" />{!s.loading ? 'Waiting for the store to start loading.' : !s.loading.endAt ? `Store is loading at ${s.loading.point} since ${time(s.loading.startAt)}.` : `Store finished loading at ${s.loading.point}, ${time(s.loading.startAt)}–${time(s.loading.endAt)}. You can send the truck.`}
+        </div>
+      )}
+      {st === 'LOADING' && !atGate(s.flow) && getWho() !== 'dispatch' && (
         <div className="space-y-2">
           <Note>{t('loadingFirst', lang)}</Note>
           <label className="block text-[11px] font-bold text-slate-700">{t('loadingPoint', lang)}
@@ -334,7 +340,7 @@ function TruckDetail({ lang, id, onBack }: { lang: string; id: string; onBack: (
         <div className="space-y-2">
           {receiptOverdue(state, s, now) && <Note tone="stop"><AlertTriangle className="w-4 h-4 inline mr-1" />{duration(now - s.sentAt)}</Note>}
           {s.returning ? null : s.flow === 'transfer'
-            ? <div id="in-app-note" className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-950"><Truck className="w-4 h-4 inline mr-1" />{UNITS[s.toUnit]?.name.split(' (')[0]} sees this truck in its LoadMatch app (Receive), or scans the QR on the delivery challan. No WhatsApp needed.</div>
+            ? <div id="in-app-note" className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-950"><Truck className="w-4 h-4 inline mr-1" />{UNITS[s.toUnit]?.name.split(' (')[0]} sees this truck in its LoadMatch app (Store), or scans the QR on the delivery challan. No WhatsApp needed.</div>
             : atGate(s.flow)
             ? <a id="btn-count" href={receiverPath(s, state.settings)} className="w-full min-h-[52px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center cursor-pointer"><PackageCheck className="w-5 h-5 mr-2" />{t('countNow', lang)}</a>
             : <>

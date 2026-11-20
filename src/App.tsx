@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Menu, MapPin, Settings2, BookOpen, X } from 'lucide-react';
 import { COMPANY } from './data/seed.ts';
+import { WHO, getWho, setWhoSaved } from './lib/who.ts';
 import Home from './views/Home.tsx';
 import Dispatch from './views/Dispatch.tsx';
 import Receive, { ReceiveTab, CountBack } from './views/Receive.tsx';
@@ -14,34 +15,10 @@ import type { Go } from './views/ui.tsx';
 const ROLES = [
   ['home', 'Home'],
   ['dispatch', 'Dispatch'],
-  ['receive', 'Receive'],
+  ['receive', 'Store'],
   ['owner', 'Owner'],
   ['reports', 'Reports'],
 ];
-
-// Who is using this phone. Each role sees only its own screens; the owner sees everything.
-// (Prototype: picked on the phone, no login. A real version uses a PIN set by the owner.)
-const WHO: Record<string, { label: string; sub: string; main: string; views: string[] }> = {
-  dispatch: { label: 'Dispatch', sub: 'I load and send trucks (Ramesh, Mysuru unit)', main: 'dispatch', views: ['dispatch'] },
-  receiver: { label: 'Receiver', sub: 'I count what arrives (Ravi, Bengaluru unit)', main: 'receive', views: ['receive'] },
-  owner: { label: 'Owner', sub: 'I see everything and decide', main: 'owner', views: ['home', 'dispatch', 'receive', 'owner', 'reports'] },
-};
-const savedWho = () => { try { const w = localStorage.getItem('loadmatch-role') || ''; return WHO[w] ? w : ''; } catch { return ''; } };
-
-function WhoAreYou({ pick }: { pick: (w: string) => void }) {
-  return (
-    <div className="max-w-md mx-auto space-y-3 pt-6">
-      <h1 className="text-xl font-bold text-slate-950">Who are you?</h1>
-      <p className="text-xs text-slate-600">Each person sees only their own work. In this demo you can switch any time from the top bar.</p>
-      {Object.entries(WHO).map(([id, w]) => (
-        <button key={id} id={`who-${id}`} onClick={() => pick(id)} className="w-full text-left bg-white border border-slate-200 hover:border-emerald-400 rounded-xl p-4 shadow-2xs cursor-pointer">
-          <div className="text-sm font-bold text-slate-950">{w.label}</div>
-          <div className="text-xs text-slate-600 mt-0.5">{w.sub}</div>
-        </button>
-      ))}
-    </div>
-  );
-}
 
 function SyncChip() {
   const { sync } = useStore();
@@ -65,7 +42,7 @@ function useBadges() {
   const toCount = state.shipments.filter((s: any) => !s.receipt && !s.cancelledAt && countedByUs(s) && (s.flow !== 'transfer' || s.sentAt)).length;
   return {
     dispatch: late ? { n: late, cls: 'bg-rose-600' } : loading ? { n: loading, cls: 'bg-slate-400' } : null,
-    receive: toCount ? { n: toCount, cls: 'bg-sky-600' } : null,
+    receive: toCount + loading ? { n: toCount + loading, cls: 'bg-sky-600' } : null,
     owner: owner ? { n: owner, cls: 'bg-amber-500' } : null,
   } as Record<string, { n: number; cls: string } | null>;
 }
@@ -79,13 +56,15 @@ function useHashRoute() {
 }
 
 export default function App() {
-  const [who, setWho] = useState(savedWho);
-  const [view, setView] = useState(() => (who ? WHO[who].main : 'home'));
+  const [who, setWho] = useState(getWho);
+  const [view, setView] = useState(() => (getWho() ? WHO[getWho()].main : 'home'));
   const roles = ROLES.filter(([id]) => who && WHO[who].views.includes(id));
-  const pickWho = (w: string) => { try { localStorage.setItem('loadmatch-role', w); } catch { /* ignore */ } setWho(w); go(WHO[w].main); };
-  const switchWho = () => { try { localStorage.removeItem('loadmatch-role'); } catch { /* ignore */ } setWho(''); setMobileOpen(false); };
+  const pickWho = (w: string) => { setWhoSaved(w); setWho(w); go(WHO[w].main); };
+  const switchWho = () => { setWhoSaved(''); setWho(''); go('home'); };
   const [openId, setOpenId] = useState<string | null>(null);
   const link = useHashRoute();
+  // the menu is hidden only for outsiders who opened a WhatsApp link; own staff (a role is picked) keep it
+  const bare = Boolean(link) && !who;
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sopOpen, setSopOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -106,10 +85,10 @@ export default function App() {
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto overflow-x-hidden">
         <header id="main-topbar" className="h-14 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between shrink-0 z-30 shadow-2xs sticky top-0">
           <div className="flex items-center space-x-3 shrink-0">
-            {!link && <button id="btn-toggle-mobile-menu" onClick={() => setMobileOpen((o) => !o)} className="p-1.5 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 sm:hidden cursor-pointer" aria-label="Open Navigation Menu">
+            {!bare && <button id="btn-toggle-mobile-menu" onClick={() => setMobileOpen((o) => !o)} className="p-1.5 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 sm:hidden cursor-pointer" aria-label="Open Navigation Menu">
               {mobileOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
             </button>}
-            <div className={`flex items-center space-x-2.5 select-none ${link ? '' : 'cursor-pointer'}`} onClick={() => !link && go('home')}>
+            <div className={`flex items-center space-x-2.5 select-none ${bare ? '' : 'cursor-pointer'}`} onClick={() => !bare && go('home')}>
               <div className="w-7 h-7 rounded-md bg-slate-900 text-white font-bold text-xs flex items-center justify-center tracking-tight">LM</div>
               <div className="flex flex-col">
                 <span className="font-bold text-sm tracking-tight text-slate-950 leading-tight">LoadMatch</span>
@@ -117,16 +96,16 @@ export default function App() {
               </div>
             </div>
           </div>
-          {!link && <nav id="role-switcher-nav" className="hidden sm:flex items-center space-x-1" aria-label="Application Role Switcher">
+          {!bare && <nav id="role-switcher-nav" className="hidden sm:flex items-center space-x-1" aria-label="Application Role Switcher">
             {roles.map(([id, label]) => (
               <button key={id} id={`role-btn-${id}`} onClick={() => go(id)}
-                className={`inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${!link && view === id ? 'text-slate-950 bg-slate-100 font-bold' : 'text-slate-600 hover:text-slate-950 hover:bg-slate-50'}`}>
+                className={`inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${!bare && view === id ? 'text-slate-950 bg-slate-100 font-bold' : 'text-slate-600 hover:text-slate-950 hover:bg-slate-50'}`}>
                 {label}
                 {badges[id] && <span className={`ml-1.5 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full text-[10px] font-bold text-white ${badges[id]!.cls}`}>{badges[id]!.n}</span>}
               </button>
             ))}
           </nav>}
-          {!link && <div className="flex items-center space-x-3 shrink-0 text-xs">
+          {!bare && <div className="flex items-center space-x-3 shrink-0 text-xs">
             <div className="hidden lg:flex items-center space-x-1.5 text-slate-600 bg-slate-50 border border-slate-200/80 px-2.5 py-1 rounded-md">
               <MapPin className="w-3 h-3 text-slate-400" />
               <span className="font-medium text-slate-800">{COMPANY.name}, {COMPANY.city}</span>
@@ -146,7 +125,7 @@ export default function App() {
           </div>}
         </header>
 
-        {mobileOpen && !link && (
+        {mobileOpen && !bare && (
           <div className="sm:hidden bg-white border-b border-slate-200 px-4 py-2 space-y-1 shadow-xs z-20">
             {roles.map(([id, label]) => (
               <button key={id} id={`m-role-${id}`} onClick={() => go(id)} className={`block w-full text-left px-3 py-2 text-xs font-semibold rounded-md cursor-pointer ${view === id ? 'text-slate-950 bg-slate-100 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>{label}{badges[id] && <span className={`ml-1.5 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full text-[10px] font-bold text-white ${badges[id]!.cls}`}>{badges[id]!.n}</span>}</button>
@@ -159,9 +138,8 @@ export default function App() {
           {link?.kind === 'r' && <Receive id={link.id} token={link.token} payload={link.payload} key={`${link.id}-${link.token}`} />}
           {link?.kind === 'c' && <CountBack id={link.id} token={link.token} payload={link.payload} onOpen={(id) => go('dispatch', { id })} />}
           {link?.kind === 'e' && <EvidenceView id={link.id} token={link.token} />}
-          {!link && <>
-            {!who && <WhoAreYou pick={pickWho} />}
-            {who && view === 'home' && <Home go={go} />}
+          {!bare && <>
+            {(!who || view === 'home') && <Home go={go} who={who} pick={pickWho} />}
             {who && view === 'dispatch' && <Dispatch go={go} initialId={openId} key={nav} />}
             {who && view === 'owner' && <Owner go={go} initialId={openId} key={`${openId || 'list'}-${nav}`} />}
             {who && view === 'receive' && <ReceiveTab key={nav} />}
