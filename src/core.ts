@@ -465,6 +465,13 @@ export function reducer(state: any, action: any): any {
       return putShipment(done('approved', state), audit({ ...s, accident, returning: true, token: action.token }, at, actor, 'ACCIDENT', `Accident${r.place ? ` near ${r.place}` : ''}: ${r.note}. Goods collected and coming back to ${s.fromUnit ? UNITS[s.fromUnit].name.split(' (')[0] : 'the sender'}; count them there.`));
     }
 
+    // The store person at the receiving end taps "Truck arrived" (drivers don't use the app)
+    case 'ARRIVED': {
+      const s = shipmentOf(state, action.id);
+      if (!s || !s.sentAt || s.receipt || s.cancelledAt || s.arrivedAt) return state;
+      return putShipment(state, audit({ ...s, arrivedAt: at }, at, action.by || actor, 'ARRIVED', 'Truck arrived; counting can start.'));
+    }
+
     case 'LOADING': {
       const s = shipmentOf(state, action.id);
       if (!s || s.sentAt || s.cancelledAt || atGate(s.flow)) return state;

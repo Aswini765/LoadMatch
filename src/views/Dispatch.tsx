@@ -116,6 +116,8 @@ export function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: s
   };
   // Prototype: the form opens filled with sample values; everything can still be changed
   const demo = flow !== 'jobwork_in';
+  // staff see only: where to, items, truck number (the rest is optional or done by the owner)
+  const simple = getWho() !== 'owner';
   const [truckNo, setTruck] = useState(demo ? `KA 09 B ${1000 + Math.floor(Math.random() * 9000)}` : '');
   const [driver, setDriver] = useState(demo ? 'Manju' : '');
   const [driverPhone, setDriverPhone] = useState(demo ? '9845012345' : '');
@@ -144,7 +146,7 @@ export function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: s
   const missing: string[] = [];
   if (flow === 'jobwork_in' && !parentId) missing.push(t('whichJobwork', lang));
   if (!truckNo.trim()) missing.push(t('truckNo', lang));
-  if (!ref.trim()) missing.push(t(flow === 'transfer' || flow === 'jobwork_out' ? 'challanNo' : flow === 'outbound' ? 'invoiceNo' : flow === 'jobwork_in' ? 'jwChallanNo' : 'billNo', lang));
+  if (!ref.trim() && !(simple && flow === 'transfer')) missing.push(t(flow === 'transfer' || flow === 'jobwork_out' ? 'challanNo' : flow === 'outbound' ? 'invoiceNo' : flow === 'jobwork_in' ? 'jwChallanNo' : 'billNo', lang));
   if (flow === 'transfer' && fromUnit === toUnit) missing.push(t('sameUnit', lang));
   if (!clean.length) missing.push(t('needItem', lang));
   else if (clean.length !== lines.filter((l) => l.item || l.qty).length) missing.push(t('fixLines', lang));
@@ -155,7 +157,7 @@ export function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: s
   const [fulfils, setFulfils] = useState<string[]>([]);
   const save = () => {
     const id = `TRK-${1000 + state.counters.trk + 1}`;
-    dispatch({ type: 'CREATE_SHIPMENT', id, flow, fromUnit: hasFrom ? fromUnit : null, toUnit: hasTo ? toUnit : null, party: flow === 'transfer' ? null : partyId, parentId: parentId || undefined, fulfils: fulfils.filter((id) => openPromises.some((d: any) => d.id === id)), truckNo, ref, driver, driverPhone, ewayBill, lines: clean, billing: flow === 'transfer' ? billing : undefined, docs, actor: me() });
+    dispatch({ type: 'CREATE_SHIPMENT', id, flow, fromUnit: hasFrom ? fromUnit : null, toUnit: hasTo ? toUnit : null, party: flow === 'transfer' ? null : partyId, parentId: parentId || undefined, fulfils: fulfils.filter((id) => openPromises.some((d: any) => d.id === id)), truckNo, ref: ref.trim() || `DC-${id.replace('TRK-', '')}`, driver, driverPhone, ewayBill, lines: clean, billing: flow === 'transfer' ? billing : undefined, docs, actor: me() });
     onSaved(id);
   };
   const sel = 'mt-1 w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm';
@@ -171,16 +173,16 @@ export function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: s
             </select>
           </label>
         )}
-        {hasFrom && <label>{t('fromUnit', lang)}<select id="f-from" value={fromUnit} onChange={(e) => setFrom(e.target.value)} className={sel}>{Object.values(UNITS).map((u) => <option key={u.id} value={u.id}>{u.name.split(' (')[0]}</option>)}</select></label>}
-        {hasTo && <label>{t('toUnit', lang)}<select id="f-to" value={toUnit} onChange={(e) => setTo(e.target.value)} className={sel}>{Object.values(UNITS).map((u) => <option key={u.id} value={u.id}>{u.name.split(' (')[0]}</option>)}</select></label>}
+        {hasFrom && !simple && <label>{t('fromUnit', lang)}<select id="f-from" value={fromUnit} onChange={(e) => setFrom(e.target.value)} className={sel}>{Object.values(UNITS).map((u) => <option key={u.id} value={u.id}>{u.name.split(' (')[0]}</option>)}</select></label>}
+        {hasTo && <label className={simple ? 'col-span-2' : ''}>{t('toUnit', lang)}<select id="f-to" value={toUnit} onChange={(e) => setTo(e.target.value)} className={sel}>{Object.values(UNITS).filter((u) => !simple || gate || u.id !== fromUnit).map((u) => <option key={u.id} value={u.id}>{u.name.split(' (')[0]}</option>)}</select></label>}
         {flow !== 'transfer' && <label>{t(flow === 'outbound' ? 'customer' : flow === 'inbound' ? 'supplier' : 'jobworker', lang)}<select id="f-party" disabled={flow === 'jobwork_in'} value={partyId} onChange={(e) => setParty(e.target.value)} className={sel}>{partyList.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}
         {flow !== 'transfer' && flow !== 'jobwork_in' && <AskAdd what="party" partyKind={flow === 'outbound' ? 'customer' : flow === 'inbound' ? 'supplier' : 'jobworker'} />}
         <label className="col-span-2">{t('truckNo', lang)}<input id="f-truck" value={truckNo} onChange={(e) => setTruck(e.target.value)} placeholder="KA 40 A 2541" className={sel} /></label>
         <label>{t('driver', lang)} <span className="font-normal text-slate-400">({t('optional', lang)})</span><input id="f-driver" value={driver} onChange={(e) => setDriver(e.target.value)} className={sel} /></label>
-        <label>{t('driverPhone', lang)} <span className="font-normal text-slate-400">({t('optional', lang)})</span><input id="f-driver-phone" type="tel" inputMode="tel" value={driverPhone} onChange={(e) => setDriverPhone(e.target.value)} className={sel} /></label>
-        <label className="col-span-2">{t(flow === 'transfer' || flow === 'jobwork_out' ? 'challanNo' : flow === 'outbound' ? 'invoiceNo' : flow === 'jobwork_in' ? 'jwChallanNo' : 'billNo', lang)}<input id="f-ref" value={ref} onChange={(e) => setRef(e.target.value)} className={sel} /></label>
+        {!simple && <label>{t('driverPhone', lang)} <span className="font-normal text-slate-400">({t('optional', lang)})</span><input id="f-driver-phone" type="tel" inputMode="tel" value={driverPhone} onChange={(e) => setDriverPhone(e.target.value)} className={sel} /></label>}
+        {!(simple && flow === 'transfer') && <label className="col-span-2">{t(flow === 'transfer' || flow === 'jobwork_out' ? 'challanNo' : flow === 'outbound' ? 'invoiceNo' : flow === 'jobwork_in' ? 'jwChallanNo' : 'billNo', lang)}<input id="f-ref" value={ref} onChange={(e) => setRef(e.target.value)} className={sel} /></label>}
       </div>
-      {hasFrom && madeFromOptions.length > 0 && (
+      {!simple && hasFrom && madeFromOptions.length > 0 && (
         <label className="block text-[11px] font-bold text-slate-700">{t('madeFrom', lang)}
           <select id="f-madefrom" value={parentId} onChange={(e) => setParentId(e.target.value)} className={sel}>
             <option value="">—</option>
@@ -189,7 +191,7 @@ export function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: s
         </label>
       )}
       {flow === 'transfer' && fromUnit === toUnit && <Note tone="warn">{t('sameUnit', lang)}</Note>}
-      {openPromises.length > 0 && (
+      {!simple && openPromises.length > 0 && (
         <div id="f-promises" className="rounded-xl border border-sky-200 bg-sky-50 p-2.5 space-y-1.5 text-xs">
           <div className="font-bold text-sky-950">{t(flow === 'outbound' ? 'promisesWeOwe' : 'promisesTheyOwe', lang)}</div>
           {openPromises.map((d: any) => (
@@ -218,7 +220,7 @@ export function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: s
 
       <div className="flex items-center justify-between pt-1">
         <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">{t(gate ? 'billedQty' : 'qty', lang)}</div>
-        <button id="btn-paste" onClick={() => setPasting(!pasting)} className="text-[11px] font-bold text-emerald-800 flex items-center cursor-pointer"><ClipboardPaste className="w-3.5 h-3.5 mr-1" />{t('paste', lang)}</button>
+        {!simple && <button id="btn-paste" onClick={() => setPasting(!pasting)} className="text-[11px] font-bold text-emerald-800 flex items-center cursor-pointer"><ClipboardPaste className="w-3.5 h-3.5 mr-1" />{t('paste', lang)}</button>}
       </div>
       {pasting && (
         <div className="space-y-2 rounded-xl border border-slate-200 p-2.5 bg-slate-50">
@@ -251,7 +253,7 @@ export function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: s
           {clean.reduce((a, l) => a + l.qty * ITEMS[l.item].rate, 0) > 50000 && !ewayBill.trim() && <span className="block mt-1 font-normal text-amber-800">{t('ewayNeeded', lang)} ({inr0(clean.reduce((a, l) => a + l.qty * ITEMS[l.item].rate, 0))})</span>}
         </label>
       )}
-      <PhotoStrip photos={docs} onAdd={(r) => setDocs([...docs, ...r])} label={t('addPaper', lang)} lang={lang} kinds={flow === 'inbound' ? ['supplier bill', 'order', 'delivery note'] : flow === 'jobwork_in' ? ['job worker challan', 'delivery note'] : ['dispatch list', 'challan', 'order']} />
+      {!simple && <PhotoStrip photos={docs} onAdd={(r) => setDocs([...docs, ...r])} label={t('addPaper', lang)} lang={lang} kinds={flow === 'inbound' ? ['supplier bill', 'order', 'delivery note'] : flow === 'jobwork_in' ? ['job worker challan', 'delivery note'] : ['dispatch list', 'challan', 'order']} />}
       {!valid && <div id="f-missing" className="text-[11px] text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-2">{t('stillNeeded', lang)}: {missing.join(' · ')}</div>}
       <button id="btn-save-list" disabled={!valid} onClick={save} className="w-full min-h-[48px] rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-sm font-bold cursor-pointer">{t('saveList', lang)} ({clean.length} {t(clean.length === 1 ? 'itemWord' : 'itemsWord', lang)})</button>
     </div>

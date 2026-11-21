@@ -7,33 +7,24 @@ const SOPS: [string, string[]][] = [
     'Owner: sees everything, decides every difference, answers staff requests, and sets up the lists.',
     'Nobody else needs a login. Customers and suppliers get a link from the company WhatsApp; the accountant gets a file.',
   ]],
-  ['1 · Staff: sending stock', [
-    'Tap Send stock, then Our other unit or Customer.',
-    'Pick items and type or say the numbers. Item not in the list? Tap “Ask owner”.',
-    'Save, then Loading started and Loading finished. The truck cannot leave before this (the time helps check CCTV).',
-    'Tap Truck left. Our other unit sees it straight away in its app; a customer gets the link from the company WhatsApp. The driver carries the challan with a QR code.',
-    'After Truck left the list is locked. Need a change (new truck, came back, accident)? Ask the owner from the truck page.',
+  ['1 · Staff: every truck has one big button', [
+    'Sending: 📦 Start loading → ✅ Loading done → 🚚 Truck left.',
+    'Receiving: 📍 Truck arrived (the store person taps it, not the driver) → 🔢 Count → Submit.',
+    'To send: tap 📤 Send, then 🏭 Our other unit or 🏪 Customer. Choose items, numbers and the truck number. That is all.',
+    'Supplier at the gate: tap 📥 Receive → 🚛 Supplier truck at the gate.',
+    'While counting, the sent number is hidden. Missing pieces are worked out by the app after you submit.',
   ]],
-  ['2 · Staff: receiving stock', [
-    '“Stock coming to you” at the top shows every truck on its way, and from where.',
-    'Tap Count. Count one item at a time; say the number into the mic or type it. Count damaged pieces separately.',
-    'The sent number is hidden so you count what is really there. You do not enter missing pieces: the app works them out after you submit.',
-    'Supplier at the gate? Receive stock → Supplier delivery, type what their bill says, then count.',
-    'Submit once; the count locks. Any difference goes only to the owner.',
-    'Short or damaged? Write it on the driver\'s lorry receipt before he leaves and add a photo.',
+  ['2 · Staff: updates', [
+    '🔔 Updates shows the latest three: truck coming, truck reached, counted OK or not matching, and the owner\'s YES or NO.',
+    'Problem with a truck (new truck, came back, accident)? Tap “Problem? Ask owner” on its card.',
+    'Old trucks are under 🗂 Old trucks.',
   ]],
-  ['3 · Staff: checking later', [
-    'To send and To receive: what is waiting for you now.',
-    'On the way: trucks your unit sent that are not counted yet.',
-    'Done: every old truck (sent, received, or with a difference). Read only.',
-    'Asked the owner: every request with the answer: Waiting, Owner said YES or Owner said NO, and the owner\'s note.',
-  ]],
-  ['4 · Owner', [
+  ['3 · Owner', [
     'Your day: today\'s trucks and money at risk.',
     'Staff are asking you: say Yes or No, with a note. Staff see your answer.',
     'Needs your decision: only what did not match, with its value and loading time. Choose: take the loss, ask for it to be sent or replaced, adjust in the next bill, or check first.',
     'Setup: add units (with GST no.), staff, items (one by one or pasted from Excel) and customers or suppliers. Staff only pick from these lists.',
-    'For your accountant: one report and one Tally file. Send when ready.',
+    'More (one button): trucks on the road, promises, the accountant file and recent trucks.',
   ]],
 ];
 

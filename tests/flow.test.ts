@@ -506,4 +506,13 @@ test('setup: only the owner adds items and parties; staff ask; reset removes the
   assert.ok(!Object.values(PARTIES).some((p: any) => p.name === 'Hosur Crates'));
 });
 
+test('store person marks the truck arrived (once, only after it left, before the count)', () => {
+  let s = buildInitialState();
+  assert.equal(run(s, { type: 'ARRIVED', id: 'TRK-1017' }), s, 'not left yet');
+  s = run(s, { type: 'ARRIVED', id: 'TRK-1016', by: 'Ravi (staff)' });
+  assert.ok(shipmentOf(s, 'TRK-1016').arrivedAt);
+  assert.equal(run(s, { type: 'ARRIVED', id: 'TRK-1016' }), s, 'once');
+  assert.equal(run(s, { type: 'ARRIVED', id: 'TRK-1013' }), s, 'already counted');
+});
+
 console.log(`\n${passed} tests passed`);

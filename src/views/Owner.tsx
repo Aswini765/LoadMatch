@@ -26,6 +26,7 @@ export default function Owner({ go, initialId }: { go: Go; initialId?: string | 
   const waiting = state.diffs.filter((d: any) => d.status === 'waiting').sort((a: any, b: any) => a.decision.dueAt - b.decision.dueAt);
   const unread = state.shipments.filter((s: any) => s.sentAt && !s.receipt && !s.cancelledAt).sort((a: any, b: any) => a.sentAt - b.sentAt);
   const [allRecent, setAllRecent] = useState(false);
+  const [more, setMore] = useState(false);
   const recent = state.shipments.filter((s: any) => s.receipt && now - s.receipt.at < 36 * 3600000).sort((a: any, b: any) => b.receipt.at - a.receipt.at);
   const byTruck = [...new Set(open.map((d: any) => d.shipmentId))].map((id) => shipmentOf(state, id as string));
   const openValue = open.reduce((a: number, d: any) => a + d.value, 0);
@@ -55,6 +56,8 @@ export default function Owner({ go, initialId }: { go: Go; initialId?: string | 
         </div>
       </Panel>
 
+      <button id="btn-owner-more" onClick={() => setMore(!more)} className="w-full py-3 rounded-xl border border-slate-300 bg-white text-sm font-bold text-slate-700 cursor-pointer">{more ? '▲ Less' : '▼ More: trucks on the road, promises, accountant, recent trucks'}</button>
+      {more && <>
       <div className="grid md:grid-cols-2 gap-6">
         <Panel eyebrow="Promised by others" title={`Waiting for them to keep it · ${waiting.length}`}>
           {!waiting.length && <div className="text-xs text-slate-500">Nothing pending.</div>}
@@ -96,6 +99,7 @@ export default function Owner({ go, initialId }: { go: Go; initialId?: string | 
           })}
         </div>
       </Panel>
+      </>}
     </div>
   );
 }
