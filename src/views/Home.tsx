@@ -17,9 +17,10 @@ export default function Home({ go, who, pick }: { go: Go; who?: string; pick?: (
 
   const toCount = state.shipments.filter((s: any) => !s.receipt && !s.cancelledAt && countedByUs(s) && (s.flow !== 'transfer' || s.sentAt)).length;
   const roles = [
-    { id: 'owner', icon: Scale, title: 'Owner', who: 'Sees everything, decides', what: 'Gets every count first (not the sender), sees only what does not match with its value and the loading time for CCTV, approves staff requests (new truck, accident), agrees or disagrees with a customer\'s count, and gets the day\'s summary and one Tally file for the accountant.', n: decide, nLabel: 'to decide' },
     { id: 'dispatch', icon: Truck, title: 'Dispatch', who: 'Office person who sends trucks', what: 'Makes the list of what goes on the truck (typed, spoken or pasted), the papers (delivery challan with a QR code, e-way bill), taps Truck left, and sends the WhatsApp link only to outside parties. Sees when the store has loaded it and when it was counted.', n: loading, nLabel: 'being loaded' },
     { id: 'store', icon: PackageCheck, title: 'Store', who: 'Person at the dock, at any unit', what: 'Loads trucks that leave (marks loading start and end, used for CCTV) and unloads and counts trucks that arrive, one line at a time by voice in their own language. Supplier deliveries and goods back from job work are counted here too.', n: toCount + loading, nLabel: late ? `to load or count · ${late} late` : 'to load or count' },
+
+    { id: 'owner', icon: Scale, title: 'Owner', who: 'Sees everything, decides', what: 'Gets every count first (not the sender), sees only what does not match with its value and the loading time for CCTV, approves staff requests (new truck, accident), agrees or disagrees with a customer\'s count, and gets the day\'s summary and one Tally file for the accountant.', n: decide, nLabel: 'to decide' },
   ];
 
 
