@@ -202,7 +202,7 @@ const putDiff = (state: any, d: any) => ({ ...state, diffs: state.diffs.map((x: 
 const isInt = (n: any) => Number.isInteger(n) && n >= 0;
 const godownOf = (unitId: string) => UNITS[unitId].godown;
 export const jobworkerGodown = (partyId: string) => `At job worker: ${PARTIES[partyId].name}`;
-const unitTax = (state: any, unitId: string) => state.settings.units?.[unitId] || { gstin: COMPANY.gstin, state: COMPANY.state };
+export const unitTax = (state: any, unitId: string) => state.settings.units?.[unitId] || { gstin: COMPANY.gstin, state: COMPANY.state };
 // Two units are one registration unless the owner gave them different GSTINs (used to suggest the paperwork)
 export const sameGstin = (state: any, a: string, b: string) => unitTax(state, a).gstin === unitTax(state, b).gstin;
 // A unit as the "party" on a branch transfer voucher
@@ -256,6 +256,41 @@ function decisionDraft(state: any, s: any, d: any, action: string, at: number) {
     return { ...base, type: 'sales_invoice', party: s.party, ref: s.ref, lines: [priced(d.item, d.qty)], narration: `${s.id}: ${d.qty} ${it.unit} ${it.name} delivered over invoice ${s.ref}; billed as agreed with the customer.` };
   }
   return null;
+}
+
+
+// ---------- the company's own lists (owner adds; staff can ask) ----------
+// Prototype: the lists live in the shared objects from seed.ts; anything added is removed again on Reset.
+const ADDED: Array<[any, string]> = [];
+function undoAdded() { while (ADDED.length) { const [o, k] = ADDED.pop()!; delete o[k]; } }
+const slug = (t: string) => t.toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 12) || 'X';
+export function addMaster(state: any, what: string, d: any, at: number) {
+  const name = String(d?.name || '').trim();
+  if (!name) return state;
+  const n = (state.counters.add || 0) + 1;
+  const counters = { ...state.counters, add: n };
+  if (what === 'item') {
+    if (Object.values(ITEMS).some((i: any) => i.name.toLowerCase() === name.toLowerCase())) return state;
+    const code = `${slug(name)}-${n}`;
+    ITEMS[code] = { code, name, unit: String(d.unit || 'pcs').trim() || 'pcs', hsn: String(d.hsn || ''), rate: Number(d.rate) || 0, gst: 18 };
+    ADDED.push([ITEMS, code]);
+  } else if (what === 'party') {
+    if (Object.values(PARTIES).some((p: any) => p.name.toLowerCase() === name.toLowerCase())) return state;
+    const id = `p${n}`;
+    const kind = ['supplier', 'customer', 'jobworker'].includes(d.kind) ? d.kind : 'customer';
+    PARTIES[id] = { id, name, kind, city: String(d.city || '').trim(), state: String(d.state || 'Karnataka'), gstin: String(d.gstin || '').trim().toUpperCase(), phone: String(d.phone || '').trim() } as any;
+    ADDED.push([PARTIES, id]);
+  } else if (what === 'unit') {
+    const id = `U${n}`;
+    UNITS[id] = { id, name, godown: name };
+    ADDED.push([UNITS, id]);
+    const gstin = String(d.gstin || '').trim().toUpperCase();
+    if (gstin) return { ...state, counters, settings: { ...state.settings, units: { ...state.settings.units, [id]: { gstin, state: String(d.state || 'Karnataka') } } } };
+  } else if (what === 'staff') {
+    const unit = UNITS[d.unit] ? d.unit : 'MYS';
+    return { ...state, counters, staff: [...(state.staff || []), { name, unit }] };
+  } else return state;
+  return { ...state, counters, addedLog: [...(state.addedLog || []), { at, what, name }] };
 }
 
 // ---------- reducer ----------
@@ -382,7 +417,27 @@ export function reducer(state: any, action: any): any {
     }
 
     // Only the owner approves or rejects. Approving makes the change and keeps the history.
+    // Staff ask the owner to add a missing item or party
+    case 'ASK_ADD': {
+      const name = String(action.name || '').trim();
+      if (!name || !['item', 'party'].includes(action.what)) return state;
+      const n = ((state.counters.req) || 0) + 1;
+      const req = { id: `REQ-${pad(n)}`, shipmentId: null, kind: 'add', what: action.what, name, partyKind: action.partyKind || 'customer', note: String(action.note || ''), by: action.by || actor, at, status: 'pending', decidedAt: null, decidedNote: '' };
+      return { ...state, requests: [...(state.requests || []), req], counters: { ...state.counters, req: n } };
+    }
+
+    case 'ADD_MASTER': {
+      if (actor !== 'Owner') return state;
+      return addMaster(state, action.what, action.data, at);
+    }
+
     case 'DECIDE_REQUEST': {
+      const r0 = (state.requests || []).find((x: any) => x.id === action.reqId);
+      if (r0 && r0.kind === 'add' && r0.status === 'pending' && actor === 'Owner') {
+        const mark = (st: any, status: string) => ({ ...st, requests: st.requests.map((x: any) => (x.id === r0.id ? { ...x, status, decidedAt: at, decidedNote: String(action.note || '') } : x)) });
+        if (!action.approve) return mark(state, 'rejected');
+        return mark(addMaster(state, r0.what, { name: r0.name, kind: r0.partyKind, unit: 'pcs' }, at), 'approved');
+      }
       const r = (state.requests || []).find((x: any) => x.id === action.reqId);
       if (!r || r.status !== 'pending' || actor !== 'Owner') return state;
       const s = shipmentOf(state, r.shipmentId);
@@ -598,11 +653,13 @@ const TYPE_ORDER: Record<string, number> = { stock_journal: 0, branch_invoice: 1
 export const importOrder = (a: any, b: any) => TYPE_ORDER[a.type] - TYPE_ORDER[b.type] || a.createdAt - b.createdAt;
 
 export function buildInitialState(anchor = Date.now()): any {
+  undoAdded();
   const base = {
     version: VERSION, anchor,
     settings: { ...DEFAULT_SETTINGS, languages: { ...DEFAULT_SETTINGS.languages }, units: JSON.parse(JSON.stringify(DEFAULT_SETTINGS.units)) },
     settingsLog: [], shipments: [], diffs: [], drafts: [], packs: [], requests: [],
-    counters: { trk: 0, dif: 0, draft: 0, req: 0 },
+    counters: { trk: 0, dif: 0, draft: 0, req: 0, add: 0 },
+    staff: [{ name: 'Ramesh', unit: 'MYS' }, { name: 'Ravi', unit: 'BLR' }],
   };
   return makeSeed(anchor).reduce((s: any, a: any) => reducer(s, a), base);
 }

@@ -6,7 +6,7 @@ import {
 } from '../src/core.ts';
 import { voucherXml } from '../src/lib/tally.ts';
 import { taxLines } from '../src/lib/tax.ts';
-import { PARTIES } from '../src/data/seed.ts';
+import { PARTIES, ITEMS } from '../src/data/seed.ts';
 import { findNumber, parseCount } from '../src/lib/voice.ts';
 
 let passed = 0;
@@ -484,6 +484,25 @@ test('customer counted our load: owner agrees or disagrees (with a reason), once
   const [t2, own] = sentTransfer(buildInitialState());
   const t3 = run(t2, { type: 'SUBMIT_RECEIPT', id: own, token: 'tok123', by: 'Ravi', lines: { L1: { counted: 99, damaged: 0 }, L2: { counted: 50, damaged: 0 } } });
   assert.equal(run(t3, { type: 'RESPOND_COUNT', id: own, agree: true, actor: 'Owner' }), t3, 'own units: nothing to agree with');
+});
+
+test('setup: only the owner adds items and parties; staff ask; reset removes them', () => {
+  let s = buildInitialState();
+  const n = Object.keys(ITEMS).length;
+  assert.equal(run(s, { type: 'ADD_MASTER', what: 'item', data: { name: 'Teak veneer 6 mm' }, actor: 'Ramesh (staff)' }), s, 'staff cannot add');
+  s = run(s, { type: 'ADD_MASTER', what: 'item', data: { name: 'Teak veneer 6 mm', unit: 'pcs', rate: 150 }, actor: 'Owner' });
+  assert.equal(Object.keys(ITEMS).length, n + 1);
+  assert.equal(run(s, { type: 'ADD_MASTER', what: 'item', data: { name: 'teak veneer 6 mm' }, actor: 'Owner' }), s, 'no duplicates');
+  s = run(s, { type: 'ASK_ADD', what: 'party', name: 'Hosur Crates', partyKind: 'customer', by: 'Ravi (staff)' });
+  const r = s.requests.at(-1);
+  assert.equal(r.kind, 'add');
+  s = run(s, { type: 'DECIDE_REQUEST', reqId: r.id, approve: true, actor: 'Owner' });
+  assert.ok(Object.values(PARTIES).some((p: any) => p.name === 'Hosur Crates'));
+  s = run(s, { type: 'ADD_MASTER', what: 'staff', data: { name: 'Suma', unit: 'BLR' }, actor: 'Owner' });
+  assert.equal(s.staff.at(-1).name, 'Suma');
+  buildInitialState();
+  assert.equal(Object.keys(ITEMS).length, n, 'reset removes added items');
+  assert.ok(!Object.values(PARTIES).some((p: any) => p.name === 'Hosur Crates'));
 });
 
 console.log(`\n${passed} tests passed`);

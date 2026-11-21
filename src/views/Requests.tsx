@@ -5,7 +5,6 @@ import { AlertTriangle, Clock, Check, X, Truck, Siren, Undo2, Send } from 'lucid
 import { useStore, loadName, route, receiverPath } from '../store.tsx';
 import { newToken } from './ui.tsx';
 import { when } from '../lib/format.ts';
-import { getWho } from '../lib/who.ts';
 
 const L: Record<string, Record<string, string>> = {
   en: { ask: 'Something changed on the way? Ask the owner', details: 'New truck or driver', cameBack: 'Truck came back', accident: 'Accident on the way', truckNo: 'New truck number', driver: 'New driver', phone: 'Driver phone', eway: 'New e-way bill no.', why: 'What happened?', place: 'Where? (place)', moved: 'Good pieces moved to another truck, going on', returned: 'Goods collected, coming back to us', send: 'Send to owner', back: 'Back', waiting: 'Waiting for the owner', said: 'Owner said', yes: 'yes', no: 'no', needWhy: 'Say what happened', needTruck: 'Write the new truck number', needOne: 'Change at least one detail', countBack: 'Count what came back', returning: 'Accident: goods are coming back here. Count them when they arrive; whatever is missing or broken goes to the owner.', accidentMoved: 'Accident on the way: good pieces moved to truck' },
@@ -31,7 +30,7 @@ export function AskOwner({ s, lang }: { s: any; lang: string }) {
     return (
       <div className="space-y-2">
         <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-950"><Siren className="w-4 h-4 inline mr-1" />{w(lang, 'returning')}{s.accident?.note && <div className="mt-1 text-rose-800">“{s.accident.note}”</div>}</div>
-        {getWho() === 'dispatch' ? <div id="count-back-store" className="text-[11px] text-slate-700">The store will count them in LoadMatch (Store → Trucks to count) when they arrive.</div> :
+        {false ? <div id="count-back-store" className="text-[11px] text-slate-700">The store will count them in LoadMatch (Store → Trucks to count) when they arrive.</div> :
         <a id="btn-count-back" href={receiverPath(s, state.settings)} className="w-full min-h-[52px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center cursor-pointer"><Undo2 className="w-5 h-5 mr-2" />{w(lang, 'countBack')}</a>}
       </div>
     );
@@ -108,6 +107,16 @@ export function OwnerRequests() {
     <div id="owner-requests" className="bg-white border-2 border-amber-300 rounded-xl p-4 space-y-3">
       <div className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Staff are asking you · {pending.length}</div>
       {pending.map((r: any) => {
+        if (r.kind === 'add') return (
+          <div key={r.id} id={`req-${r.id}`} className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2 text-xs">
+            <div className="flex items-start justify-between gap-2"><div className="font-bold text-slate-900">Add a new {r.what === 'item' ? 'item' : r.partyKind}: “{r.name}”</div><span className="text-[10px] text-slate-500 shrink-0">{r.by}, {when(r.at, now)}</span></div>
+            <div className="text-slate-600">Not in the list when making a truck list. Yes adds it now; staff can pick it straight away. You can fill GST no. and rate later in Setup.</div>
+            <div className="grid grid-cols-2 gap-2">
+              <button id={`req-no-${r.id}`} onClick={() => dispatch({ type: 'DECIDE_REQUEST', reqId: r.id, approve: false, actor: 'Owner' })} className="py-2.5 rounded-lg border border-slate-300 bg-white font-bold cursor-pointer"><X className="w-3.5 h-3.5 inline mr-1" />No</button>
+              <button id={`req-yes-${r.id}`} onClick={() => dispatch({ type: 'DECIDE_REQUEST', reqId: r.id, approve: true, actor: 'Owner' })} className="py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold cursor-pointer"><Check className="w-3.5 h-3.5 inline mr-1" />Yes, add it</button>
+            </div>
+          </div>
+        );
         const s = state.shipments.find((x: any) => x.id === r.shipmentId);
         const changes = Object.entries(r.details || {}).filter(([, v]) => String(v || '').trim());
         return (

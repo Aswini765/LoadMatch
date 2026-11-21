@@ -14,11 +14,11 @@ const countTitle = () => (getWho() ? 'LoadMatch · Store' : 'LoadMatch · Count'
 
 // ---------- the Receive tab: your own floor staff ----------
 // Trucks heading to your units, and supplier deliveries at the gate.
-export function ReceiveTab() {
+export function ReceiveTab({ initialAdd = null }: { initialAdd?: string | null } = {}) {
   const { state, dispatch } = useStore();
   const [lang, setLangState] = useState(savedLang);
   const setLang = (l: string) => { setLangState(l); saveLang(l); };
-  const [adding, setAdding] = useState<string | null>(null);
+  const [adding, setAdding] = useState<string | null>(initialAdd);
   const open = state.shipments
     .filter((s: any) => !s.receipt && !s.cancelledAt && (s.returning || (countedByUs(s) && (s.flow !== 'transfer' || s.sentAt))))
     .sort((a: any, b: any) => (a.sentAt || a.createdAt) - (b.sentAt || b.createdAt));

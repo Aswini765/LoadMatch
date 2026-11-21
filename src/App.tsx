@@ -3,6 +3,8 @@ import { Menu, MapPin, Settings2, BookOpen, X } from 'lucide-react';
 import { COMPANY } from './data/seed.ts';
 import { WHO, getWho, setWhoSaved } from './lib/who.ts';
 import Home from './views/Home.tsx';
+import Staff from './views/Staff.tsx';
+import Masters from './views/Masters.tsx';
 import Dispatch from './views/Dispatch.tsx';
 import Receive, { ReceiveTab, CountBack } from './views/Receive.tsx';
 import Owner, { EvidenceView } from './views/Owner.tsx';
@@ -14,9 +16,9 @@ import type { Go } from './views/ui.tsx';
 
 const ROLES = [
   ['home', 'Home'],
-  ['dispatch', 'Dispatch'],
-  ['receive', 'Store'],
+  ['staff', 'Staff'],
   ['owner', 'Owner'],
+  ['setup', 'Setup'],
   ['reports', 'Reports'],
 ];
 
@@ -41,8 +43,7 @@ function useBadges() {
   const loading = state.shipments.filter((s: any) => !s.sentAt && !s.cancelledAt && !atGate(s.flow)).length;
   const toCount = state.shipments.filter((s: any) => !s.receipt && !s.cancelledAt && countedByUs(s) && (s.flow !== 'transfer' || s.sentAt)).length;
   return {
-    dispatch: late ? { n: late, cls: 'bg-rose-600' } : loading ? { n: loading, cls: 'bg-slate-400' } : null,
-    receive: toCount + loading ? { n: toCount + loading, cls: 'bg-sky-600' } : null,
+    staff: late ? { n: late, cls: 'bg-rose-600' } : toCount + loading ? { n: toCount + loading, cls: 'bg-sky-600' } : null,
     owner: owner ? { n: owner, cls: 'bg-amber-500' } : null,
   } as Record<string, { n: number; cls: string } | null>;
 }
@@ -60,8 +61,8 @@ export default function App() {
   const [view, setView] = useState(() => (getWho() ? WHO[getWho()].main : 'home'));
   // Top bar: Home · Dispatch · Store · Owner always (the order a truck moves). Tapping a person's tab becomes that person
   // (demo); Reports shows next to Owner for the owner.
-  const roles = ROLES.filter(([id]) => id !== 'reports' || who === 'owner');
-  const TAB_WHO: Record<string, string> = { dispatch: 'dispatch', receive: 'store', owner: 'owner' };
+  const roles = ROLES.filter(([id]) => !['reports', 'setup'].includes(id) || who === 'owner');
+  const TAB_WHO: Record<string, string> = { staff: 'staff', owner: 'owner' };
   const openTab = (id: string) => (TAB_WHO[id] && TAB_WHO[id] !== who ? pickWho(TAB_WHO[id]) : go(id));
   const pickWho = (w: string) => { setWhoSaved(w); setWho(w); go(WHO[w].main); };
   const switchWho = () => { setWhoSaved(''); setWho(''); go('home'); };
@@ -146,7 +147,9 @@ export default function App() {
             {(!who || view === 'home') && <Home go={go} who={who} pick={pickWho} />}
             {who && view === 'dispatch' && <Dispatch go={go} initialId={openId} key={nav} />}
             {who && view === 'owner' && <Owner go={go} initialId={openId} key={`${openId || 'list'}-${nav}`} />}
-            {who && view === 'receive' && <ReceiveTab key={nav} />}
+            {who && view === 'receive' && <ReceiveTab key={nav} initialAdd={openId?.startsWith('add:') ? openId.slice(4) : null} />}
+            {who && view === 'staff' && <Staff go={go} key={nav} />}
+            {who === 'owner' && view === 'setup' && <Masters />}
             {who && view === 'reports' && <Reports go={go} />}
           </>}
         </main>

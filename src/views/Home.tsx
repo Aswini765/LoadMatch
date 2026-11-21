@@ -17,9 +17,7 @@ export default function Home({ go, who, pick }: { go: Go; who?: string; pick?: (
 
   const toCount = state.shipments.filter((s: any) => !s.receipt && !s.cancelledAt && countedByUs(s) && (s.flow !== 'transfer' || s.sentAt)).length;
   const roles = [
-    { id: 'dispatch', icon: Truck, title: 'Dispatch', who: 'Office person who sends trucks', what: 'Makes the list of what goes on the truck (typed, spoken or pasted), the papers (delivery challan with a QR code, e-way bill), taps Truck left, and sends the WhatsApp link only to outside parties. Sees when the store has loaded it and when it was counted.', n: loading, nLabel: 'being loaded' },
-    { id: 'store', icon: PackageCheck, title: 'Store', who: 'Person at the dock, at any unit', what: 'Loads trucks that leave (marks loading start and end, used for CCTV) and unloads and counts trucks that arrive, one line at a time by voice in their own language. Supplier deliveries and goods back from job work are counted here too.', n: toCount + loading, nLabel: late ? `to load or count · ${late} late` : 'to load or count' },
-
+    { id: 'staff', icon: Truck, title: 'Staff', who: 'One person at each unit', what: 'Sends stock: makes the list, loads the truck, taps Truck left. Receives stock: counts what arrived, one line at a time, by voice in their own language. Every screen says if it is Sending or Receiving, and Same GST (our unit) or Other GST (outside party). Their home shows To do now, On the way and Done.', n: toCount + loading, nLabel: late ? `to load or count · ${late} late` : 'to load or count' },
     { id: 'owner', icon: Scale, title: 'Owner', who: 'Sees everything, decides', what: 'Gets every count first (not the sender), sees only what does not match with its value and the loading time for CCTV, approves staff requests (new truck, accident), agrees or disagrees with a customer\'s count, and gets the day\'s summary and one Tally file for the accountant.', n: decide, nLabel: 'to decide' },
   ];
 
@@ -29,12 +27,12 @@ export default function Home({ go, who, pick }: { go: Go; who?: string; pick?: (
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-2xs space-y-3">
         <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">LoadMatch</div>
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-950">What was sent. What arrived. What's missing.</h1>
-        <p className="text-sm text-slate-600 max-w-3xl">Dispatch lists what goes on the truck and the store person loads it. Where it arrives, the store person counts it by speaking, in their own language. The app compares the two and shows the owner only what does not match, with the loading time to check the CCTV. Your own units work inside the app; customers, suppliers and job workers get a WhatsApp link from the company number. The accountant gets one Tally file.</p>
+        <p className="text-sm text-slate-600 max-w-3xl">Two people use it. Staff at the sending unit list what goes on the truck and load it. Staff where it arrives count it by speaking, in their own language. The app compares the two and shows the owner only what does not match, with the loading time to check the CCTV. Your own units work inside the app; customers, suppliers and job workers get a WhatsApp link from the company number. The accountant gets one Tally file.</p>
         <div className="text-xs text-slate-500">Demo: {COMPANY.name}, {COMPANY.city} · two units, two suppliers, two customers</div>
       </div>
 
       <div className="text-sm font-bold text-slate-900">Who uses LoadMatch? Tap who you are to start.</div>
-      <div className="grid sm:grid-cols-3 gap-4">
+      <div className="grid sm:grid-cols-2 gap-4">
         {roles.map(({ id, icon: Icon, title, who, what, n, nLabel }) => (
           <button key={title} id={`home-${title.toLowerCase()}`} onClick={() => (pick ? pick(id) : go(id))}
             className="text-left bg-white border border-slate-200 hover:border-slate-400 rounded-xl p-4 shadow-2xs space-y-2 cursor-pointer transition-colors">
@@ -52,13 +50,13 @@ export default function Home({ go, who, pick }: { go: Go; who?: string; pick?: (
         <div className="flex items-center gap-2">
           <Settings2 className="w-5 h-5 text-emerald-700" />
           <span className="font-bold text-slate-900">Set up for your company</span>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 uppercase tracking-wide">Planned</span>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 uppercase tracking-wide">Owner → Setup</span>
         </div>
-        <p className="text-xs text-slate-700 leading-relaxed">LoadMatch will have a web setup page. A company uploads its own Excel (or a Tally export) with items and units, its branches or units, customers, suppliers and staff phone numbers. It then chooses its rules: whether receivers count without seeing the sent quantity, who hears about differences, the loss limit, languages and the accounting software. The app is set up for that company, and the staff use it on their mobile phones.</p>
+        <p className="text-xs text-slate-700 leading-relaxed">The owner opens Setup and adds the company's own lists: units (with GST number), staff (one per unit), items (one by one or pasted from Excel) and customers, suppliers and job workers. Staff only pick from these lists; if something is missing they tap “Ask owner”, and the owner adds it with one tap.</p>
         <ol className="text-xs text-slate-600 grid sm:grid-cols-3 gap-2 pt-1">
-          <li className="bg-slate-50 border border-slate-200 rounded-lg p-2.5"><span className="font-bold text-slate-900 block">1. Upload Excel</span>Your item list, branches, customers, suppliers and staff, in your own column names.</li>
+          <li className="bg-slate-50 border border-slate-200 rounded-lg p-2.5"><span className="font-bold text-slate-900 block">1. Upload Excel</span>Items pasted from Excel; units, parties and staff added in Setup.</li>
           <li className="bg-slate-50 border border-slate-200 rounded-lg p-2.5"><span className="font-bold text-slate-900 block">2. Choose your rules</span>A few yes/no choices on the web page, changeable any time.</li>
-          <li className="bg-slate-50 border border-slate-200 rounded-lg p-2.5"><span className="font-bold text-slate-900 block">3. Use it on the phone</span>Owner, dispatch and store staff use the app on their phones; outside parties get a WhatsApp link; the accountant gets a Tally file.</li>
+          <li className="bg-slate-50 border border-slate-200 rounded-lg p-2.5"><span className="font-bold text-slate-900 block">3. Use it on the phone</span>Staff and the owner use the app on their phones; outside parties get a WhatsApp link; the accountant gets a Tally file.</li>
         </ol>
         <div className="text-[11px] text-slate-500">This demo runs with sample data from a plywood business.</div>
       </div>

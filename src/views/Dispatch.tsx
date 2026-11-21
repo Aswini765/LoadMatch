@@ -5,7 +5,8 @@ import { useVoice, findNumber } from '../lib/voice.ts';
 import { resultText } from './Receive.tsx';
 import { ITEMS, PARTIES, UNITS, LOADING_POINTS, COMPANY } from '../data/seed.ts';
 import { AskOwner } from './Requests.tsx';
-import { getWho } from '../lib/who.ts';
+import { getUnit } from '../lib/who.ts';
+import { AskAdd } from './Staff.tsx';
 import { inr0 } from '../lib/format.ts';
 import { t, unitWord } from '../i18n.ts';
 import { PhoneFrame, Note, PhotoStrip, savedLang, saveLang, shareWhatsApp, appLink, newToken, type Go } from './ui.tsx';
@@ -17,7 +18,7 @@ const BADGE: Record<string, string> = Object.fromEntries(Object.entries(STATUS_M
 export default function Dispatch({ go, initialId }: { go: Go; initialId?: string | null }) {
   const [lang, setLangState] = useState(savedLang);
   const setLang = (l: string) => { setLangState(l); saveLang(l); };
-  const [screen, setScreen] = useState<string>(initialId ? `truck:${initialId}` : 'list');
+  const [screen, setScreen] = useState<string>(initialId ? (initialId.startsWith('new:') ? initialId : `truck:${initialId}`) : 'list');
   const { state } = useStore();
   const cur = screen.startsWith('truck:') ? state.shipments.find((x: any) => x.id === screen.slice(6)) : null;
   const sub = cur ? `${t('sendSide', lang)}: ${route(cur).split(' → ')[0]} · ${loadName(cur.id)}` : screen.startsWith('truck:') ? loadName(screen.slice(6)) : screen.startsWith('new:') ? t(screen === 'new:transfer' ? 'newTransfer' : screen === 'new:jobwork_out' ? 'newJobwork' : 'newCustomer', lang) : t('trucks', lang);
@@ -98,8 +99,9 @@ export function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: s
   const gate = atGate(flow);
   const hasFrom = !gate;
   const hasTo = flow === 'transfer' || gate;
-  const [fromUnit, setFrom] = useState(flow === 'outbound' ? 'BLR' : 'MYS');
-  const [toUnit, setTo] = useState(gate ? 'MYS' : 'BLR');
+  const other = (u: string) => Object.keys(UNITS).find((k) => k !== u) || u;
+  const [fromUnit, setFrom] = useState(getUnit());
+  const [toUnit, setTo] = useState(gate ? getUnit() : other(getUnit()));
   const [partyId, setParty] = useState(partyList[0]?.id || '');
   // "made from": the earlier load this one continues (a job work return must say which load it returns)
   const [parentId, setParentId] = useState('');
@@ -172,6 +174,7 @@ export function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: s
         {hasFrom && <label>{t('fromUnit', lang)}<select id="f-from" value={fromUnit} onChange={(e) => setFrom(e.target.value)} className={sel}>{Object.values(UNITS).map((u) => <option key={u.id} value={u.id}>{u.name.split(' (')[0]}</option>)}</select></label>}
         {hasTo && <label>{t('toUnit', lang)}<select id="f-to" value={toUnit} onChange={(e) => setTo(e.target.value)} className={sel}>{Object.values(UNITS).map((u) => <option key={u.id} value={u.id}>{u.name.split(' (')[0]}</option>)}</select></label>}
         {flow !== 'transfer' && <label>{t(flow === 'outbound' ? 'customer' : flow === 'inbound' ? 'supplier' : 'jobworker', lang)}<select id="f-party" disabled={flow === 'jobwork_in'} value={partyId} onChange={(e) => setParty(e.target.value)} className={sel}>{partyList.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}
+        {flow !== 'transfer' && flow !== 'jobwork_in' && <AskAdd what="party" partyKind={flow === 'outbound' ? 'customer' : flow === 'inbound' ? 'supplier' : 'jobworker'} />}
         <label className="col-span-2">{t('truckNo', lang)}<input id="f-truck" value={truckNo} onChange={(e) => setTruck(e.target.value)} placeholder="KA 40 A 2541" className={sel} /></label>
         <label>{t('driver', lang)} <span className="font-normal text-slate-400">({t('optional', lang)})</span><input id="f-driver" value={driver} onChange={(e) => setDriver(e.target.value)} className={sel} /></label>
         <label>{t('driverPhone', lang)} <span className="font-normal text-slate-400">({t('optional', lang)})</span><input id="f-driver-phone" type="tel" inputMode="tel" value={driverPhone} onChange={(e) => setDriverPhone(e.target.value)} className={sel} /></label>
@@ -240,6 +243,7 @@ export function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: s
           </div>
         ))}
         <button id="btn-add-line" onClick={() => setLines([...lines, { item: '', qty: '' }])} className="text-[11px] font-bold text-slate-700 flex items-center cursor-pointer"><Plus className="w-3.5 h-3.5 mr-1" />{t('addLine', lang)}</button>
+        <AskAdd what="item" />
       </div>
       {!gate && (
         <label className="block text-[11px] font-bold text-slate-700">{t('ewayBill', lang)} <span className="font-normal text-slate-400">({t('optional', lang)})</span>
@@ -306,12 +310,12 @@ function TruckDetail({ lang, id, onBack }: { lang: string; id: string; onBack: (
         {((s.flow === 'transfer' && s.billing === 'none') || s.flow === 'jobwork_out') && <button id="btn-challan" onClick={async () => { const QR = (await import('qrcode')).default; const qr = s.token ? await QR.toDataURL(appLink(receiverPath(s, state.settings)), { margin: 1, width: 240 }) : ''; printReport(challanHtml(state, s, qr)); }} className="w-full py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 cursor-pointer">{t('printChallan', lang)}</button>}
       </div>
       <Chain s={s} lang={lang} />
-      {st === 'LOADING' && !atGate(s.flow) && getWho() === 'dispatch' && (
+      {st === 'LOADING' && !atGate(s.flow) && false && (
         <div id="loading-status" className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-800">
           <Truck className="w-4 h-4 inline mr-1" />{!s.loading ? 'Waiting for the store to start loading.' : !s.loading.endAt ? `Store is loading at ${s.loading.point} since ${time(s.loading.startAt)}.` : `Store finished loading at ${s.loading.point}, ${time(s.loading.startAt)}–${time(s.loading.endAt)}. You can send the truck.`}
         </div>
       )}
-      {st === 'LOADING' && !atGate(s.flow) && getWho() !== 'dispatch' && (
+      {st === 'LOADING' && !atGate(s.flow) && true && (
         <div className="space-y-2">
           <Note>{t('loadingFirst', lang)}</Note>
           <label className="block text-[11px] font-bold text-slate-700">{t('loadingPoint', lang)}
