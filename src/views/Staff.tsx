@@ -16,7 +16,7 @@ const W: Record<string, Record<L, string>> = {
   updates: { en: 'Updates', hi: 'खबर', kn: 'ಸುದ್ದಿ', te: 'సమాచారం' },
   send: { en: 'Send', hi: 'भेजें', kn: 'ಕಳುಹಿಸಿ', te: 'పంపండి' },
   receive: { en: 'Receive', hi: 'माल आया', kn: 'ಸ್ವೀಕರಿಸಿ', te: 'స్వీకరించండి' },
-  myTrucks: { en: 'My trucks', hi: 'मेरी गाड़ियाँ', kn: 'ನನ್ನ ಲಾರಿಗಳು', te: 'నా లారీలు' },
+  myTrucks: { en: 'Trucks I send', hi: 'भेजने वाली गाड़ियाँ', kn: 'ಕಳುಹಿಸುವ ಲಾರಿಗಳು', te: 'పంపే లారీలు' },
   startLoading: { en: 'Start loading', hi: 'लोडिंग शुरू', kn: 'ಲೋಡಿಂಗ್ ಶುರು', te: 'లోడింగ్ మొదలు' },
   loadingDone: { en: 'Loading done', hi: 'लोडिंग पूरी', kn: 'ಲೋಡಿಂಗ್ ಮುಗಿಯಿತು', te: 'లోడింగ్ పూర్తి' },
   truckLeft: { en: 'Truck left', hi: 'गाड़ी निकल गई', kn: 'ಲಾರಿ ಹೊರಟಿತು', te: 'లారీ బయలుదేరింది' },
@@ -42,6 +42,9 @@ const W: Record<string, Record<L, string>> = {
   backAccident: { en: 'Coming back after accident', hi: 'दुर्घटना के बाद वापस', kn: 'ಅಪಘಾತದ ನಂತರ ವಾಪಸ್', te: 'ప్రమాదం తర్వాత తిరిగి' },
   expected: { en: 'Expected', hi: 'आने वाली', kn: 'ಬರಬೇಕಿದೆ', te: 'రావాల్సింది' },
   notInList: { en: 'A truck came that is not in the list? Tell owner', hi: 'सूची में नहीं है ऐसी गाड़ी आई? मालिक को बताएं', kn: 'ಪಟ್ಟಿಯಲ್ಲಿಲ್ಲದ ಲಾರಿ ಬಂತೇ? ಮಾಲೀಕರಿಗೆ ತಿಳಿಸಿ', te: 'జాబితాలో లేని లారీ వచ్చిందా? యజమానికి చెప్పండి' },
+  comingToday: { en: 'Coming to you', hi: 'आपके पास आ रही हैं', kn: 'ನಿಮಗೆ ಬರುತ್ತಿವೆ', te: 'మీకు వస్తున్నవి' },
+  tapWhenHere: { en: 'Truck is here? Tap it to count.', hi: 'गाड़ी आ गई? दबाएँ और गिनें।', kn: 'ಲಾರಿ ಬಂತೇ? ಒತ್ತಿ ಎಣಿಸಿ.', te: 'లారీ వచ్చిందా? నొక్కి లెక్కించండి.' },
+  noneComing: { en: 'No truck coming now', hi: 'अभी कोई गाड़ी नहीं आ रही', kn: 'ಈಗ ಯಾವ ಲಾರಿಯೂ ಬರುತ್ತಿಲ್ಲ', te: 'ఇప్పుడు ఏ లారీ రావడం లేదు' },
   cancelled: { en: 'Cancelled', hi: 'रद्द', kn: 'ರದ್ದು', te: 'రద్దు' },
 };
 const fromX = (x: string, l: L) => ({ en: `From ${x}`, hi: `${x} से`, kn: `${x}ಇಂದ`, te: `${x} నుండి` }[l]);
@@ -101,7 +104,8 @@ export default function Staff({ go }: { go: Go }) {
     else news.push({ at: r.decidedAt, icon: r.status === 'approved' ? '👍' : '👎', text: `${w(r.status === 'approved' ? 'yes' : 'no')} · ${what}${r.decidedNote ? ` · “${r.decidedNote}”` : ''}`, tone: r.status === 'approved' ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200' });
   }
   // trucks coming to you stay on top until they arrive; then newest first
-  news.sort((a, b) => Number(!!b.pin) - Number(!!a.pin) || b.at - a.at);
+  // trucks coming to you are in their own list above, so updates hold the rest, newest first
+  const updates = news.filter((n) => !n.pin).sort((a, b) => b.at - a.at);
 
   // one big button: the next step for this truck
   const step = (s: any): { icon: string; status: string; btn?: string; btnCls?: string; act?: () => void } => {
@@ -125,7 +129,7 @@ export default function Staff({ go }: { go: Go }) {
           <span className="text-3xl leading-none">{st.icon}</span>
           <div className="min-w-0 flex-1">
             <div className="text-base font-bold text-slate-900 truncate">{s.returning ? w('backAccident') : incoming ? fromX(from, l) : toX(to, l)}</div>
-            {s.truckNo && s.truckNo !== 'NOT KNOWN' && <div className="inline-block mt-0.5 px-2 py-0.5 rounded-md border-2 border-slate-800 bg-amber-50 font-mono font-bold text-sm text-slate-900">{s.truckNo}</div>}
+            {s.truckNo && s.truckNo !== 'NOT KNOWN' && <div className="inline-block whitespace-nowrap mt-0.5 px-2 py-0.5 rounded-md border-2 border-slate-800 bg-amber-50 font-mono font-bold text-sm text-slate-900">{s.truckNo}</div>}
             <div className="text-xs text-slate-600">{st.status} · {loadName(s.id)}</div>
           </div>
         </div>
@@ -136,7 +140,7 @@ export default function Staff({ go }: { go: Go }) {
     );
   };
 
-  const mine = [...receiving, ...sending];
+  const mine = sending;
   return (
     <PhoneFrame title="LoadMatch" sub={`${staffName(state)} · ${uname(unit)}`} lang={lang} setLang={setLang}>
       <div className="space-y-4">
@@ -145,11 +149,33 @@ export default function Staff({ go }: { go: Go }) {
           {Object.keys(UNITS).map((u) => <button key={u} id={`unit-${u}`} onClick={() => pickUnit(u)} className={`px-3 py-1.5 rounded-full border font-bold cursor-pointer ${u === unit ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-300'}`}>{uname(u)}</button>)}
         </div>
 
+        <div id="coming" className="rounded-2xl border-2 border-sky-300 bg-sky-50 p-3 space-y-2">
+          <div className="text-base font-bold text-sky-950">🚚 {w('comingToday')} · {receiving.length}</div>
+          {!receiving.length && <div className="text-sm text-sky-900">{w('noneComing')}</div>}
+          {receiving.length > 0 && <div className="text-xs text-sky-900">👆 {w('tapWhenHere')}</div>}
+          {receiving.map((s: any) => {
+            const [from] = route(s).split(' → ');
+            return (
+              <button key={s.id} id={`coming-${s.id}`} onClick={() => { if (!s.arrivedAt) dispatch({ type: 'ARRIVED', id: s.id, by: me(), actor: me() }); count(s); }} className="w-full text-left rounded-xl bg-white border-2 border-sky-200 hover:border-sky-500 p-3 space-y-2 cursor-pointer block">
+                <span className="flex items-center gap-3">
+                  <span className="text-3xl leading-none">{s.returning ? '⚠️' : s.flow === 'inbound' ? '🚛' : '🚚'}</span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-base font-bold text-slate-900">{s.returning ? w('backAccident') : fromX(from, l)}</span>
+                    <span className="block text-xs text-slate-600">{s.arrivedAt ? `📍 ${w('reached')}` : s.expectedOn ? `${w('expected')} ${dayText(s.expectedOn)}` : `${w('onTheWay')} · ${when(s.sentAt)}`} · {loadName(s.id)}</span>
+                  </span>
+                  {s.truckNo && s.truckNo !== 'NOT KNOWN' && <span className="shrink-0 whitespace-nowrap px-2 py-0.5 rounded-md border-2 border-slate-800 bg-amber-50 font-mono font-bold text-sm text-slate-900">{s.truckNo}</span>}
+                </span>
+                <span className="w-full min-h-[48px] rounded-xl bg-emerald-600 text-white text-base font-bold flex items-center justify-center">📍 {w('arrived')} → 🔢 {w('count')}</span>
+              </button>
+            );
+          })}
+        </div>
+
         <div id="updates" className="space-y-1.5">
           <div className="text-sm font-bold text-slate-900">🔔 {w('updates')}</div>
-          {!news.length && <div className="text-xs text-slate-500">{w('noNews')}</div>}
-          {(allNews ? news.slice(0, 10) : news.slice(0, 3)).map((n, i) => <div key={i} className={`rounded-xl border px-3 py-2 text-sm flex items-start gap-2 ${n.tone}`}><span className="text-lg leading-none">{n.icon}</span><span className="flex-1">{n.text}<span className="block text-[11px] text-slate-500">{when(n.at)}</span></span></div>)}
-          {news.length > 3 && <button id="btn-news-all" onClick={() => setAllNews(!allNews)} className="text-xs font-bold text-slate-500 underline cursor-pointer">{allNews ? '−' : `+${Math.min(news.length, 10) - 3}`}</button>}
+          {!updates.length && <div className="text-xs text-slate-500">{w('noNews')}</div>}
+          {(allNews ? updates.slice(0, 10) : updates.slice(0, 3)).map((n, i) => <div key={i} className={`rounded-xl border px-3 py-2 text-sm flex items-start gap-2 ${n.tone}`}><span className="text-lg leading-none">{n.icon}</span><span className="flex-1">{n.text}<span className="block text-[11px] text-slate-500">{when(n.at)}</span></span></div>)}
+          {updates.length > 3 && <button id="btn-news-all" onClick={() => setAllNews(!allNews)} className="text-xs font-bold text-slate-500 underline cursor-pointer">{allNews ? '−' : `+${Math.min(updates.length, 10) - 3}`}</button>}
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -164,15 +190,15 @@ export default function Staff({ go }: { go: Go }) {
         )}
         {open === 'receive' && (
           <div className="space-y-2">
-            <div className="text-xs text-slate-600">🚚 🚛 {w('fromOur')}</div>
+            <div className="text-xs text-slate-600">👆 {w('tapWhenHere')} (🚚 {w('comingToday')})</div>
             <AskAdd what="delivery" label={w('notInList')} />
           </div>
         )}
 
         <div className="space-y-2">
-          <div className="text-sm font-bold text-slate-900">🚚 {w('myTrucks')}</div>
-          {!mine.length && <div id="nothing-pending" className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{w('nothing')}</div>}
-          {(open === 'send' ? sending : open === 'receive' ? receiving : mine).map((s: any) => <Card key={s.id} s={s} />)}
+          {open !== 'receive' && <div className="text-sm font-bold text-slate-900">📤 {w('myTrucks')}</div>}
+          {!mine.length && open !== 'receive' && <div id="nothing-pending" className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{w('nothing')}</div>}
+          {open !== 'receive' && sending.map((s: any) => <Card key={s.id} s={s} />)}
         </div>
 
         <button id="btn-old" onClick={() => setShowOld(!showOld)} className="text-sm font-bold text-slate-600 underline cursor-pointer">🗂 {w('oldTrucks')} ({old.length})</button>
