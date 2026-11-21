@@ -96,7 +96,10 @@ export default function Receive({ id, token, payload }: { id: string; token: str
   const saved = loadDraft(`${id}-${token}`);
   const [by, setBy] = useState(() => saved?.by || (() => { try { return localStorage.getItem('loadmatch-name') || 'Ravi'; } catch { return 'Ravi'; } })());
   // Prototype: counts open filled in, with the first line 2 short and 1 damaged to show a difference
-  const [counts, setCounts] = useState<Record<string, Count>>(() => saved?.counts || (ok ? Object.fromEntries(s.lines.map((l: any, i: number) => [l.id, i === 0 ? { counted: String(Math.max(0, l.qty - 2)), damaged: '1' } : { counted: String(l.qty), damaged: '0' }])) : {}));
+  const demoCounts = () => Object.fromEntries(s.lines.map((l: any, i: number) => [l.id, i === 0 ? { counted: String(Math.max(0, l.qty - 2)), damaged: '1' } : { counted: String(l.qty), damaged: '0' }]));
+  const [counts, setCounts] = useState<Record<string, Count>>(() => saved?.counts || (ok ? demoCounts() : {}));
+  // with the shared database the load can arrive a moment after this screen opens: fill the demo counts then
+  useEffect(() => { if (ok && !s.receipt && !saved?.counts && !Object.keys(counts).length) setCounts(demoCounts()); }, [ok]);
   const [photos, setPhotos] = useState<any[]>(saved?.photos || []);
   const [note, setNote] = useState(saved?.note || '');
   const [step, setStep] = useState<number>(saved?.step ?? 0); // 0..n-1 lines, n = review

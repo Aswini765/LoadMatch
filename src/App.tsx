@@ -142,7 +142,7 @@ export default function App() {
           {link?.kind === 'r' && <Receive id={link.id} token={link.token} payload={link.payload} key={`${link.id}-${link.token}`} />}
           {link?.kind === 'c' && <CountBack id={link.id} token={link.token} payload={link.payload} onOpen={(id) => go('dispatch', { id })} />}
           {link?.kind === 'e' && <EvidenceView id={link.id} token={link.token} />}
-          {!bare && <>
+          {!link && <>
             {(!who || view === 'home') && <Home go={go} who={who} pick={pickWho} />}
             {who && view === 'dispatch' && <Dispatch go={go} initialId={openId} key={nav} />}
             {who && view === 'owner' && <Owner go={go} initialId={openId} key={`${openId || 'list'}-${nav}`} />}
