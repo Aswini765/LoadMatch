@@ -98,7 +98,7 @@ export function AskOwner({ s, lang }: { s: any; lang: string }) {
 const KIND_TEXT: Record<string, string> = { details: 'Change truck or driver', came_back: 'Truck came back', accident: 'Accident on the way' };
 const FIELD: Record<string, string> = { truckNo: 'Truck', driver: 'Driver', driverPhone: 'Driver phone', ewayBill: 'E-way bill' };
 
-export function OwnerRequests() {
+export function OwnerRequests({ go }: { go?: (v: string, o?: any) => void } = {}) {
   const { state, dispatch } = useStore();
   const [notes, setNotes] = useState<Record<string, string>>({});
   const pending = (state.requests || []).filter((r: any) => r.status === 'pending');
@@ -114,6 +114,16 @@ export function OwnerRequests() {
     <div id="owner-requests" className="bg-white border-2 border-amber-300 rounded-xl p-4 space-y-3">
       <div className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Staff are asking you · {pending.length}</div>
       {pending.map((r: any) => {
+        if (r.kind === 'add' && r.what === 'delivery') return (
+          <div key={r.id} id={`req-${r.id}`} className="rounded-xl border border-sky-200 bg-sky-50 p-3 space-y-2 text-xs">
+            <div className="flex items-start justify-between gap-2"><div className="font-bold text-slate-900">🚛 Truck came that is not in the list: “{r.name}”</div><span className="text-[10px] text-slate-500 shrink-0">{r.by}, {when(r.at, now)}</span></div>
+            <div className="text-slate-600">Add it as an expected delivery (supplier, items from their bill, which unit). The store then counts it.</div>
+            <div className="grid grid-cols-2 gap-2">
+              <button id={`req-add-delivery-${r.id}`} onClick={() => { dispatch({ type: 'DECIDE_REQUEST', reqId: r.id, approve: true, note: 'Added; please count it.', actor: 'Owner' }); go?.('dispatch', { id: 'new:inbound' }); }} className="py-2.5 rounded-lg bg-emerald-600 text-white font-bold cursor-pointer">+ Add delivery</button>
+              <button id={`req-no-${r.id}`} onClick={() => dispatch({ type: 'DECIDE_REQUEST', reqId: r.id, approve: false, note: 'Do not unload. Not ordered.', actor: 'Owner' })} className="py-2.5 rounded-lg border border-slate-300 bg-white font-bold cursor-pointer">Not ours, send back</button>
+            </div>
+          </div>
+        );
         if (r.kind === 'add') return (
           <div key={r.id} id={`req-${r.id}`} className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2 text-xs">
             <div className="flex items-start justify-between gap-2"><div className="font-bold text-slate-900">Add a new {r.what === 'item' ? 'item' : r.partyKind}: “{r.name}”</div><span className="text-[10px] text-slate-500 shrink-0">{r.by}, {when(r.at, now)}</span></div>
@@ -161,7 +171,7 @@ function Decided({ list, now }: { list: any[]; now: number }) {
       <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">You answered</div>
       {list.map((r: any) => (
         <div key={r.id} className="text-[11px] text-slate-700 flex justify-between gap-2">
-          <span className="truncate">{r.kind === 'add' ? `Add “${r.name}”` : `${KIND_TEXT[r.kind]} · ${loadName(r.shipmentId)}`} · {r.by}</span>
+          <span className="truncate">{r.kind === 'add' ? `${r.what === 'delivery' ? 'Truck' : 'Add'} “${r.name}”` : `${KIND_TEXT[r.kind]} · ${loadName(r.shipmentId)}`} · {r.by}</span>
           <b className={r.status === 'approved' ? 'text-emerald-700 shrink-0' : 'text-rose-700 shrink-0'}>{r.status === 'approved' ? 'Yes' : 'No'} · {when(r.decidedAt, now)}</b>
         </div>
       ))}

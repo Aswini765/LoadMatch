@@ -339,6 +339,8 @@ export function reducer(state: any, action: any): any {
         // Default follows the units' GSTINs as set by the owner.
         docs: (action.docs || []).filter((d: any) => d && d.id).map((d: any) => ({ id: d.id, name: String(d.name || 'photo'), kind: d.kind || 'document', by: actor, at })),
         parentId: action.parentId || null,
+        // a supplier delivery the owner expects (from the order); the store marks it arrived and counts it
+        expectedOn: action.expectedOn || null,
         // promises this load keeps (a supplier's replacement, goods we owe a customer, a job worker's balance)
         fulfils: (action.fulfils || []).filter((id: string) => { const d = diffOf(state, id); return d && d.status === 'waiting' && (action.lines || []).some((l: any) => l.item === d.item); }),
         billing: flow.startsWith('jobwork') ? 'none' : flow === 'transfer' ? (['none', 'invoice'].includes(action.billing) ? action.billing : (sameGstin(state, action.fromUnit, action.toUnit) ? 'none' : 'invoice')) : 'invoice',
@@ -423,7 +425,7 @@ export function reducer(state: any, action: any): any {
     // Staff ask the owner to add a missing item or party
     case 'ASK_ADD': {
       const name = String(action.name || '').trim();
-      if (!name || !['item', 'party'].includes(action.what)) return state;
+      if (!name || !['item', 'party', 'delivery'].includes(action.what)) return state;
       const n = ((state.counters.req) || 0) + 1;
       const req = { id: `REQ-${pad(n)}`, shipmentId: null, kind: 'add', what: action.what, name, partyKind: action.partyKind || 'customer', note: String(action.note || ''), by: action.by || actor, at, status: 'pending', decidedAt: null, decidedNote: '' };
       return { ...state, requests: [...(state.requests || []), req], counters: { ...state.counters, req: n } };
@@ -439,6 +441,7 @@ export function reducer(state: any, action: any): any {
       if (r0 && r0.kind === 'add' && r0.status === 'pending' && actor === 'Owner') {
         const mark = (st: any, status: string) => ({ ...st, requests: st.requests.map((x: any) => (x.id === r0.id ? { ...x, status, decidedAt: at, decidedNote: String(action.note || '') } : x)) });
         if (!action.approve) return mark(state, 'rejected');
+        if (r0.what === 'delivery') return mark(state, 'approved'); // the owner adds it as an expected delivery
         return mark(addMaster(state, r0.what, { name: r0.name, kind: r0.partyKind, unit: 'pcs' }, at), 'approved');
       }
       const r = (state.requests || []).find((x: any) => x.id === action.reqId);

@@ -127,6 +127,10 @@ export function makeSeed(anchor: number) {
   // ...and an hour ago the driver called: accident near Mandya. Staff asked the owner; waiting for a yes.
   ev.push({ type: 'REQUEST_CHANGE', id: 'TRK-1016', kind: 'accident', outcome: 'returned', place: 'Mandya', note: 'Truck hit a divider near Mandya. Driver is safe. Some sheets broke; the rest are loaded into a tempo and coming back to Mysuru.', by: 'Ramesh (staff)', at: at(-1), actor: 'Dispatch staff' });
 
+  // TRK-1020: the owner ordered veneer from Coastal Veneers; expected at Mysuru today. The store marks it arrived and counts it.
+  ev.push({ type: 'CREATE_SHIPMENT', id: 'TRK-1020', flow: 'inbound', toUnit: 'MYS', party: 'coastal', truckNo: 'KA 19 D 6630', ref: 'PO-0332', expectedOn: at(0), at: at(-20), actor: 'Owner', lines: [{ item: 'OKU-AB-91', qty: 200 }, { item: 'BRP-1136', qty: 150 }] });
+  ev.push({ type: 'SEND_TO_RECEIVER', id: 'TRK-1020', token: 'demo20k', at: at(-20), actor: 'Owner' });
+
   // TRK-1017: customer dispatch being loaded now
   ev.push({ type: 'CREATE_SHIPMENT', id: 'TRK-1017', flow: 'outbound', fromUnit: 'BLR', party: 'deccan', truckNo: 'TN 70 K 3390', ref: 'INV-2520', driver: 'Selvam', driverPhone: '9443067890', ewayBill: '3410 2251 7788', at: at(0, -30), actor: 'Dispatch staff', lines: [{ item: 'BOX-NL', qty: 150 }, { item: 'BOX-RB', qty: 60 }] });
 

@@ -515,4 +515,15 @@ test('store person marks the truck arrived (once, only after it left, before the
   assert.equal(run(s, { type: 'ARRIVED', id: 'TRK-1013' }), s, 'already counted');
 });
 
+test('expected supplier delivery: owner adds it, store marks arrived, then counts', () => {
+  let s = buildInitialState();
+  const e = shipmentOf(s, 'TRK-1020');
+  assert.ok(e.expectedOn && e.sentAt && !e.arrivedAt, 'seeded as expected');
+  s = run(s, { type: 'ARRIVED', id: 'TRK-1020', by: 'Ramesh (staff)' });
+  s = run(s, { type: 'SUBMIT_RECEIPT', id: 'TRK-1020', token: 'demo20k', by: 'Ramesh', lines: { L1: { counted: 200, damaged: 0 }, L2: { counted: 140, damaged: 0 } } });
+  assert.deepEqual(diffsOf(s, 'TRK-1020').map((d: any) => [d.kind, d.qty]), [['short', 10]]);
+  s = run(s, { type: 'ASK_ADD', what: 'delivery', name: 'Coastal Veneers (at Mysuru unit)', by: 'Ramesh (staff)' });
+  assert.equal(s.requests.at(-1).what, 'delivery');
+});
+
 console.log(`\n${passed} tests passed`);

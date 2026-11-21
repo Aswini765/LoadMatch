@@ -41,7 +41,8 @@ export default function Owner({ go, initialId }: { go: Go; initialId?: string | 
         </div>} />
 
       <TodaySummary />
-      <OwnerRequests />
+      <button id="btn-expect-supplier" onClick={() => go('dispatch', { id: 'new:inbound' })} className="w-full py-3 rounded-xl border-2 border-dashed border-sky-300 bg-sky-50 text-sm font-bold text-sky-900 cursor-pointer">🚛 + Expected from supplier (add when you place the order; the store marks it arrived and counts it)</button>
+      <OwnerRequests go={go} />
       <Panel eyebrow="Needs your decision" title={open.length ? `${open.length} difference${open.length > 1 ? 's' : ''} on ${byTruck.length} truck${byTruck.length > 1 ? 's' : ''} · worth ${inr0(openValue)}` : 'Nothing to decide'}>
         {!open.length && <Note tone="go"><CheckCircle2 className="w-4 h-4 inline mr-1" />Every truck that was counted either matched or already has your decision.</Note>}
         <div className="space-y-4">

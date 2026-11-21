@@ -11,7 +11,7 @@ const SOPS: [string, string[]][] = [
     'Sending: 📦 Start loading → ✅ Loading done → 🚚 Truck left.',
     'Receiving: 📍 Truck arrived (the store person taps it, not the driver) → 🔢 Count → Submit.',
     'To send: tap 📤 Send, then 🏭 Our other unit or 🏪 Customer. Choose items, numbers and the truck number. That is all.',
-    'Supplier at the gate: tap 📥 Receive → 🚛 Supplier truck at the gate.',
+    'Supplier deliveries: the owner adds them when the order is placed. They show as 🚛 Truck coming from the supplier. Tap 📍 Truck arrived, then 🔢 Count. A truck not in the list? Tap 📥 Receive → Tell owner.',
     'While counting, the sent number is hidden. Missing pieces are worked out by the app after you submit.',
   ]],
   ['2 · Staff: updates', [
@@ -23,6 +23,7 @@ const SOPS: [string, string[]][] = [
     'Your day: today\'s trucks and money at risk.',
     'Staff are asking you: say Yes or No, with a note. Staff see your answer.',
     'Needs your decision: only what did not match, with its value and loading time. Choose: take the loss, ask for it to be sent or replaced, adjust in the next bill, or check first.',
+    '🚛 + Expected from supplier: add each order you place (supplier, items, unit, day). The store sees it coming and counts it.',
     'Setup: add units (with GST no.), staff, items (one by one or pasted from Excel) and customers or suppliers. Staff only pick from these lists.',
     'More (one button): trucks on the road, promises, the accountant file and recent trucks.',
   ]],

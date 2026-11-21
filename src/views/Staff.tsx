@@ -32,7 +32,7 @@ const W: Record<string, Record<L, string>> = {
   ourUnit: { en: 'Our other unit', hi: 'हमारी दूसरी यूनिट', kn: 'ನಮ್ಮ ಇನ್ನೊಂದು ಘಟಕ', te: 'మా ఇంకో యూనిట్' },
   customer: { en: 'Customer', hi: 'ग्राहक', kn: 'ಗ್ರಾಹಕ', te: 'కస్టమర్' },
   supplierGate: { en: 'Supplier truck at the gate', hi: 'सप्लायर की गाड़ी गेट पर', kn: 'ಸರಬರಾಜುದಾರರ ಲಾರಿ ಗೇಟ್‌ನಲ್ಲಿ', te: 'సరఫరాదారు లారీ గేటు వద్ద' },
-  fromOur: { en: 'Trucks from our unit are in My trucks below.', hi: 'हमारी यूनिट की गाड़ियाँ नीचे “मेरी गाड़ियाँ” में हैं।', kn: 'ನಮ್ಮ ಘಟಕದ ಲಾರಿಗಳು ಕೆಳಗೆ “ನನ್ನ ಲಾರಿಗಳು” ನಲ್ಲಿವೆ.', te: 'మా యూనిట్ లారీలు కింద “నా లారీలు”లో ఉన్నాయి.' },
+  fromOur: { en: 'Every truck coming to you (our unit or a supplier) is below. Tap Truck arrived, then Count.', hi: 'आपके पास आने वाली हर गाड़ी नीचे है। “गाड़ी पहुँच गई” दबाएँ, फिर गिनें।', kn: 'ನಿಮಗೆ ಬರುವ ಪ್ರತಿ ಲಾರಿ ಕೆಳಗಿದೆ. “ಲಾರಿ ಬಂತು” ಒತ್ತಿ, ನಂತರ ಎಣಿಸಿ.', te: 'మీకు వచ్చే ప్రతి లారీ కింద ఉంది. “లారీ వచ్చింది” నొక్కి, తర్వాత లెక్కించండి.' },
   waLink: { en: 'Send count link on WhatsApp', hi: 'WhatsApp पर गिनती लिंक भेजें', kn: 'WhatsApp‌ನಲ್ಲಿ ಎಣಿಕೆ ಲಿಂಕ್ ಕಳುಹಿಸಿ', te: 'WhatsAppలో లెక్క లింక్ పంపండి' },
   yes: { en: 'Owner said YES', hi: 'मालिक ने हाँ कहा', kn: 'ಮಾಲೀಕರು ಹೌದು ಎಂದರು', te: 'యజమాని సరే అన్నారు' },
   no: { en: 'Owner said NO', hi: 'मालिक ने ना कहा', kn: 'ಮಾಲೀಕರು ಬೇಡ ಎಂದರು', te: 'యజమాని వద్దు అన్నారు' },
@@ -40,11 +40,14 @@ const W: Record<string, Record<L, string>> = {
   okCount: { en: 'counted, all OK', hi: 'गिनती ठीक', kn: 'ಎಣಿಕೆ ಸರಿ', te: 'లెక్క సరిగ్గా ఉంది' },
   diff: { en: 'does not match. Owner is checking', hi: 'मेल नहीं खाता, मालिक देख रहे हैं', kn: 'ಹೊಂದುತ್ತಿಲ್ಲ, ಮಾಲೀಕರು ನೋಡುತ್ತಿದ್ದಾರೆ', te: 'సరిపోలలేదు, యజమాని చూస్తున్నారు' },
   backAccident: { en: 'Coming back after accident', hi: 'दुर्घटना के बाद वापस', kn: 'ಅಪಘಾತದ ನಂತರ ವಾಪಸ್', te: 'ప్రమాదం తర్వాత తిరిగి' },
+  expected: { en: 'Expected', hi: 'आने वाली', kn: 'ಬರಬೇಕಿದೆ', te: 'రావాల్సింది' },
+  notInList: { en: 'A truck came that is not in the list? Tell owner', hi: 'सूची में नहीं है ऐसी गाड़ी आई? मालिक को बताएं', kn: 'ಪಟ್ಟಿಯಲ್ಲಿಲ್ಲದ ಲಾರಿ ಬಂತೇ? ಮಾಲೀಕರಿಗೆ ತಿಳಿಸಿ', te: 'జాబితాలో లేని లారీ వచ్చిందా? యజమానికి చెప్పండి' },
   cancelled: { en: 'Cancelled', hi: 'रद्द', kn: 'ರದ್ದು', te: 'రద్దు' },
 };
 const fromX = (x: string, l: L) => ({ en: `From ${x}`, hi: `${x} से`, kn: `${x}ಇಂದ`, te: `${x} నుండి` }[l]);
 const toX = (x: string, l: L) => ({ en: `To ${x}`, hi: `${x} को`, kn: `${x}ಗೆ`, te: `${x}కు` }[l]);
 const comingX = (x: string, l: L) => ({ en: `Truck coming from ${x}`, hi: `${x} से गाड़ी आ रही है`, kn: `${x}ಇಂದ ಲಾರಿ ಬರುತ್ತಿದೆ`, te: `${x} నుండి లారీ వస్తోంది` }[l]);
+const dayText = (ms: number) => { const d = new Date(ms).toDateString(), t = new Date(), y = new Date(Date.now() + 86400000); return d === t.toDateString() ? 'today' : d === y.toDateString() ? 'tomorrow' : new Date(ms).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }); };
 const reachedX = (x: string, l: L) => ({ en: `reached ${x}`, hi: `${x} पहुँची`, kn: `${x} ತಲುಪಿತು`, te: `${x} చేరింది` }[l]);
 
 const big = 'w-full min-h-[56px] rounded-2xl text-base font-bold flex items-center justify-center cursor-pointer';
@@ -78,12 +81,13 @@ export default function Staff({ go }: { go: Go }) {
   };
 
   // Updates: short lines with a picture, newest first
-  const news: { at: number; icon: string; text: string; tone: string }[] = [];
+  const news: { at: number; icon: string; text: string; tone: string; pin?: boolean }[] = [];
   for (const s of state.shipments) {
     const [from, to] = route(s).split(' → ');
     if (s.cancelledAt) continue;
-    if (s.toUnit === unit && s.flow === 'transfer' && s.sentAt && !s.arrivedAt && !s.receipt) news.push({ at: s.sentAt, icon: '🚚', text: `${comingX(from, l)} · ${loadName(s.id)}`, tone: 'bg-sky-50 border-sky-200' });
-    if (s.returning && s.fromUnit === unit && !s.receipt) news.push({ at: s.accident?.at || s.sentAt, icon: '⚠️', text: `${w('backAccident')} · ${loadName(s.id)}`, tone: 'bg-rose-50 border-rose-200' });
+    if (s.toUnit === unit && s.flow === 'transfer' && s.sentAt && !s.arrivedAt && !s.receipt) news.push({ at: s.sentAt, pin: true, icon: '🚚', text: `${comingX(from, l)} · ${loadName(s.id)}`, tone: 'bg-sky-50 border-sky-200' });
+    if (s.toUnit === unit && s.expectedOn && !s.arrivedAt && !s.receipt) news.push({ at: s.expectedOn, pin: true, icon: '🚛', text: `${comingX(from, l)} · ${w('expected')} ${dayText(s.expectedOn)}`, tone: 'bg-sky-50 border-sky-200' });
+    if (s.returning && s.fromUnit === unit && !s.receipt) news.push({ at: s.accident?.at || s.sentAt, pin: true, icon: '⚠️', text: `${w('backAccident')} · ${loadName(s.id)}`, tone: 'bg-rose-50 border-rose-200' });
     if (s.fromUnit === unit && s.arrivedAt && !s.receipt) news.push({ at: s.arrivedAt, icon: '📍', text: `${loadName(s.id)} ${reachedX(to, l)}`, tone: 'bg-sky-50 border-sky-200' });
     if (s.fromUnit === unit && s.receipt && Date.now() - s.receipt.at < 48 * 3600000) {
       const bad = diffsOf(state, s.id).length > 0;
@@ -96,12 +100,13 @@ export default function Staff({ go }: { go: Go }) {
     if (r.status === 'pending') news.push({ at: r.at, icon: '⏳', text: `${w('waiting')} · ${what}`, tone: 'bg-amber-50 border-amber-200' });
     else news.push({ at: r.decidedAt, icon: r.status === 'approved' ? '👍' : '👎', text: `${w(r.status === 'approved' ? 'yes' : 'no')} · ${what}${r.decidedNote ? ` · “${r.decidedNote}”` : ''}`, tone: r.status === 'approved' ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200' });
   }
-  news.sort((a, b) => b.at - a.at);
+  // trucks coming to you stay on top until they arrive; then newest first
+  news.sort((a, b) => Number(!!b.pin) - Number(!!a.pin) || b.at - a.at);
 
   // one big button: the next step for this truck
   const step = (s: any): { icon: string; status: string; btn?: string; btnCls?: string; act?: () => void } => {
     if (receiving.includes(s)) {
-      if (!s.arrivedAt && !atGate(s.flow)) return { icon: '🚚', status: w('onTheWay'), btn: `📍 ${w('arrived')}`, btnCls: 'bg-sky-600 text-white', act: () => dispatch({ type: 'ARRIVED', id: s.id, by: me(), actor: me() }) };
+      if (!s.arrivedAt && (!atGate(s.flow) || s.expectedOn)) return { icon: s.expectedOn ? '🚛' : '🚚', status: s.expectedOn ? `${w('expected')} ${dayText(s.expectedOn)}` : w('onTheWay'), btn: `📍 ${w('arrived')}`, btnCls: 'bg-sky-600 text-white', act: () => dispatch({ type: 'ARRIVED', id: s.id, by: me(), actor: me() }) };
       return { icon: '📍', status: w('reached'), btn: `🔢 ${w('count')}`, btnCls: 'bg-emerald-600 text-white', act: () => count(s) };
     }
     if (!s.loading) return { icon: '📦', status: w('loading'), btn: `📦 ${w('startLoading')}`, btnCls: 'bg-violet-600 text-white', act: () => dispatch({ type: 'LOADING', id: s.id, point: 'Dock 1', phase: 'start', actor: me() }) };
@@ -158,8 +163,8 @@ export default function Staff({ go }: { go: Go }) {
         )}
         {open === 'receive' && (
           <div className="space-y-2">
-            <button id="recv-supplier" onClick={() => go('receive', { id: 'add:inbound' })} className={`${big} py-3 bg-white border-2 border-sky-300 text-sky-900`}>🚛 {w('supplierGate')}</button>
-            <div className="text-xs text-slate-600">🏭 {w('fromOur')}</div>
+            <div className="text-xs text-slate-600">🚚 🚛 {w('fromOur')}</div>
+            <AskAdd what="delivery" label={w('notInList')} />
           </div>
         )}
 
@@ -180,17 +185,17 @@ export default function Staff({ go }: { go: Go }) {
   );
 }
 
-export function AskAdd({ what, partyKind }: { what: 'item' | 'party'; partyKind?: string }) {
+export function AskAdd({ what, partyKind, label }: { what: 'item' | 'party' | 'delivery'; partyKind?: string; label?: string }) {
   const { state, dispatch } = useStore();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [sent, setSent] = useState('');
   if (sent) return <div className="text-[11px] text-emerald-800">Asked the owner to add “{sent}”. It appears here once approved.</div>;
-  if (!open) return <button id={`ask-add-${what}`} onClick={() => setOpen(true)} className="text-[11px] font-bold text-sky-800 underline cursor-pointer text-left">{what === 'item' ? 'Item not in the list? Ask owner to add it' : partyKind === 'supplier' ? 'New supplier at the gate? Ask owner to add them' : `New ${partyKind || 'party'}? Ask owner to add them`}</button>;
+  if (!open) return <button id={`ask-add-${what}`} onClick={() => setOpen(true)} className="text-[11px] font-bold text-sky-800 underline cursor-pointer text-left">{label || (what === 'item' ? 'Item not in the list? Ask owner to add it' : partyKind === 'supplier' ? 'New supplier at the gate? Ask owner to add them' : `New ${partyKind || 'party'}? Ask owner to add them`)}</button>;
   return (
     <div className="flex gap-2">
-      <input id={`ask-add-name-${what}`} value={name} onChange={(e) => setName(e.target.value)} placeholder={what === 'item' ? 'Item name and size' : 'Party name'} className="flex-1 p-2 rounded-lg border border-slate-300 text-xs" />
-      <button id={`ask-add-send-${what}`} disabled={!name.trim()} onClick={() => { dispatch({ type: 'ASK_ADD', what, name, partyKind, by: me() }); setSent(name.trim()); }} className="px-3 rounded-lg bg-slate-900 text-white text-xs font-bold disabled:opacity-40 cursor-pointer">Ask</button>
+      <input id={`ask-add-name-${what}`} value={name} onChange={(e) => setName(e.target.value)} placeholder={what === 'item' ? 'Item name and size' : what === 'delivery' ? 'Whose truck? e.g. Coastal Veneers' : 'Party name'} className="flex-1 p-2 rounded-lg border border-slate-300 text-xs" />
+      <button id={`ask-add-send-${what}`} disabled={!name.trim()} onClick={() => { dispatch({ type: 'ASK_ADD', what, name: what === 'delivery' ? `${name.trim()} (at ${uname(getUnit())})` : name, partyKind, by: me() }); setSent(name.trim()); }} className="px-3 rounded-lg bg-slate-900 text-white text-xs font-bold disabled:opacity-40 cursor-pointer">Ask</button>
     </div>
   );
 }

@@ -118,6 +118,9 @@ export function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: s
   const demo = flow !== 'jobwork_in';
   // staff see only: where to, items, truck number (the rest is optional or done by the owner)
   const simple = getWho() !== 'owner';
+  // the owner (not the gate) adds a supplier delivery he expects, before it comes
+  const expecting = !simple && flow === 'inbound';
+  const [expectedOn, setExpectedOn] = useState(new Date().toISOString().slice(0, 10));
   const [truckNo, setTruck] = useState(demo ? `KA 09 B ${1000 + Math.floor(Math.random() * 9000)}` : '');
   const [driver, setDriver] = useState(demo ? 'Manju' : '');
   const [driverPhone, setDriverPhone] = useState(demo ? '9845012345' : '');
@@ -145,7 +148,7 @@ export function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: s
   const clean = lines.filter((l) => l.item && Number(l.qty) > 0).map((l) => ({ item: l.item, qty: Math.floor(Number(l.qty)) }));
   const missing: string[] = [];
   if (flow === 'jobwork_in' && !parentId) missing.push(t('whichJobwork', lang));
-  if (!truckNo.trim()) missing.push(t('truckNo', lang));
+  if (!truckNo.trim() && !expecting) missing.push(t('truckNo', lang));
   if (!ref.trim() && !(simple && flow === 'transfer')) missing.push(t(flow === 'transfer' || flow === 'jobwork_out' ? 'challanNo' : flow === 'outbound' ? 'invoiceNo' : flow === 'jobwork_in' ? 'jwChallanNo' : 'billNo', lang));
   if (flow === 'transfer' && fromUnit === toUnit) missing.push(t('sameUnit', lang));
   if (!clean.length) missing.push(t('needItem', lang));
@@ -157,7 +160,8 @@ export function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: s
   const [fulfils, setFulfils] = useState<string[]>([]);
   const save = () => {
     const id = `TRK-${1000 + state.counters.trk + 1}`;
-    dispatch({ type: 'CREATE_SHIPMENT', id, flow, fromUnit: hasFrom ? fromUnit : null, toUnit: hasTo ? toUnit : null, party: flow === 'transfer' ? null : partyId, parentId: parentId || undefined, fulfils: fulfils.filter((id) => openPromises.some((d: any) => d.id === id)), truckNo, ref: ref.trim() || `DC-${id.replace('TRK-', '')}`, driver, driverPhone, ewayBill, lines: clean, billing: flow === 'transfer' ? billing : undefined, docs, actor: me() });
+    dispatch({ type: 'CREATE_SHIPMENT', id, flow, fromUnit: hasFrom ? fromUnit : null, toUnit: hasTo ? toUnit : null, party: flow === 'transfer' ? null : partyId, parentId: parentId || undefined, fulfils: fulfils.filter((id) => openPromises.some((d: any) => d.id === id)), truckNo: truckNo.trim() || (expecting ? 'NOT KNOWN' : truckNo), expectedOn: expecting ? new Date(expectedOn + 'T12:00').getTime() : undefined, ref: ref.trim() || `DC-${id.replace('TRK-', '')}`, driver, driverPhone, ewayBill, lines: clean, billing: flow === 'transfer' ? billing : undefined, docs, actor: me() });
+    if (expecting) dispatch({ type: 'SEND_TO_RECEIVER', id, token: newToken(), actor: me() });
     onSaved(id);
   };
   const sel = 'mt-1 w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm';
@@ -177,6 +181,7 @@ export function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: s
         {hasTo && <label className={simple ? 'col-span-2' : ''}>{t('toUnit', lang)}<select id="f-to" value={toUnit} onChange={(e) => setTo(e.target.value)} className={sel}>{Object.values(UNITS).filter((u) => !simple || gate || u.id !== fromUnit).map((u) => <option key={u.id} value={u.id}>{u.name.split(' (')[0]}</option>)}</select></label>}
         {flow !== 'transfer' && <label>{t(flow === 'outbound' ? 'customer' : flow === 'inbound' ? 'supplier' : 'jobworker', lang)}<select id="f-party" disabled={flow === 'jobwork_in'} value={partyId} onChange={(e) => setParty(e.target.value)} className={sel}>{partyList.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>}
         {flow !== 'transfer' && flow !== 'jobwork_in' && <AskAdd what="party" partyKind={flow === 'outbound' ? 'customer' : flow === 'inbound' ? 'supplier' : 'jobworker'} />}
+        {expecting && <label className="col-span-2">Expected on<input id="f-expected" type="date" value={expectedOn} onChange={(e) => setExpectedOn(e.target.value)} className={sel} /></label>}
         <label className="col-span-2">{t('truckNo', lang)}<input id="f-truck" value={truckNo} onChange={(e) => setTruck(e.target.value)} placeholder="KA 40 A 2541" className={sel} /></label>
         <label>{t('driver', lang)} <span className="font-normal text-slate-400">({t('optional', lang)})</span><input id="f-driver" value={driver} onChange={(e) => setDriver(e.target.value)} className={sel} /></label>
         {!simple && <label>{t('driverPhone', lang)} <span className="font-normal text-slate-400">({t('optional', lang)})</span><input id="f-driver-phone" type="tel" inputMode="tel" value={driverPhone} onChange={(e) => setDriverPhone(e.target.value)} className={sel} /></label>}
