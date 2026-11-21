@@ -17,8 +17,8 @@ export default function Home({ go, who, pick }: { go: Go; who?: string; pick?: (
 
   const toCount = state.shipments.filter((s: any) => !s.receipt && !s.cancelledAt && countedByUs(s) && (s.flow !== 'transfer' || s.sentAt)).length;
   const roles = [
-    { id: 'staff', icon: Truck, title: 'Staff', who: 'One person at each unit', what: 'Sends stock: makes the list, loads the truck, taps Truck left. Receives stock: counts what arrived, one line at a time, by voice in their own language. Every screen says if it is Sending or Receiving, and Same GST (our unit) or Other GST (outside party). Their home shows To do now, On the way and Done.', n: toCount + loading, nLabel: late ? `to load or count · ${late} late` : 'to load or count' },
-    { id: 'owner', icon: Scale, title: 'Owner', who: 'Sees everything, decides', what: 'Gets every count first (not the sender), sees only what does not match with its value and the loading time for CCTV, approves staff requests (new truck, accident), agrees or disagrees with a customer\'s count, and gets the day\'s summary and one Tally file for the accountant.', n: decide, nLabel: 'to decide' },
+    { id: 'staff', icon: Truck, title: 'Staff', who: 'One person at each unit', what: 'Sees the trucks coming to their unit and taps the one that arrived to count it. Sends trucks with one big button for each step: Start loading, Loading done, Truck left. Asks the owner when there is a problem.', n: toCount + loading, nLabel: late ? `to load or count · ${late} late` : 'to load or count' },
+    { id: 'owner', icon: Scale, title: 'Owner', who: 'Sees everything, decides', what: 'Decides what to do when something is missing, damaged or extra. Answers staff requests. Adds expected supplier deliveries, items, customers and staff in Setup. Gets one file for the accountant.', n: decide, nLabel: 'to decide' },
   ];
 
 
@@ -27,7 +27,7 @@ export default function Home({ go, who, pick }: { go: Go; who?: string; pick?: (
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-2xs space-y-3">
         <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">LoadMatch</div>
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-950">What was sent. What arrived. What's missing.</h1>
-        <p className="text-sm text-slate-600 max-w-3xl">Two people use it. Staff at the sending unit list what goes on the truck and load it. Staff where it arrives count it by speaking, in their own language. The app compares the two and shows the owner only what does not match, with the loading time to check the CCTV. Your own units work inside the app; customers, suppliers and job workers get a WhatsApp link from the company number. The accountant gets one Tally file.</p>
+        <p className="text-sm text-slate-600 max-w-3xl">Two people use it. <b>Staff</b> at each unit send trucks and count what arrives, with big buttons, pictures and their own language. The app compares sent and received and shows the <b>Owner</b> only what is missing, damaged or extra. Customers and suppliers need no app: they get a link from the company WhatsApp.</p>
         <div className="text-xs text-slate-500">Demo: {COMPANY.name}, {COMPANY.city} · two units, two suppliers, two customers</div>
       </div>
 

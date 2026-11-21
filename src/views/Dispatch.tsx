@@ -23,9 +23,9 @@ export default function Dispatch({ go, initialId }: { go: Go; initialId?: string
   const cur = screen.startsWith('truck:') ? state.shipments.find((x: any) => x.id === screen.slice(6)) : null;
   const sub = cur ? `${t('sendSide', lang)}: ${route(cur).split(' → ')[0]} · ${loadName(cur.id)}` : screen.startsWith('truck:') ? loadName(screen.slice(6)) : screen.startsWith('new:') ? t(screen === 'new:transfer' ? 'newTransfer' : screen === 'new:jobwork_out' ? 'newJobwork' : 'newCustomer', lang) : t('trucks', lang);
   return (
-    <PhoneFrame title="LoadMatch · Dispatch" sub={sub} lang={lang} setLang={setLang}>
+    <PhoneFrame title={getWho() === 'owner' ? 'LoadMatch · Trucks' : 'LoadMatch · Send'} sub={sub} lang={lang} setLang={setLang}>
       {screen === 'list' && <TruckList lang={lang} open={(id) => setScreen(`truck:${id}`)} create={(f) => setScreen(`new:${f}`)} />}
-      {screen.startsWith('new:') && <NewList lang={lang} flow={screen.slice(4)} onBack={() => setScreen('list')} onSaved={(id) => setScreen(`truck:${id}`)} />}
+      {screen.startsWith('new:') && <NewList lang={lang} flow={screen.slice(4)} onBack={() => setScreen('list')} onSaved={(id) => (getWho() === 'owner' ? setScreen(`truck:${id}`) : go('staff'))} />}
       {screen.startsWith('truck:') && <TruckDetail lang={lang} id={screen.slice(6)} onBack={() => setScreen('list')} />}
     </PhoneFrame>
   );
@@ -267,6 +267,8 @@ export function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: s
 
 function TruckDetail({ lang, id, onBack }: { lang: string; id: string; onBack: () => void }) {
   const { state, dispatch } = useStore();
+  // staff use the big buttons on their home screen; here they only see the truck, print the challan, or ask the owner
+  const simple = getWho() !== 'owner';
   const s = state.shipments.find((x: any) => x.id === id);
   const [point, setPoint] = useState(LOADING_POINTS[0]);
   const [copied, setCopied] = useState(false);
@@ -312,8 +314,8 @@ function TruckDetail({ lang, id, onBack }: { lang: string; id: string; onBack: (
       </div>
 
       <div className="space-y-1">
-        <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">{t('papers', lang)}</div>
-        <PhotoStrip photos={s.docs || []} onAdd={(r) => dispatch({ type: 'ATTACH_DOC', id: s.id, docs: r, actor: me() })} label={t('addPaper', lang)} lang={lang} kinds={s.flow === 'inbound' ? ['supplier bill', 'order', 'delivery note'] : ['dispatch list', 'challan', 'order']} />
+        {!simple && <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">{t('papers', lang)}</div>}
+        {!simple && <PhotoStrip photos={s.docs || []} onAdd={(r) => dispatch({ type: 'ATTACH_DOC', id: s.id, docs: r, actor: me() })} label={t('addPaper', lang)} lang={lang} kinds={s.flow === 'inbound' ? ['supplier bill', 'order', 'delivery note'] : ['dispatch list', 'challan', 'order']} />}
         {((s.flow === 'transfer' && s.billing === 'none') || s.flow === 'jobwork_out') && <button id="btn-challan" onClick={async () => { const QR = (await import('qrcode')).default; const qr = s.token ? await QR.toDataURL(appLink(receiverPath(s, state.settings)), { margin: 1, width: 240 }) : ''; printReport(challanHtml(state, s, qr)); }} className="w-full py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 cursor-pointer">{t('printChallan', lang)}</button>}
       </div>
       <Chain s={s} lang={lang} />
@@ -322,7 +324,7 @@ function TruckDetail({ lang, id, onBack }: { lang: string; id: string; onBack: (
           <Truck className="w-4 h-4 inline mr-1" />{!s.loading ? 'Waiting for the store to start loading.' : !s.loading.endAt ? `Store is loading at ${s.loading.point} since ${time(s.loading.startAt)}.` : `Store finished loading at ${s.loading.point}, ${time(s.loading.startAt)}–${time(s.loading.endAt)}. You can send the truck.`}
         </div>
       )}
-      {st === 'LOADING' && !atGate(s.flow) && true && (
+      {st === 'LOADING' && !atGate(s.flow) && !simple && (
         <div className="space-y-2">
           <Note>{t('loadingFirst', lang)}</Note>
           <label className="block text-[11px] font-bold text-slate-700">{t('loadingPoint', lang)}
@@ -336,9 +338,9 @@ function TruckDetail({ lang, id, onBack }: { lang: string; id: string; onBack: (
       )}
       {st === 'LOADING' && (
         <>
-          <button id="btn-send" disabled={!atGate(s.flow) && !s.loading?.endAt} onClick={sendOrCount} className="w-full min-h-[52px] rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-sm font-bold flex items-center justify-center cursor-pointer shadow-md">
+          {!simple && <button id="btn-send" disabled={!atGate(s.flow) && !s.loading?.endAt} onClick={sendOrCount} className="w-full min-h-[52px] rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-sm font-bold flex items-center justify-center cursor-pointer shadow-md">
             {atGate(s.flow) ? <><PackageCheck className="w-5 h-5 mr-2" />{t('countNow', lang)}</> : <><Send className="w-5 h-5 mr-2" />{t('sendReceiver', lang)}</>}
-          </button>
+          </button>}
           {!cancelling ? <button id="btn-cancel" onClick={() => setCancelling(true)} className="w-full py-2 text-[11px] font-bold text-rose-700 cursor-pointer">{t('cancelTruck', lang)}</button> : (
             <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 space-y-2 text-xs">
               <div className="font-bold text-rose-950">{t('cancelSure', lang)}</div>

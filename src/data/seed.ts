@@ -124,8 +124,8 @@ export function makeSeed(anchor: number) {
   ev.push({ type: 'LOADING', id: 'TRK-1016', point: 'Dock 1', phase: 'start', at: at(-3, -50), actor: 'Dispatch staff' });
   ev.push({ type: 'LOADING', id: 'TRK-1016', point: 'Dock 1', phase: 'end', at: at(-3, -10), actor: 'Dispatch staff' });
   ev.push({ type: 'SEND_TO_RECEIVER', id: 'TRK-1016', token: 'demo16k', at: at(-3), actor: 'Dispatch staff' });
-  // ...and an hour ago the driver called: accident near Mandya. Staff asked the owner; waiting for a yes.
-  ev.push({ type: 'REQUEST_CHANGE', id: 'TRK-1016', kind: 'accident', outcome: 'returned', place: 'Mandya', note: 'Truck hit a divider near Mandya. Driver is safe. Some sheets broke; the rest are loaded into a tempo and coming back to Mysuru.', by: 'Ramesh (staff)', at: at(-1), actor: 'Dispatch staff' });
+  // Ravi at Bengaluru asked the owner to add an item that is not in the list yet
+  ev.push({ type: 'ASK_ADD', what: 'item', name: 'Teak veneer 6 mm', by: 'Ravi (staff)', at: at(-1), actor: 'Ravi (staff)' });
 
   // TRK-1020: the owner ordered veneer from Coastal Veneers; expected at Mysuru today. The store marks it arrived and counts it.
   ev.push({ type: 'CREATE_SHIPMENT', id: 'TRK-1020', flow: 'inbound', toUnit: 'MYS', party: 'coastal', truckNo: 'KA 19 D 6630', ref: 'PO-0332', expectedOn: at(0), at: at(-20), actor: 'Owner', lines: [{ item: 'OKU-AB-91', qty: 200 }, { item: 'BRP-1136', qty: 150 }] });

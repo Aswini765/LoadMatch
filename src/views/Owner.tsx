@@ -33,15 +33,10 @@ export default function Owner({ go, initialId }: { go: Go; initialId?: string | 
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
-      <PageHeader title="Owner" sub="You only see what did not match. Everything else is already done." right={
-        <div className="flex gap-2 text-xs">
-          <Stat n={open.length} label="to decide" cls="text-amber-700" />
-          <Stat n={waiting.filter((d: any) => diffOverdue(d, now)).length} label="promises late" cls="text-rose-700" />
-          <Stat n={unread.filter((s: any) => receiptOverdue(state, s, now)).length} label="trucks not counted" cls="text-sky-700" />
-        </div>} />
+      <PageHeader title="Owner" sub="You see only what is missing, damaged or extra, and what staff ask you." />
 
       <TodaySummary />
-      <button id="btn-expect-supplier" onClick={() => go('dispatch', { id: 'new:inbound' })} className="w-full py-3 rounded-xl border-2 border-dashed border-sky-300 bg-sky-50 text-sm font-bold text-sky-900 cursor-pointer">🚛 + Expected from supplier (add when you place the order; the store marks it arrived and counts it)</button>
+      <button id="btn-expect-supplier" onClick={() => go('dispatch', { id: 'new:inbound' })} className="w-full py-3 rounded-xl border-2 border-dashed border-sky-300 bg-sky-50 text-sm font-bold text-sky-900 cursor-pointer">🚛 + Add expected supplier delivery</button>
       <OwnerRequests go={go} />
       <Panel eyebrow="Needs your decision" title={open.length ? `${open.length} difference${open.length > 1 ? 's' : ''} on ${byTruck.length} truck${byTruck.length > 1 ? 's' : ''} · worth ${inr0(openValue)}` : 'Nothing to decide'}>
         {!open.length && <Note tone="go"><CheckCircle2 className="w-4 h-4 inline mr-1" />Every truck that was counted either matched or already has your decision.</Note>}

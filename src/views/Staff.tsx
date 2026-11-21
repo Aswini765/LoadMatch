@@ -161,9 +161,9 @@ export default function Staff({ go }: { go: Go }) {
                   <span className="text-3xl leading-none">{s.returning ? '⚠️' : s.flow === 'inbound' ? '🚛' : '🚚'}</span>
                   <span className="flex-1 min-w-0">
                     <span className="block text-base font-bold text-slate-900">{s.returning ? w('backAccident') : fromX(from, l)}</span>
+                    {s.truckNo && s.truckNo !== 'NOT KNOWN' && <span className="inline-block whitespace-nowrap my-0.5 px-2 py-0.5 rounded-md border-2 border-slate-800 bg-amber-50 font-mono font-bold text-sm text-slate-900">{s.truckNo}</span>}
                     <span className="block text-xs text-slate-600">{s.arrivedAt ? `📍 ${w('reached')}` : s.expectedOn ? `${w('expected')} ${dayText(s.expectedOn)}` : `${w('onTheWay')} · ${when(s.sentAt)}`} · {loadName(s.id)}</span>
                   </span>
-                  {s.truckNo && s.truckNo !== 'NOT KNOWN' && <span className="shrink-0 whitespace-nowrap px-2 py-0.5 rounded-md border-2 border-slate-800 bg-amber-50 font-mono font-bold text-sm text-slate-900">{s.truckNo}</span>}
                 </span>
                 <span className="w-full min-h-[48px] rounded-xl bg-emerald-600 text-white text-base font-bold flex items-center justify-center">📍 {w('arrived')} → 🔢 {w('count')}</span>
               </button>
@@ -215,7 +215,7 @@ export default function Staff({ go }: { go: Go }) {
 export function AskAdd({ what, partyKind, label }: { what: 'item' | 'party' | 'delivery'; partyKind?: string; label?: string }) {
   const { state, dispatch } = useStore();
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState('');
+  const [name, setName] = useState(what === 'item' ? 'Rosewood veneer 4 mm' : what === 'delivery' ? 'Sri Lakshmi Timbers' : partyKind === 'supplier' ? 'Kaveri Timber Depot' : 'Hosur Crates');
   const [sent, setSent] = useState('');
   if (sent) return <div className="text-[11px] text-emerald-800">Asked the owner to add “{sent}”. It appears here once approved.</div>;
   if (!open) return <button id={`ask-add-${what}`} onClick={() => setOpen(true)} className="text-[11px] font-bold text-sky-800 underline cursor-pointer text-left">{label || (what === 'item' ? 'Item not in the list? Ask owner to add it' : partyKind === 'supplier' ? 'New supplier at the gate? Ask owner to add them' : `New ${partyKind || 'party'}? Ask owner to add them`)}</button>;

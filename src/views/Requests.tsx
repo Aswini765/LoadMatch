@@ -51,9 +51,9 @@ export function AskOwner({ s, lang }: { s: any; lang: string }) {
       {outcomeNote}
       <div className="text-[11px] font-bold text-slate-600">{w(lang, 'ask')}</div>
       <div className="grid grid-cols-3 gap-1.5">
-        <button id="ask-details" onClick={() => setKind('details')} className="py-2 rounded-lg border border-slate-300 bg-white text-[11px] font-bold cursor-pointer"><Truck className="w-4 h-4 mx-auto mb-0.5" />{w(lang, 'details')}</button>
-        <button id="ask-came-back" onClick={() => setKind('came_back')} className="py-2 rounded-lg border border-slate-300 bg-white text-[11px] font-bold cursor-pointer"><Undo2 className="w-4 h-4 mx-auto mb-0.5" />{w(lang, 'cameBack')}</button>
-        <button id="ask-accident" onClick={() => setKind('accident')} className="py-2 rounded-lg border border-rose-300 bg-rose-50 text-rose-800 text-[11px] font-bold cursor-pointer"><Siren className="w-4 h-4 mx-auto mb-0.5" />{w(lang, 'accident')}</button>
+        <button id="ask-details" onClick={() => { setKind('details'); setF({ truckNo: 'KA 09 C 7788', driver: 'Suresh', note: 'Truck broke down near Srirangapatna. Goods moved to another truck.' }); }} className="py-2 rounded-lg border border-slate-300 bg-white text-[11px] font-bold cursor-pointer"><Truck className="w-4 h-4 mx-auto mb-0.5" />{w(lang, 'details')}</button>
+        <button id="ask-came-back" onClick={() => { setKind('came_back'); setF({ note: 'Road closed after Mandya. Driver brought the truck back.' }); }} className="py-2 rounded-lg border border-slate-300 bg-white text-[11px] font-bold cursor-pointer"><Undo2 className="w-4 h-4 mx-auto mb-0.5" />{w(lang, 'cameBack')}</button>
+        <button id="ask-accident" onClick={() => { setKind('accident'); setF({ place: 'Mandya', note: 'Truck hit a divider. Driver is safe. Some sheets broke.' }); }} className="py-2 rounded-lg border border-rose-300 bg-rose-50 text-rose-800 text-[11px] font-bold cursor-pointer"><Siren className="w-4 h-4 mx-auto mb-0.5" />{w(lang, 'accident')}</button>
       </div>
     </div>
   );

@@ -21,11 +21,11 @@ function Card({ id, title, sub, children }: { id: string; title: string; sub: st
 export default function Masters() {
   const { state, dispatch } = useStore();
   const add = (what: string, data: any) => dispatch({ type: 'ADD_MASTER', what, data, actor: 'Owner' });
-  const [item, setItem] = useState({ name: '', unit: 'pcs', rate: '' });
-  const [paste, setPaste] = useState('');
-  const [party, setParty] = useState({ name: '', kind: 'customer', city: '', gstin: '', phone: '' });
-  const [unit, setUnitF] = useState({ name: '', gstin: '' });
-  const [staff, setStaff] = useState({ name: '', unit: 'MYS' });
+  const [item, setItem] = useState({ name: 'Pine veneer 4 mm', unit: 'pcs', rate: '110' });
+  const [paste, setPaste] = useState('Pine plank 2 in, pcs, 90\nSal wood beam, pcs, 400');
+  const [party, setParty] = useState({ name: 'Hosur Crates', kind: 'customer', city: 'Hosur', gstin: '33GGGGG6666G1Z5', phone: '9876543210' });
+  const [unit, setUnitF] = useState({ name: 'Hosur godown', gstin: '' });
+  const [staff, setStaff] = useState({ name: 'Suma', unit: 'BLR' });
   const pasteRows = paste.split('\n').map((l) => l.split(/\t|,/).map((x) => x.trim())).filter((r) => r[0]);
 
   return (
