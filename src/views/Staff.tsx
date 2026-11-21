@@ -91,7 +91,7 @@ export default function Staff({ go }: { go: Go }) {
     if (s.toUnit === unit && s.flow === 'transfer' && s.sentAt && !s.arrivedAt && !s.receipt) news.push({ at: s.sentAt, pin: true, icon: '🚚', text: `${comingX(from, l)} · ${loadName(s.id)}`, tone: 'bg-sky-50 border-sky-200' });
     if (s.toUnit === unit && s.expectedOn && !s.arrivedAt && !s.receipt) news.push({ at: s.expectedOn, pin: true, icon: '🚛', text: `${comingX(from, l)} · ${w('expected')} ${dayText(s.expectedOn)}`, tone: 'bg-sky-50 border-sky-200' });
     if (s.returning && s.fromUnit === unit && !s.receipt) news.push({ at: s.accident?.at || s.sentAt, pin: true, icon: '⚠️', text: `${w('backAccident')} · ${loadName(s.id)}`, tone: 'bg-rose-50 border-rose-200' });
-    if (s.fromUnit === unit && s.arrivedAt && !s.receipt) news.push({ at: s.arrivedAt, icon: '📍', text: `${loadName(s.id)} ${reachedX(to, l)}`, tone: 'bg-sky-50 border-sky-200' });
+    if (s.fromUnit === unit && s.arrivedAt && !s.receipt && !s.returning) news.push({ at: s.arrivedAt, icon: '📍', text: `${loadName(s.id)} ${reachedX(to, l)}`, tone: 'bg-sky-50 border-sky-200' });
     if (s.fromUnit === unit && s.receipt && Date.now() - s.receipt.at < 48 * 3600000) {
       const bad = diffsOf(state, s.id).length > 0;
       news.push({ at: s.receipt.at, icon: bad ? '⚠️' : '✅', text: `${loadName(s.id)} ${bad ? w('diff') : w('okCount')}`, tone: bad ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200' });
