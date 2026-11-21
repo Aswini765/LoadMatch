@@ -85,7 +85,8 @@ export default function Staff({ go }: { go: Go }) {
   const onWay = mine.filter((s: any) => s.fromUnit === unit && s.sentAt && !s.receipt && !s.cancelledAt && !s.returning);
   const done = mine.filter((s: any) => (s.fromUnit === unit || s.toUnit === unit) && (s.receipt || s.cancelledAt))
     .filter((s: any) => filter === 'all' || (filter === 'sent' ? s.fromUnit === unit : filter === 'received' ? s.toUnit === unit : diffsOf(state, s.id).length > 0))
-    .sort((a: any, b: any) => (b.receipt?.at || b.cancelledAt) - (a.receipt?.at || a.cancelledAt)).slice(0, 30);
+    .sort((a: any, b: any) => (b.receipt?.at || b.cancelledAt) - (a.receipt?.at || a.cancelledAt));
+  const [allDone, setAllDone] = useState(false);
   const count = (s: any) => {
     if (s.sentAt) { window.location.hash = receiverPath(s, state.settings); return; }
     const token = newToken();
@@ -143,7 +144,8 @@ export default function Staff({ go }: { go: Go }) {
           ))}
         </div>
         {!done.length && <div className="text-[11px] text-slate-500">Nothing here yet.</div>}
-        {done.map((s: any) => <Row key={s.id} s={s} unit={unit} state={state} action="View" onClick={() => open(s)} />)}
+        {(allDone ? done : done.slice(0, 3)).map((s: any) => <Row key={s.id} s={s} unit={unit} state={state} action="View" onClick={() => open(s)} />)}
+        {done.length > 3 && <button id="btn-done-all" onClick={() => setAllDone(!allDone)} className="text-[11px] font-bold text-slate-600 underline cursor-pointer">{allDone ? 'Show less' : `Show all ${done.length}`}</button>}
         <div className="text-[10px] text-slate-500">Old trucks are read only. To change one, open it and ask the owner.</div>
       </div>
     </PhoneFrame>
@@ -154,10 +156,12 @@ export default function Staff({ go }: { go: Go }) {
 const ASKED: Record<string, string> = { details: 'Change truck or driver', came_back: 'Truck came back', accident: 'Accident', add: 'Add to list' };
 function MyRequests() {
   const { state } = useStore();
-  const list = (state.requests || []).slice().sort((a: any, b: any) => (b.decidedAt || b.at) - (a.decidedAt || a.at)).slice(0, 6);
+  const [all, setAll] = useState(false);
+  const every = (state.requests || []).slice().sort((a: any, b: any) => (b.decidedAt || b.at) - (a.decidedAt || a.at));
+  const list = all ? every : every.slice(0, 3);
   return (
     <div id="my-requests" className="space-y-1.5">
-      <Head icon={AlertTriangle} text={`Asked the owner · ${list.filter((r: any) => r.status === 'pending').length} waiting`} />
+      <Head icon={AlertTriangle} text={`Asked the owner · ${every.filter((r: any) => r.status === 'pending').length} waiting`} />
       {!list.length && <div className="text-[11px] text-slate-500">Nothing asked yet.</div>}
       {list.map((r: any) => (
         <div key={r.id} id={`myreq-${r.id}`} className={`rounded-xl border p-2.5 text-xs ${r.status === 'pending' ? 'border-amber-200 bg-amber-50' : r.status === 'approved' ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'}`}>
@@ -167,6 +171,7 @@ function MyRequests() {
           {r.decidedNote && <div className="text-slate-800">Owner: “{r.decidedNote}”</div>}
         </div>
       ))}
+      {every.length > 3 && <button id="btn-req-all" onClick={() => setAll(!all)} className="text-[11px] font-bold text-slate-600 underline cursor-pointer">{all ? 'Show less' : `Show all ${every.length}`}</button>}
     </div>
   );
 }

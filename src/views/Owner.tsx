@@ -25,6 +25,7 @@ export default function Owner({ go, initialId }: { go: Go; initialId?: string | 
   const open = state.diffs.filter((d: any) => d.status === 'open' || d.status === 'investigating');
   const waiting = state.diffs.filter((d: any) => d.status === 'waiting').sort((a: any, b: any) => a.decision.dueAt - b.decision.dueAt);
   const unread = state.shipments.filter((s: any) => s.sentAt && !s.receipt && !s.cancelledAt).sort((a: any, b: any) => a.sentAt - b.sentAt);
+  const [allRecent, setAllRecent] = useState(false);
   const recent = state.shipments.filter((s: any) => s.receipt && now - s.receipt.at < 36 * 3600000).sort((a: any, b: any) => b.receipt.at - a.receipt.at);
   const byTruck = [...new Set(open.map((d: any) => d.shipmentId))].map((id) => shipmentOf(state, id as string));
   const openValue = open.reduce((a: number, d: any) => a + d.value, 0);
@@ -81,9 +82,9 @@ export default function Owner({ go, initialId }: { go: Go; initialId?: string | 
 
       <AccountantPanel />
 
-      <Panel eyebrow="Last 36 hours" title="Recent trucks">
+      <Panel eyebrow="Last 36 hours" title="Recent trucks" right={recent.length > 3 && <button id="btn-recent-all" onClick={() => setAllRecent(!allRecent)} className="text-[11px] font-bold text-slate-600 underline cursor-pointer">{allRecent ? 'Show less' : `Show all ${recent.length}`}</button>}>
         <div className="grid sm:grid-cols-2 gap-2">
-          {recent.map((s: any) => {
+          {(allRecent ? recent : recent.slice(0, 3)).map((s: any) => {
             const st = shipmentStatus(state, s);
             return (
               <div key={s.id} className="rounded-lg border border-slate-200 p-2.5 text-xs space-y-1">
@@ -286,7 +287,7 @@ function AccountantPanel() {
   const stamp = tallyDate(now);
   // your own decisions first (they can still be undone); the report and Tally file keep import order
   const listed = [...ready.filter((d: any) => d.diffId).sort((a: any, b: any) => b.createdAt - a.createdAt), ...ready.filter((d: any) => !d.diffId)];
-  const shown = showAll ? listed : listed.slice(0, 5);
+  const shown = showAll ? listed : listed.slice(0, 3);
   const packDrafts = (p: any) => p.ids.map((id: string) => state.drafts.find((d: any) => d.id === id)).filter(Boolean).sort(importOrder);
   return (
     <Panel eyebrow="For your accountant" title={ready.length ? `${ready.length} item${ready.length === 1 ? '' : 's'} ready to send` : 'Nothing new for your accountant'} right={ready.length > 0 && (
