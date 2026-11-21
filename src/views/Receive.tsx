@@ -100,8 +100,8 @@ export default function Receive({ id, token, payload }: { id: string; token: str
   const ok = s && s.token && s.token === token && !s.cancelledAt;
   const saved = loadDraft(`${id}-${token}`);
   const [by, setBy] = useState(() => saved?.by || (() => { try { return localStorage.getItem('loadmatch-name') || 'Ravi'; } catch { return 'Ravi'; } })());
-  // Prototype: counts open filled in, with the first line 2 short and 1 damaged to show a difference
-  const demoCounts = () => Object.fromEntries(s.lines.map((l: any, i: number) => [l.id, i === 0 ? { counted: String(Math.max(0, l.qty - 2)), damaged: '1' } : { counted: String(l.qty), damaged: '0' }]));
+  // Prototype: counts open filled in with exactly what was sent (the happy path). For a sad path, press − to make some missing or + damaged.
+  const demoCounts = () => Object.fromEntries(s.lines.map((l: any) => [l.id, { counted: String(l.qty), damaged: '0' }]));
   const [counts, setCounts] = useState<Record<string, Count>>(() => saved?.counts || (ok ? demoCounts() : {}));
   // with the shared database the load can arrive a moment after this screen opens: fill the demo counts then
   useEffect(() => { if (ok && !s.receipt && !saved?.counts && !Object.keys(counts).length) setCounts(demoCounts()); }, [ok]);
