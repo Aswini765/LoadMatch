@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Mic, MicOff, Camera, Lock, CheckCircle2, AlertTriangle, Minus, Plus, ChevronLeft, ChevronRight, MessageCircle, PackageCheck, Warehouse, ArrowRight, Wrench } from 'lucide-react';
-import { useStore, item, route, shipmentOf, diffsOf, shipmentStatus, receiverPath, countBackPath, unpackLoad, unpackCount, reducer, countedByUs, atGate, jobworkOpen, loadName, FLOW_LABEL } from '../store.tsx';
+import { useStore, item, party, route, shipmentOf, diffsOf, shipmentStatus, receiverPath, countBackPath, unpackLoad, unpackCount, reducer, countedByUs, atGate, jobworkOpen, loadName, FLOW_LABEL } from '../store.tsx';
 import { LOADING_POINTS } from '../data/seed.ts';
 import { t, fill, unitWord } from '../i18n.ts';
 import { useVoice, parseCount } from '../lib/voice.ts';
@@ -99,7 +99,8 @@ export default function Receive({ id, token, payload }: { id: string; token: str
   const s = sameLoad ? mine : remote ? shipmentOf(state, id) : null;
   const ok = s && s.token && s.token === token && !s.cancelledAt;
   const saved = loadDraft(`${id}-${token}`);
-  const [by, setBy] = useState(() => saved?.by || (() => { try { return localStorage.getItem('loadmatch-name') || 'Ravi'; } catch { return 'Ravi'; } })());
+  // our staff: their own name; an outside receiver: the last name typed on this phone
+  const [by, setBy] = useState(() => saved?.by || (getWho() ? me().replace(' (staff)', '') : (() => { try { return localStorage.getItem('loadmatch-name') || (s?.party ? `${party(s.party)?.name.split(' ')[0]} stores` : 'Store person'); } catch { return 'Store person'; } })()));
   // Prototype: counts open filled in with exactly what was sent (the happy path). For a sad path, press − to make some missing or + damaged.
   const demoCounts = () => Object.fromEntries(s.lines.map((l: any) => [l.id, { counted: String(l.qty), damaged: '0' }]));
   const [counts, setCounts] = useState<Record<string, Count>>(() => saved?.counts || (ok ? demoCounts() : {}));

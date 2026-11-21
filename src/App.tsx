@@ -48,11 +48,15 @@ function useBadges() {
   } as Record<string, { n: number; cls: string } | null>;
 }
 
+// the page scrolls inside the main column, so reset that (and the window) when the screen changes
+const toTop = () => { window.scrollTo(0, 0); document.getElementById('main-topbar')?.parentElement?.scrollTo(0, 0); };
+
 // Links shared on WhatsApp open one screen directly: #/r/<truck>/<token>/<load> (receiver), #/c/<truck>/<token>/<count> (count back to sender), #/e/<diff>/<token> (evidence)
 function useHashRoute() {
   const read = () => { const m = window.location.hash.match(/^#\/(r|e|c)\/([^/]+)\/([^/?#]+)(?:\/([^/?#]+))?/); return m ? { kind: m[1], id: decodeURIComponent(m[2]), token: m[3], payload: m[4] || '' } : null; };
   const [r, setR] = useState(read);
-  useEffect(() => { const on = () => setR(read()); window.addEventListener('hashchange', on); return () => window.removeEventListener('hashchange', on); }, []);
+  // every new screen starts at the top
+  useEffect(() => { const on = () => { setR(read()); toTop(); }; window.addEventListener('hashchange', on); return () => window.removeEventListener('hashchange', on); }, []);
   return r;
 }
 
@@ -83,6 +87,7 @@ export default function App() {
     window.dispatchEvent(new HashChangeEvent('hashchange'));
     setNav((n) => n + 1);
     setMobileOpen(false);
+    toTop();
   };
 
   return (
