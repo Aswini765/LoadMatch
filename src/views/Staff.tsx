@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Send, PackageCheck, ArrowRight, Truck, Clock, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Send, PackageCheck, ArrowRight, Truck, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { useStore, route, diffsOf, countedByUs, atGate, receiverPath, loadName } from '../store.tsx';
 import { UNITS } from '../data/seed.ts';
 import { getUnit, setUnit, setMeName, me } from '../lib/who.ts';
@@ -13,8 +13,8 @@ const staffName = (state: any) => (state.staff || []).find((p: any) => p.unit ==
 // Sending or receiving, and whether the other side has the same GST number (our unit) or another one
 export function sideTag(state: any, s: any, unit: string) {
   const sending = s.fromUnit === unit && !s.returning;
-  const other = s.flow === 'transfer' ? 'our unit' : s.flow === 'inbound' ? 'supplier' : s.flow === 'outbound' ? 'customer' : 'job work';
-  return { sending, label: `${sending ? 'Sending' : 'Receiving'} · ${other}`, other };
+  const [from, to] = route(s).split(' → ');
+  return { sending, label: sending ? `To ${to}` : `From ${from}`, other: sending ? to : from };
 }
 
 const SEND_RULES = [
@@ -105,6 +105,13 @@ export default function Staff({ go }: { go: Go }) {
         </div>
         <div className="text-[10px] text-slate-500 -mt-1">Demo: switch unit to play the person at the other end of the truck.</div>
 
+        {toCount.length > 0 && (
+          <div id="incoming-banner" className="rounded-xl border-2 border-sky-300 bg-sky-50 p-3 text-xs text-sky-950 space-y-1">
+            <div className="font-bold flex items-center"><PackageCheck className="w-4 h-4 mr-1" />Stock coming to you · {toCount.length}</div>
+            {toCount.map((s: any) => <div key={s.id}>{s.returning ? 'Coming back after accident: ' : ''}<b>{loadName(s.id)}</b> from <b>{route(s).split(' → ')[0]}</b>{s.truckNo ? `, truck ${s.truckNo}` : ''}{s.sentAt ? `, left ${when(s.sentAt)}` : ''}. Count it when it arrives.</div>)}
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-2">
           <button id="btn-send-stock" onClick={() => setMode(mode === 'send' ? '' : 'send')} className={`py-4 rounded-xl font-bold text-sm cursor-pointer flex flex-col items-center border-2 ${mode === 'send' ? 'bg-violet-700 text-white border-violet-700' : 'bg-violet-50 text-violet-900 border-violet-200'}`}><Send className="w-5 h-5 mb-1" />Send stock</button>
           <button id="btn-receive-stock" onClick={() => setMode(mode === 'receive' ? '' : 'receive')} className={`py-4 rounded-xl font-bold text-sm cursor-pointer flex flex-col items-center border-2 ${mode === 'receive' ? 'bg-sky-700 text-white border-sky-700' : 'bg-sky-50 text-sky-900 border-sky-200'}`}><PackageCheck className="w-5 h-5 mb-1" />Receive stock</button>
@@ -121,16 +128,22 @@ export default function Staff({ go }: { go: Go }) {
         {mode === 'receive' && (
           <div className="space-y-2">
             <div className="text-xs font-bold text-slate-900">Where is it coming from?</div>
-            <div id="recv-unit" className="bg-white border border-slate-200 rounded-xl p-3"><div className="text-sm font-bold text-slate-900">Our other unit</div><div className="text-[11px] text-slate-500">Nothing to type. The truck is already listed below under <b>To do now → Count</b>.</div></div>
+            <div id="recv-unit" className="bg-white border border-slate-200 rounded-xl p-3"><div className="text-sm font-bold text-slate-900">Our other unit</div><div className="text-[11px] text-slate-500">Nothing to type. The truck is already listed below under <b>To receive → Count</b>.</div></div>
             <Choice id="recv-supplier" title="Supplier delivery" sub="Pick the supplier and type what their bill says, then count what came." onClick={() => go('receive', { id: 'add:inbound' })} />
             <Rules list={RECEIVE_RULES} tone="border-sky-200 bg-sky-50 text-sky-950" />
           </div>
         )}
 
-        <Head icon={Clock} text="To do now" />
-        {!toLoad.length && !toCount.length && <div id="nothing-pending" className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl p-3"><CheckCircle2 className="w-4 h-4 inline mr-1" />Nothing pending ✓</div>}
-        {toLoad.map((s: any) => <Row key={s.id} s={s} unit={unit} state={state} action={s.loading?.endAt ? 'Truck left' : 'Load'} onClick={() => open(s)} />)}
-        {toCount.map((s: any) => <Row key={s.id} s={s} unit={unit} state={state} action="Count" onClick={() => count(s)} />)}
+        {mode !== 'receive' && <>
+          <Head icon={Send} text={`To send · ${toLoad.length}`} />
+          {!toLoad.length && <div className="text-[11px] text-slate-500">No truck waiting to be loaded at {uname(unit)}.</div>}
+          {toLoad.map((s: any) => <Row key={s.id} s={s} unit={unit} state={state} action={s.loading?.endAt ? 'Truck left' : 'Load'} onClick={() => open(s)} />)}
+        </>}
+        {mode !== 'send' && <>
+          <Head icon={PackageCheck} text={`To receive · ${toCount.length}`} />
+          {!toCount.length && <div id="nothing-pending" className="text-[11px] text-slate-500">Nothing coming to {uname(unit)} right now.</div>}
+          {toCount.map((s: any) => <Row key={s.id} s={s} unit={unit} state={state} action="Count" onClick={() => count(s)} />)}
+        </>}
 
         <MyRequests />
 
