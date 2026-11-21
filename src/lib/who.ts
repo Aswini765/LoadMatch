@@ -2,6 +2,7 @@
 // Two people: Staff (one at each unit: makes the list, loads, sends, and counts what arrives) and the Owner (sees all, decides).
 export const WHO: Record<string, { label: string; what: string; main: string; views: string[] }> = {
   owner: { label: 'Owner', what: 'Sees everything. Decides on differences, approves staff requests, adds items, parties and staff.', main: 'owner', views: ['home', 'staff', 'dispatch', 'receive', 'owner', 'reports', 'setup'] },
+  accountant: { label: 'Accountant', what: 'Does the paperwork for the owner\'s decisions: debit notes, credit notes, bills and the Tally file.', main: 'accountant', views: ['home', 'accountant'] },
   staff: { label: 'Staff', what: 'One person at each unit. Sends stock (list, load, truck left) and receives stock (counts what arrived).', main: 'staff', views: ['home', 'staff', 'dispatch', 'receive'] },
 };
 // Kept only while the page is open: every refresh starts on Home with nobody chosen (demo).

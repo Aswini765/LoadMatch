@@ -33,6 +33,7 @@ const W: Record<string, Record<L, string>> = {
   customer: { en: 'Customer', hi: 'ग्राहक', kn: 'ಗ್ರಾಹಕ', te: 'కస్టమర్' },
   supplierGate: { en: 'Supplier truck at the gate', hi: 'सप्लायर की गाड़ी गेट पर', kn: 'ಸರಬರಾಜುದಾರರ ಲಾರಿ ಗೇಟ್‌ನಲ್ಲಿ', te: 'సరఫరాదారు లారీ గేటు వద్ద' },
   fromOur: { en: 'Every truck coming to you (our unit or a supplier) is below. Tap Truck arrived, then Count.', hi: 'आपके पास आने वाली हर गाड़ी नीचे है। “गाड़ी पहुँच गई” दबाएँ, फिर गिनें।', kn: 'ನಿಮಗೆ ಬರುವ ಪ್ರತಿ ಲಾರಿ ಕೆಳಗಿದೆ. “ಲಾರಿ ಬಂತು” ಒತ್ತಿ, ನಂತರ ಎಣಿಸಿ.', te: 'మీకు వచ్చే ప్రతి లారీ కింద ఉంది. “లారీ వచ్చింది” నొక్కి, తర్వాత లెక్కించండి.' },
+  ownerSends: { en: 'The owner sends the count link to the customer.', hi: 'मालिक ग्राहक को गिनती का लिंक भेजेंगे।', kn: 'ಮಾಲೀಕರು ಗ್ರಾಹಕರಿಗೆ ಎಣಿಕೆ ಲಿಂಕ್ ಕಳುಹಿಸುತ್ತಾರೆ.', te: 'యజమాని కస్టమర్‌కు లెక్క లింక్ పంపుతారు.' },
   waLink: { en: 'Send count link on WhatsApp', hi: 'WhatsApp पर गिनती लिंक भेजें', kn: 'WhatsApp‌ನಲ್ಲಿ ಎಣಿಕೆ ಲಿಂಕ್ ಕಳುಹಿಸಿ', te: 'WhatsAppలో లెక్క లింక్ పంపండి' },
   yes: { en: 'Owner said YES', hi: 'मालिक ने हाँ कहा', kn: 'ಮಾಲೀಕರು ಹೌದು ಎಂದರು', te: 'యజమాని సరే అన్నారు' },
   no: { en: 'Owner said NO', hi: 'मालिक ने ना कहा', kn: 'ಮಾಲೀಕರು ಬೇಡ ಎಂದರು', te: 'యజమాని వద్దు అన్నారు' },
@@ -154,7 +155,7 @@ export default function Staff({ go }: { go: Go }) {
           </div>
         </div>
         {st.btn && <button id={`step-${s.id}`} onClick={st.act} className={`${big} ${st.btnCls}`}>{st.btn}</button>}
-        {!st.btn && s.flow === 'outbound' && <a id={`wa-${s.id}`} href={shareWhatsApp(`${COMPANY.name}: ${loadName(s.id)}, truck ${s.truckNo}. Please count and submit:\n${appLink(receiverPath(s, state.settings))}`)} target="_blank" rel="noreferrer" className={`${big} border-2 border-emerald-600 text-emerald-800 text-sm`}>💬 {w('waLink')}</a>}
+        {!st.btn && s.flow === 'outbound' && <div id={`owner-link-${s.id}`} className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">💬 {w('ownerSends')}</div>}
         <button id={`open-${s.id}`} onClick={() => go('dispatch', { id: s.id })} className="text-[12px] font-semibold text-slate-500 underline cursor-pointer">{w('problem')}</button>
       </div>
     );

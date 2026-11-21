@@ -1,5 +1,5 @@
 import React from 'react';
-import { Truck, PackageCheck, Scale, FileCode, ArrowRight, BarChart3, Settings2 } from 'lucide-react';
+import { Truck, PackageCheck, Scale, Calculator, FileCode, ArrowRight, BarChart3, Settings2 } from 'lucide-react';
 import { useStore, shipmentStatus, receiptOverdue, countedByUs, atGate } from '../store.tsx';
 import { COMPANY } from '../data/seed.ts';
 import type { Go } from './ui.tsx';
@@ -19,6 +19,7 @@ export default function Home({ go, who, pick }: { go: Go; who?: string; pick?: (
   const roles = [
     { id: 'staff', icon: Truck, title: 'Staff', who: 'One person at each unit', what: 'Sees the trucks coming to their unit and taps the one that arrived to count it. Sends trucks with one big button for each step: Start loading, Loading done, Truck left. Asks the owner when there is a problem.', n: toCount + loading, nLabel: late ? `to load or count · ${late} late` : 'to load or count' },
     { id: 'owner', icon: Scale, title: 'Owner', who: 'Sees everything, decides', what: 'Decides what to do when something is missing, damaged or extra. Answers staff requests. Adds expected supplier deliveries, items, customers and staff in Setup. Gets one file for the accountant.', n: decide, nLabel: 'to decide' },
+    { id: 'accountant', icon: Calculator, title: 'Accountant', who: 'Does the paperwork', what: 'Gets a to-do list from the owner\'s decisions: debit note to a supplier, credit note or bill for a customer. Ticks each one when done in Tally. Also gets the report and one Tally file.', n: state.drafts.filter((d: any) => d.status === 'pending' && d.diffId).length, nLabel: 'to do' },
   ];
 
 
@@ -27,12 +28,12 @@ export default function Home({ go, who, pick }: { go: Go; who?: string; pick?: (
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-2xs space-y-3">
         <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">LoadMatch</div>
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-950">What was sent. What arrived. What's missing.</h1>
-        <p className="text-sm text-slate-600 max-w-3xl">Two people use it. <b>Staff</b> at each unit send trucks and count what arrives, with big buttons, pictures and their own language. The app compares sent and received and shows the <b>Owner</b> only what is missing, damaged or extra. Customers and suppliers need no app: they get a link from the company WhatsApp.</p>
+        <p className="text-sm text-slate-600 max-w-3xl">Three people use it. <b>Staff</b> at each unit send trucks and count what arrives, with big buttons, pictures and their own language. The app compares sent and received and shows the <b>Owner</b> only what is missing, damaged or extra. The <b>Accountant</b> gets the paperwork as a to-do list. Customers and suppliers need no app: the owner sends them a link from the company WhatsApp.</p>
         <div className="text-xs text-slate-500">Demo: {COMPANY.name}, {COMPANY.city} · two units, two suppliers, two customers</div>
       </div>
 
       <div className="text-sm font-bold text-slate-900">Who uses LoadMatch? Tap who you are to start.</div>
-      <div className="grid sm:grid-cols-2 gap-4">
+      <div className="grid sm:grid-cols-3 gap-4">
         {roles.map(({ id, icon: Icon, title, who, what, n, nLabel }) => (
           <button key={title} id={`home-${title.toLowerCase()}`} onClick={() => (pick ? pick(id) : go(id))}
             className="text-left bg-white border border-slate-200 hover:border-slate-400 rounded-xl p-4 shadow-2xs space-y-2 cursor-pointer transition-colors">

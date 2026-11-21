@@ -325,21 +325,28 @@ test('job work: sent out, comes back in parts, balance and one-year date', () =>
   assert.deepEqual(childrenOf(s, shipmentOf(s, out)).map((x: any) => x.id), [back]);
 });
 
-test('adjust in the next bill: what the factory does with supplier and customer differences', () => {
+test('supplier pays for a shortage: the accountant gets a debit note to make', () => {
   let s = buildInitialState();
-  const d = diffsOf(s, 'TRK-1015')[0]; // customer got 3 extra: not offered there
-  assert.ok(!OPTIONS.outbound.excess.includes('adjust_next_bill'));
-  assert.ok(OPTIONS.inbound.short.includes('adjust_next_bill') && OPTIONS.outbound.short.includes('adjust_next_bill'));
+  assert.deepEqual(OPTIONS.inbound.short, ['replace', 'debit_note', 'investigate'], 'no "take the loss" for suppliers');
   s = run(s, { type: 'CREATE_SHIPMENT', flow: 'inbound', toUnit: 'MYS', party: 'coastal', truckNo: 'KA 3', ref: 'SB-9', lines: [{ item: 'BRP-1148', qty: 50 }] });
   const id = lastShip(s).id;
   s = run(s, { type: 'SEND_TO_RECEIVER', id, token: 'tokadj1' }, { type: 'SUBMIT_RECEIPT', id, token: 'tokadj1', by: 'Gate', lines: { L1: { counted: 46, damaged: 0 } } });
   const short = diffsOf(s, id)[0];
-  s = run(s, { type: 'DECIDE', diffId: short.id, action: 'adjust_next_bill' });
+  s = run(s, { type: 'DECIDE', diffId: short.id, action: 'debit_note' });
   assert.equal(diffOf(s, short.id).status, 'settled');
   const dn = draftsFor(s, id).find((x: any) => x.diffId === short.id);
   assert.equal(dn.type, 'debit_note');
-  assert.match(dn.narration, /next bill/);
-  void d;
+  assert.equal(run(s, { type: 'SEND_TO_ACCOUNTANT', ids: [dn.id], actor: 'Ramesh (staff)' }), s, 'staff cannot mark it done');
+  s = run(s, { type: 'SEND_TO_ACCOUNTANT', ids: [dn.id], actor: 'Accountant' });
+  assert.equal(s.drafts.find((x: any) => x.id === dn.id).status, 'sent');
+});
+
+test('owner sends the customer count link (not staff)', () => {
+  let s = buildInitialState();
+  s = run(s, { type: 'LOADING', id: 'TRK-1017', phase: 'start' }, { type: 'LOADING', id: 'TRK-1017', phase: 'end' }, { type: 'SEND_TO_RECEIVER', id: 'TRK-1017', token: 'tok1017' });
+  assert.equal(run(s, { type: 'LINK_SENT', id: 'TRK-1017', actor: 'Ravi (staff)' }), s);
+  s = run(s, { type: 'LINK_SENT', id: 'TRK-1017', actor: 'Owner' });
+  assert.ok(shipmentOf(s, 'TRK-1017').linkSentAt);
 });
 
 test('a promised replacement closes itself when it arrives on a later truck', () => {

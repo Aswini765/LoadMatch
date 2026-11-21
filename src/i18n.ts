@@ -64,7 +64,7 @@ const T: Record<string, Tr> = {
   loadingPoint: { en: 'Where is it being loaded?', hi: 'माल कहाँ लोड हो रहा है?', kn: 'ಎಲ್ಲಿ ಲೋಡ್ ಆಗುತ್ತಿದೆ?', te: 'ఎక్కడ లోడ్ అవుతోంది?' },
   startLoading: { en: 'Loading started', hi: 'लोडिंग शुरू', kn: 'ಲೋಡಿಂಗ್ ಆರಂಭ', te: 'లోడింగ్ మొదలు' },
   endLoading: { en: 'Loading finished', hi: 'लोडिंग पूरी', kn: 'ಲೋಡಿಂಗ್ ಮುಗಿಯಿತು', te: 'లోడింగ్ పూర్తి' },
-  loadingFirst: { en: 'Record when loading starts and finishes. That time is used to find CCTV footage if there is a dispute.', hi: 'लोडिंग शुरू और पूरी होने का समय दर्ज करें। विवाद होने पर इसी समय से CCTV देखा जाता है।', kn: 'ಲೋಡಿಂಗ್ ಆರಂಭ ಮತ್ತು ಮುಗಿದ ಸಮಯ ದಾಖಲಿಸಿ. ವಿವಾದವಾದರೆ ಈ ಸಮಯದಿಂದ CCTV ನೋಡಲಾಗುತ್ತದೆ.', te: 'లోడింగ్ మొదలు, పూర్తి సమయం నమోదు చేయండి. వివాదం వస్తే ఈ సమయంతో CCTV చూస్తారు.' },
+  loadingFirst: { en: 'Record when loading starts and finishes. That time helps if there is a dispute later.', hi: 'लोडिंग शुरू और पूरी होने का समय दर्ज करें। बाद में विवाद हो तो यह काम आता है।', kn: 'ಲೋಡಿಂಗ್ ಆರಂಭ ಮತ್ತು ಮುಗಿದ ಸಮಯ ದಾಖಲಿಸಿ. ನಂತರ ವಿವಾದವಾದರೆ ಇದು ಸಹಾಯ ಮಾಡುತ್ತದೆ.', te: 'లోడింగ్ మొదలు, పూర్తి సమయం నమోదు చేయండి. తర్వాత వివాదం వస్తే ఇది ఉపయోగపడుతుంది.' },
   sendReceiver: { en: 'Truck left: send link to receiver', hi: 'गाड़ी निकली: रिसीवर को लिंक भेजें', kn: 'ವಾಹನ ಹೊರಟಿತು: ಸ್ವೀಕರಿಸುವವರಿಗೆ ಲಿಂಕ್ ಕಳುಹಿಸಿ', te: 'వాహనం బయలుదేరింది: రిసీవర్‌కు లింక్ పంపండి' },
   shareWhatsApp: { en: 'Share on WhatsApp', hi: 'WhatsApp पर भेजें', kn: 'WhatsApp ನಲ್ಲಿ ಹಂಚಿ', te: 'WhatsApp లో పంపండి' },
   copyLink: { en: 'Copy link', hi: 'लिंक कॉपी करें', kn: 'ಲಿಂಕ್ ನಕಲಿಸಿ', te: 'లింక్ కాపీ చేయండి' },

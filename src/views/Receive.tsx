@@ -370,7 +370,7 @@ export function CountBack({ id, token, payload, onOpen }: { id: string; token: s
   return <PhoneFrame title="LoadMatch" sub={s ? `${loadName(s.id)} · ${s.truckNo}` : id} lang={lang} setLang={setLang}><div className="space-y-3">{body}</div></PhoneFrame>;
 }
 
-// Store person at the sending unit: trucks dispatch has listed, waiting to be loaded. Start and end times are the CCTV window.
+// Store person at the sending unit: trucks dispatch has listed, waiting to be loaded. Start and end times help if there is a dispute later.
 function TrucksToLoad() {
   const { state, dispatch } = useStore();
   const [points, setPoints] = useState<Record<string, string>>({});

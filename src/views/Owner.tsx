@@ -80,7 +80,7 @@ export default function Owner({ go, initialId }: { go: Go; initialId?: string | 
       </div>
 
 
-      <AccountantPanel />
+      <Panel eyebrow="Accountant" title={`${state.drafts.filter((d: any) => d.status === 'pending').length} items waiting for the accountant`}><div className="text-xs text-slate-600">Debit notes, credit notes and bills from your decisions go to the <b>Accountant</b> screen as a to-do list, with the report and the Tally file.</div></Panel>
 
       <Panel eyebrow="Last 36 hours" title="Recent trucks" right={recent.length > 3 && <button id="btn-recent-all" onClick={() => setAllRecent(!allRecent)} className="text-[11px] font-bold text-slate-600 underline cursor-pointer">{allRecent ? 'Show less' : `Show all ${recent.length}`}</button>}>
         <div className="grid sm:grid-cols-2 gap-2">
@@ -107,14 +107,18 @@ function Stat({ n, label, cls }: { n: number; label: string; cls: string }) {
 
 // Newest things staff did, at the very top: counts submitted (matched or not) and requests
 function LatestFromStaff() {
-  const { state } = useStore();
+  const { state, dispatch } = useStore();
   const now = Date.now();
-  const items: { at: number; icon: string; text: string; tone: string; target: string }[] = [];
+  const items: { at: number; icon: string; text: string; tone: string; target: string; link?: any }[] = [];
   for (const s of state.shipments) {
     if (!s.receipt || now - s.receipt.at > 24 * 3600000) continue;
     const n = diffsOf(state, s.id).filter((d: any) => d.status === 'open' || d.status === 'investigating').length;
     const bad = diffsOf(state, s.id).length > 0;
     items.push({ at: s.receipt.at, icon: bad ? '⚠️' : '✅', text: `${s.receipt.by} counted ${loadName(s.id)} (${route(s)}): ${bad ? (n ? 'does not match. Decide below.' : 'does not match. Decided.') : 'all matched.'}`, tone: bad && n ? 'border-amber-300 bg-amber-50' : 'border-emerald-200 bg-emerald-50', target: n ? `own-truck-${s.id}` : '' });
+  }
+  for (const s of state.shipments) {
+    if (s.flow !== 'outbound' || !s.sentAt || s.receipt || s.cancelledAt || s.linkSentAt) continue;
+    items.push({ at: s.sentAt, icon: '🚚', text: `${loadName(s.id)} left for ${party(s.party).name} (truck ${s.truckNo}). Send them the count link.`, tone: 'border-violet-300 bg-violet-50', target: '', link: s } as any);
   }
   for (const r of state.requests || []) {
     if (r.status !== 'pending') continue;
@@ -127,10 +131,12 @@ function LatestFromStaff() {
     <div id="latest-from-staff" className="bg-white border-2 border-slate-900 rounded-xl p-4 space-y-2">
       <div className="text-sm font-bold text-slate-900">🆕 Latest from staff</div>
       {items.slice(0, 5).map((x, i) => (
-        <button key={i} onClick={() => go(x.target)} className={`w-full text-left rounded-lg border px-3 py-2 text-sm flex items-start gap-2 ${x.tone} ${x.target ? 'cursor-pointer' : 'cursor-default'}`}>
+        <div key={i} role="button" onClick={() => go(x.target)} className={`w-full text-left rounded-lg border px-3 py-2 text-sm flex items-start gap-2 ${x.tone} ${x.target ? 'cursor-pointer' : 'cursor-default'}`}>
           <span className="text-lg leading-none">{x.icon}</span>
-          <span className="flex-1">{x.text}<span className="block text-[11px] text-slate-500">{when(x.at, now)}</span></span>
-        </button>
+          <span className="flex-1">{x.text}<span className="block text-[11px] text-slate-500">{when(x.at, now)}</span>
+            {(x as any).link && <a id={`send-link-${(x as any).link.id}`} href={shareWhatsApp(`${COMPANY.name}: ${loadName((x as any).link.id)} is on the way (truck ${(x as any).link.truckNo}). When it arrives, please count and submit here:\n${appLink(receiverPath((x as any).link, state.settings))}`)} target="_blank" rel="noreferrer" onClick={() => dispatch({ type: 'LINK_SENT', id: (x as any).link.id, actor: 'Owner' })} className="mt-1.5 inline-flex px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold">💬 Send count link to customer</a>}
+          </span>
+        </div>
       ))}
     </div>
   );
@@ -227,7 +233,7 @@ function DiffCard({ d, s, startOpen }: { d: any; s: any; startOpen?: boolean }) 
           {a.due && <label className="flex items-center justify-between gap-2 font-semibold text-slate-700">By when?<input id={`due-${d.id}`} type="datetime-local" value={due} onChange={(e) => setDue(e.target.value)} className="p-1.5 rounded border border-slate-300 bg-white" /></label>}
           {a.draft && <div className="text-slate-600">Your accountant will get this in the next report{s.flow === 'transfer' && s.billing === 'invoice' ? (choice === 'write_off' ? ' (credit note to your other unit)' : ' (bill to your other unit)') : ''}.</div>}
           {!a.draft && !a.due && choice !== 'investigate' && <div className="text-slate-600">This closes it. Nothing for the accountant.</div>}
-          {choice === 'investigate' && <div className="text-slate-600">Keeps it open while you check the CCTV and talk to the driver and sender. Add the CCTV video below.</div>}
+          {choice === 'investigate' && <div className="text-slate-600">Keeps it open while you talk to the driver and the sender. You can add a photo or video link below.</div>}
           <input id={`note-${d.id}`} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note: who agreed, what was said (optional)" className="w-full p-2 rounded border border-slate-300 bg-white" />
           {big && (
             <label className="flex items-start gap-2 p-2 rounded bg-amber-50 border border-amber-200 text-amber-950 font-semibold cursor-pointer">
@@ -251,7 +257,7 @@ function DiffCard({ d, s, startOpen }: { d: any; s: any; startOpen?: boolean }) 
   );
 }
 
-// The CCTV window comes from the loading times the dispatch staff recorded. The owner attaches the clip
+// The loading times staff recorded help find the right video. The owner attaches the clip
 // (a name or a link to where it is stored) and decides who sees the pack: it is shared only on purpose.
 function Evidence({ d }: { d: any }) {
   const { state, dispatch } = useStore();
@@ -269,7 +275,7 @@ function Evidence({ d }: { d: any }) {
     <div className="rounded-lg border border-slate-200 p-2.5 space-y-2 text-xs">
       <pre id={`ev-${d.id}`} className="whitespace-pre-wrap font-sans text-[11px] text-slate-700 bg-slate-50 rounded p-2 leading-relaxed">{text}</pre>
       <div className="flex gap-2">
-        <input id={`clip-${d.id}`} value={clip} onChange={(e) => setClip(e.target.value)} placeholder="CCTV video: file name or link" className="flex-1 min-w-0 p-2 rounded border border-slate-300" />
+        <input id={`clip-${d.id}`} value={clip} onChange={(e) => setClip(e.target.value)} placeholder="Video or photo: file name or link" className="flex-1 min-w-0 p-2 rounded border border-slate-300" />
         <button id={`attach-${d.id}`} disabled={!clip.trim()} onClick={() => { const v = clip.trim(); dispatch({ type: 'ATTACH_CLIP', diffId: d.id, name: /^https?:/.test(v) ? '' : v, link: /^https?:/.test(v) ? v : '', actor: 'Owner' }); setClip(''); }} className="px-2.5 rounded-lg bg-slate-900 disabled:opacity-40 text-white font-bold flex items-center cursor-pointer"><Film className="w-3.5 h-3.5 mr-1" />Add</button>
       </div>
       <div className="flex gap-2">
@@ -318,7 +324,7 @@ export function EvidenceView({ id, token }: { id: string; token: string }) {
 
 // The accountant does not log in. The owner sends a pack: a printable report and one Tally file,
 // in import order. The owner's decision is the approval; until it is sent, a decision can be undone.
-function AccountantPanel() {
+export function AccountantPanel({ mode = 'owner' }: { mode?: 'owner' | 'accountant' } = {}) {
   const { state, dispatch } = useStore();
   const ready = state.drafts.filter((d: any) => d.status === 'pending').sort(importOrder);
   const packs = [...(state.packs || [])].reverse();
@@ -327,12 +333,14 @@ function AccountantPanel() {
   const now = Date.now();
   const stamp = tallyDate(now);
   // your own decisions first (they can still be undone); the report and Tally file keep import order
-  const listed = [...ready.filter((d: any) => d.diffId).sort((a: any, b: any) => b.createdAt - a.createdAt), ...ready.filter((d: any) => !d.diffId)];
-  const shown = showAll ? listed : listed.slice(0, 3);
+  const listed = [...ready.filter((d: any) => d.diffId).sort((a: any, b: any) => b.createdAt - a.createdAt), ...(mode === 'accountant' ? [] : ready.filter((d: any) => !d.diffId))];
+  // the accountant sees every to-do from the owner's decisions; routine stock entries go in the Tally file
+  const shown = showAll || mode === 'accountant' ? listed : listed.slice(0, 3);
+  const stockOnly = ready.filter((d: any) => !d.diffId).length;
   const packDrafts = (p: any) => p.ids.map((id: string) => state.drafts.find((d: any) => d.id === id)).filter(Boolean).sort(importOrder);
   return (
     <Panel eyebrow="For your accountant" title={ready.length ? `${ready.length} item${ready.length === 1 ? '' : 's'} ready to send` : 'Nothing new for your accountant'} right={ready.length > 0 && (
-      <button id="btn-send-accountant" onClick={() => dispatch({ type: 'SEND_TO_ACCOUNTANT', ids: ready.map((d: any) => d.id), actor: 'Owner' })} className="px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-bold flex items-center cursor-pointer"><Send className="w-3.5 h-3.5 mr-1" />Mark as sent</button>)}>
+      <button id="btn-send-accountant" onClick={() => dispatch({ type: 'SEND_TO_ACCOUNTANT', ids: ready.map((d: any) => d.id), actor: mode === 'accountant' ? 'Accountant' : 'Owner' })} className="px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-bold flex items-center cursor-pointer"><Send className="w-3.5 h-3.5 mr-1" />Mark as sent</button>)}>
       {ready.length > 0 && (
         <>
           <div className="text-xs text-slate-600">Made from the counts and your decisions. Send your accountant the report (to print) or the Tally file, then tap “Mark as sent”.</div>
@@ -341,26 +349,29 @@ function AccountantPanel() {
             <button id="btn-tally-file" onClick={() => download(`loadmatch-tally-${stamp}.xml`, batchXml(ready))} className="px-3 py-2 rounded-lg border border-slate-300 bg-white text-xs font-bold flex items-center cursor-pointer"><FileCode className="w-3.5 h-3.5 mr-1.5" />Tally file</button>
             <a id="btn-wa-accountant" href={shareWhatsApp(packSummary(state, ready, now))} target="_blank" rel="noreferrer" className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold flex items-center"><MessageCircle className="w-3.5 h-3.5 mr-1.5" />WhatsApp summary</a>
           </div>
+          {mode === 'accountant' && <div id="acc-todo-head" className="text-sm font-bold text-slate-900">To do · {listed.length}{stockOnly ? <span className="font-normal text-xs text-slate-500"> (plus {stockOnly} routine stock entries, already in the Tally file)</span> : null}</div>}
+          {mode === 'accountant' && !listed.length && <div className="text-xs text-emerald-800">✓ Nothing to do from the owner's decisions.</div>}
           <div className="divide-y divide-slate-100 border border-slate-200 rounded-lg">
             {shown.map((d: any) => {
               const amt = entryAmount(d);
               return (
                 <div key={d.id} id={`entry-${d.id}`} className="p-2.5 text-xs flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="font-bold text-slate-900">{DRAFT_PLAIN[d.type]} <span className="font-normal text-slate-400">· {loadName(d.shipmentId)}</span></div>
+                    <div className="font-bold text-slate-900">{mode === 'accountant' ? `Make a ${DRAFT_LABEL[d.type].toLowerCase()}${d.party && party(d.party) ? `: ${party(d.party).name}` : ''}` : DRAFT_PLAIN[d.type]} <span className="font-normal text-slate-400">· {loadName(d.shipmentId)}</span></div>
                     <div className="text-slate-600">{d.narration.replace(/^TRK-\d+( \([^)]*\))?(, truck [^:]+)?: ?/, '')}</div>
                     <div className="text-[10px] text-slate-400">In Tally: {DRAFT_LABEL[d.type]}</div>
                     {undoing === d.id && <div className="mt-1 flex gap-2"><span className="text-slate-700">Undo your decision and decide again?</span><button id={`undo-ok-${d.id}`} onClick={() => { dispatch({ type: 'REJECT_DRAFT', id: d.id, note: 'Owner corrected the decision', actor: 'Owner' }); setUndoing(null); }} className="font-bold text-rose-700 cursor-pointer">Undo</button><button onClick={() => setUndoing(null)} className="text-slate-500 cursor-pointer">Keep</button></div>}
                   </div>
                   <div className="text-right shrink-0">
                     {amt != null && <div className="font-bold text-slate-900">{inr(amt)}</div>}
-                    {d.diffId && undoing !== d.id && <button id={`undo-${d.id}`} onClick={() => setUndoing(d.id)} className="text-[11px] font-bold text-slate-500 inline-flex items-center cursor-pointer"><Undo2 className="w-3 h-3 mr-0.5" />Undo</button>}
+                    {mode === 'accountant' && <button id={`done-${d.id}`} onClick={() => dispatch({ type: 'SEND_TO_ACCOUNTANT', ids: [d.id], actor: 'Accountant' })} className="mt-1 px-3 py-1.5 rounded-md bg-emerald-600 text-white text-[11px] font-bold cursor-pointer">✓ Done in Tally</button>}
+                    {mode === 'owner' && d.diffId && undoing !== d.id && <button id={`undo-${d.id}`} onClick={() => setUndoing(d.id)} className="text-[11px] font-bold text-slate-500 inline-flex items-center cursor-pointer"><Undo2 className="w-3 h-3 mr-0.5" />Undo</button>}
                   </div>
                 </div>
               );
             })}
           </div>
-          {ready.length > 5 && <button onClick={() => setShowAll(!showAll)} className="text-[11px] font-bold text-slate-600 cursor-pointer">{showAll ? 'Show fewer' : `Show all ${ready.length}`}</button>}
+          {mode === 'owner' && listed.length > 3 && <button onClick={() => setShowAll(!showAll)} className="text-[11px] font-bold text-slate-600 cursor-pointer">{showAll ? 'Show fewer' : `Show all ${listed.length}`}</button>}
         </>
       )}
       {packs.length > 0 && (
@@ -435,7 +446,7 @@ function AgreeCount({ s }: { s: any }) {
         </div>
       ) : (
         <div className="flex gap-2">
-          <input id={`agree-why-${s.id}`} value={why} onChange={(e) => setWhy(e.target.value)} placeholder="Why? e.g. CCTV shows 50 loaded" className="flex-1 p-1.5 rounded-md border border-slate-300 bg-white" />
+          <input id={`agree-why-${s.id}`} value={why} onChange={(e) => setWhy(e.target.value)} placeholder="Why? e.g. we loaded 50, the driver signed" className="flex-1 p-1.5 rounded-md border border-slate-300 bg-white" />
           <button id={`agree-no-ok-${s.id}`} disabled={!why.trim()} onClick={() => dispatch({ type: 'RESPOND_COUNT', id: s.id, agree: false, note: why, actor: 'Owner' })} className="px-3 py-1.5 rounded-md bg-rose-600 disabled:opacity-40 text-white font-bold cursor-pointer">Send</button>
         </div>
       )}

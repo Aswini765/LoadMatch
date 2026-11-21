@@ -2,10 +2,11 @@ import React from 'react';
 import { X, BookOpen } from 'lucide-react';
 
 const SOPS: [string, string[]][] = [
-  ['Two people use LoadMatch', [
+  ['Three people use LoadMatch', [
     'Staff: one person at each unit. Sends stock and receives stock.',
     'Owner: sees everything, decides every difference, answers staff requests, and sets up the lists.',
-    'Nobody else needs a login. Customers and suppliers get a link from the company WhatsApp; the accountant gets a file.',
+    'Accountant: does the paperwork for the owner\'s decisions (debit notes, credit notes, bills) from a to-do list.',
+    'Customers and suppliers need no app: the owner sends them a count link from the company WhatsApp.',
   ]],
   ['1 · Staff: every truck has one big button', [
     'Sending: 📦 Start loading → ✅ Loading done → 🚚 Truck left.',
@@ -25,7 +26,12 @@ const SOPS: [string, string[]][] = [
     'Needs your decision: only what did not match, with its value and loading time. Choose: take the loss, ask for it to be sent or replaced, adjust in the next bill, or check first.',
     '🚛 + Expected from supplier: add each order you place (supplier, items, unit, day). The store sees it coming and counts it.',
     'Setup: add units (with GST no.), staff, items (one by one or pasted from Excel) and customers or suppliers. Staff only pick from these lists.',
-    'More (one button): trucks on the road, promises, the accountant file and recent trucks.',
+    'Latest from staff (top): every count and request, newest first. When a truck leaves for a customer, tap “Send count link to customer”.',
+    'More (one button): trucks on the road, promises and recent trucks.',
+  ]],
+  ['4 · Accountant', [
+    'To do: each debit note, credit note or bill the owner\'s decisions need, with party and amount. Tick “Done in Tally”.',
+    'The report to print and one Tally file with all stock entries.',
   ]],
 ];
 

@@ -35,27 +35,27 @@ export const ACTIONS: Record<string, { label: string; due?: boolean; settles?: b
   // between our own units the goods are usually not lost: left at the sender, or the transporter pays
   unit_sends_rest: { label: 'Left behind: sending unit sends it in the next truck', due: true },
   correct_list: { label: 'Our list was wrong: they really got the extra', settles: true, draft: 'Stock journal between units' },
-  replace: { label: 'Supplier sends it with the next load', due: true },
+  replace: { label: 'Supplier sends it in the next load', due: true },
   adjust_next_bill: { label: 'Adjust it in the next bill', settles: true, draft: 'Debit or credit note, to adjust in the next bill' },
-  debit_note: { label: 'Pay the supplier less (debit note)', settles: true, draft: 'Debit note' },
+  debit_note: { label: 'Supplier pays for it (accountant makes a debit note)', settles: true, draft: 'Debit note' },
   accept: { label: 'We take the loss', settles: true, loss: true },
-  keep_extra: { label: 'Keep the extra and pay for it', settles: true },
+  keep_extra: { label: 'Keep the extra; we pay for it', settles: true },
   return_extra: { label: 'Send the extra back to the supplier', due: true },
   send_rest: { label: 'We send the missing goods', due: true },
   send_replacement: { label: 'We send replacements', due: true },
-  credit_note: { label: 'Charge the customer less (credit note)', settles: true, loss: true, draft: 'Credit note' },
-  bill_extra: { label: 'Charge the customer for the extra', settles: true, draft: 'Sales invoice' },
+  credit_note: { label: 'Customer pays less (accountant makes a credit note)', settles: true, loss: true, draft: 'Credit note' },
+  bill_extra: { label: 'Customer pays for the extra (accountant bills it)', settles: true, draft: 'Sales invoice' },
   customer_returns: { label: 'Customer sends the extra back', due: true },
   jobworker_sends_rest: { label: 'Job worker sends the rest', due: true },
   jobworker_replaces: { label: 'Job worker replaces the damaged ones', due: true },
   keep_returned: { label: 'They sent back more: add it to our stock', settles: true, draft: 'Stock journal from the job worker' },
-  investigate: { label: 'Check first (CCTV, driver, sender)' },
+  investigate: { label: 'Check first' },
   claim: { label: 'Claim from the transporter or insurance', due: true },
 };
 export const OPTIONS: Record<string, Record<string, string[]>> = {
   transfer: { short: ['unit_sends_rest', 'claim', 'investigate', 'write_off'], damaged: ['claim', 'investigate', 'write_off'], excess: ['correct_list', 'investigate'] },
-  inbound: { short: ['replace', 'adjust_next_bill', 'debit_note', 'accept', 'investigate'], damaged: ['replace', 'adjust_next_bill', 'debit_note', 'accept', 'investigate'], excess: ['keep_extra', 'return_extra', 'investigate'] },
-  outbound: { short: ['send_rest', 'adjust_next_bill', 'credit_note', 'investigate'], damaged: ['send_replacement', 'adjust_next_bill', 'credit_note', 'investigate'], excess: ['bill_extra', 'customer_returns', 'investigate'] },
+  inbound: { short: ['replace', 'debit_note', 'investigate'], damaged: ['replace', 'debit_note', 'investigate'], excess: ['keep_extra', 'return_extra', 'investigate'] },
+  outbound: { short: ['send_rest', 'credit_note', 'investigate'], damaged: ['send_replacement', 'credit_note', 'investigate'], excess: ['bill_extra', 'customer_returns', 'investigate'] },
   jobwork_out: { short: ['write_off', 'investigate'], damaged: ['write_off', 'investigate'], excess: ['correct_list', 'investigate'] },
   jobwork_in: { short: ['jobworker_sends_rest', 'write_off', 'investigate'], damaged: ['jobworker_replaces', 'write_off', 'investigate'], excess: ['keep_returned', 'investigate'] },
 };
@@ -187,10 +187,10 @@ export function evidenceText(state: any, d: any) {
     `${route(s)} · ${s.flow === 'outbound' ? 'invoice' : s.flow === 'inbound' ? 'bill' : 'challan'} ${s.ref}${s.ewayBill ? ` · e-way bill ${s.ewayBill}` : ''}`,
     `${it.name}: sent ${l.qty}, counted ${r.counted}${r.damaged ? `, damaged ${r.damaged}` : ''} → ${KIND_LABEL[d.kind].toLowerCase()} ${d.qty} ${it.unit}`,
   ];
-  if (s.loading?.startAt) parts.push(`Loading: ${s.loading.point}, ${fmtTime(s.loading.startAt)}–${fmtTime(s.loading.endAt)} on ${fmtDate(s.loading.startAt)} (check CCTV for this window)`);
+  if (s.loading?.startAt) parts.push(`Loading: ${s.loading.point}, ${fmtTime(s.loading.startAt)}–${fmtTime(s.loading.endAt)} on ${fmtDate(s.loading.startAt)}`);
   parts.push(`Counted by ${s.receipt.by}, ${fmtDate(s.receipt.at)} ${fmtTime(s.receipt.at)}${s.receipt.photos?.length ? ` · ${s.receipt.photos.length} photo(s)` : ''}`);
   if (s.docs?.length) parts.push(`Papers: ${s.docs.map((x: any) => x.kind).join(', ')} (${s.docs.length} photo${s.docs.length > 1 ? 's' : ''})`);
-  if (d.evidence.clips.length) parts.push(`CCTV: ${d.evidence.clips.map((c: any) => c.link || c.name).join(', ')}`);
+  if (d.evidence.clips.length) parts.push(`Video: ${d.evidence.clips.map((c: any) => c.link || c.name).join(', ')}`);
   return parts.join('\n');
 }
 const fmtTime = (ms: number) => new Date(ms).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -494,7 +494,7 @@ export function reducer(state: any, action: any): any {
     case 'SEND_TO_RECEIVER': {
       const s = shipmentOf(state, action.id);
       if (!s || s.sentAt || s.cancelledAt) return state;
-      if (!atGate(s.flow) && !s.loading?.endAt) return state; // the loading window is the CCTV evidence
+      if (!atGate(s.flow) && !s.loading?.endAt) return state; // loading must be finished before the truck leaves
       if (!action.token || String(action.token).length < 6) return state;
       let next = putShipment(state, audit({ ...s, sentAt: at, token: action.token }, at, actor, atGate(s.flow) ? 'COUNT_STARTED' : 'SENT', atGate(s.flow) ? 'Gate count opened.' : 'Truck left; receiver link shared.'));
       if (s.flow === 'transfer' && s.billing === 'invoice') {
@@ -634,9 +634,17 @@ export function reducer(state: any, action: any): any {
 
     // The owner sends the ready entries to the accountant (printable report + Tally file). The owner's decision
     // is the approval; a sent entry is kept with the pack it went in.
+    // The owner sends the count link to the customer from the company WhatsApp (staff don't)
+    case 'LINK_SENT': {
+      const s = shipmentOf(state, action.id);
+      if (!s || !s.sentAt || s.receipt || actor !== 'Owner') return state;
+      return putShipment(state, audit({ ...s, linkSentAt: at }, at, actor, 'LINK_SENT', 'Owner sent the count link to the customer.'));
+    }
+
+    // The accountant marks a to-do (debit note, credit note, bill…) done; the owner or accountant can send the rest as a pack
     case 'SEND_TO_ACCOUNTANT': {
       const ids = new Set((action.ids || []).filter((id: string) => state.drafts.some((x: any) => x.id === id && x.status === 'pending')));
-      if (!ids.size) return state;
+      if (!ids.size || !['Owner', 'Accountant'].includes(actor)) return state;
       const packId = `P-${pad((state.packs || []).length + 1)}`;
       return {
         ...state,
