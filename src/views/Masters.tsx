@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Plus, ClipboardPaste } from 'lucide-react';
-import { useStore, unitTax } from '../store.tsx';
+import { useStore, unitTax, gstinOk } from '../store.tsx';
 import { ITEMS, PARTIES, UNITS } from '../data/seed.ts';
 
 // Owner → Setup: the company's own lists. Staff only pick from these (or ask the owner to add).
 const inp = 'w-full p-2 rounded-lg border border-slate-300 text-xs bg-white';
 const btn = 'w-full py-2 rounded-lg bg-slate-900 text-white text-xs font-bold disabled:opacity-40 cursor-pointer flex items-center justify-center';
+const Bad = ({ g }: { g: string }) => (gstinOk(g) ? null : <div className="text-[11px] text-rose-700">GST no. should be 15 characters, like 29AAAAA0000A1Z5.</div>);
 const KIND: Record<string, string> = { supplier: 'Supplier', customer: 'Customer', jobworker: 'Job worker' };
 
 function Card({ id, title, sub, children }: { id: string; title: string; sub: string; children: React.ReactNode }) {
@@ -38,7 +39,8 @@ export default function Masters() {
           <div className="space-y-1">{Object.values(UNITS).map((u) => <div key={u.id} className="text-xs flex justify-between border-b border-slate-100 py-1"><span className="font-semibold">{u.name}</span><span className="font-mono text-slate-500">{unitTax(state, u.id).gstin}</span></div>)}</div>
           <input id="unit-name" value={unit.name} onChange={(e) => setUnitF({ ...unit, name: e.target.value })} placeholder="New unit name, e.g. Hosur godown" className={inp} />
           <input id="unit-gstin" value={unit.gstin} onChange={(e) => setUnitF({ ...unit, gstin: e.target.value })} placeholder="GST no. (empty = same as company)" className={inp} />
-          <button id="btn-add-unit" disabled={!unit.name.trim()} onClick={() => { add('unit', unit); setUnitF({ name: '', gstin: '' }); }} className={btn}><Plus className="w-3.5 h-3.5 mr-1" />Add unit</button>
+          <Bad g={unit.gstin} />
+          <button id="btn-add-unit" disabled={!unit.name.trim() || !gstinOk(unit.gstin)} onClick={() => { add('unit', unit); setUnitF({ name: '', gstin: '' }); }} className={btn}><Plus className="w-3.5 h-3.5 mr-1" />Add unit</button>
         </Card>
 
         <Card id="setup-staff" title={`Staff · ${(state.staff || []).length}`} sub="One staff person per unit sends and receives. The owner sees everything.">
@@ -69,7 +71,8 @@ export default function Masters() {
             <input id="party-gstin" value={party.gstin} onChange={(e) => setParty({ ...party, gstin: e.target.value })} placeholder="GST no." className={inp} />
             <input id="party-phone" value={party.phone} onChange={(e) => setParty({ ...party, phone: e.target.value })} placeholder="WhatsApp no." className={inp} />
           </div>
-          <button id="btn-add-party" disabled={!party.name.trim()} onClick={() => { add('party', party); setParty({ name: '', kind: party.kind, city: '', gstin: '', phone: '' }); }} className={btn}><Plus className="w-3.5 h-3.5 mr-1" />Add {KIND[party.kind].toLowerCase()}</button>
+          <Bad g={party.gstin} />
+          <button id="btn-add-party" disabled={!party.name.trim() || !gstinOk(party.gstin)} onClick={() => { add('party', party); setParty({ name: '', kind: party.kind, city: '', gstin: '', phone: '' }); }} className={btn}><Plus className="w-3.5 h-3.5 mr-1" />Add {KIND[party.kind].toLowerCase()}</button>
         </Card>
       </div>
     </div>

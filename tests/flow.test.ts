@@ -493,6 +493,7 @@ test('setup: only the owner adds items and parties; staff ask; reset removes the
   s = run(s, { type: 'ADD_MASTER', what: 'item', data: { name: 'Teak veneer 6 mm', unit: 'pcs', rate: 150 }, actor: 'Owner' });
   assert.equal(Object.keys(ITEMS).length, n + 1);
   assert.equal(run(s, { type: 'ADD_MASTER', what: 'item', data: { name: 'teak veneer 6 mm' }, actor: 'Owner' }), s, 'no duplicates');
+  assert.equal(run(s, { type: 'ADD_MASTER', what: 'party', data: { name: 'Bad GST Co', gstin: '29ABC' }, actor: 'Owner' }), s, 'wrong GST no. refused');
   s = run(s, { type: 'ASK_ADD', what: 'party', name: 'Hosur Crates', partyKind: 'customer', by: 'Ravi (staff)' });
   const r = s.requests.at(-1);
   assert.equal(r.kind, 'add');

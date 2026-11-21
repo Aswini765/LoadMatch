@@ -263,10 +263,13 @@ function decisionDraft(state: any, s: any, d: any, action: string, at: number) {
 // Prototype: the lists live in the shared objects from seed.ts; anything added is removed again on Reset.
 const ADDED: Array<[any, string]> = [];
 function undoAdded() { while (ADDED.length) { const [o, k] = ADDED.pop()!; delete o[k]; } }
+// Same check as the database: 15 characters, state code + PAN + entity no. + Z + check character
+export const GSTIN_RE = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
+export const gstinOk = (g: string) => !String(g || '').trim() || GSTIN_RE.test(String(g).trim().toUpperCase());
 const slug = (t: string) => t.toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 12) || 'X';
 export function addMaster(state: any, what: string, d: any, at: number) {
   const name = String(d?.name || '').trim();
-  if (!name) return state;
+  if (!name || !gstinOk(d?.gstin)) return state;
   const n = (state.counters.add || 0) + 1;
   const counters = { ...state.counters, add: n };
   if (what === 'item') {
