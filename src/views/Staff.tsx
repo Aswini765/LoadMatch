@@ -106,7 +106,7 @@ export default function Staff({ go }: { go: Go }) {
   // one big button: the next step for this truck
   const step = (s: any): { icon: string; status: string; btn?: string; btnCls?: string; act?: () => void } => {
     if (receiving.includes(s)) {
-      if (!s.arrivedAt && (!atGate(s.flow) || s.expectedOn)) return { icon: s.expectedOn ? '🚛' : '🚚', status: s.expectedOn ? `${w('expected')} ${dayText(s.expectedOn)}` : w('onTheWay'), btn: `📍 ${w('arrived')}`, btnCls: 'bg-sky-600 text-white', act: () => dispatch({ type: 'ARRIVED', id: s.id, by: me(), actor: me() }) };
+      if (!s.arrivedAt && (!atGate(s.flow) || s.expectedOn)) return { icon: s.expectedOn ? '🚛' : '🚚', status: s.expectedOn ? `${w('expected')} ${dayText(s.expectedOn)}` : w('onTheWay'), btn: `📍 ${w('arrived')} → 🔢 ${w('count')}`, btnCls: 'bg-sky-600 text-white', act: () => { dispatch({ type: 'ARRIVED', id: s.id, by: me(), actor: me() }); count(s); } };
       return { icon: '📍', status: w('reached'), btn: `🔢 ${w('count')}`, btnCls: 'bg-emerald-600 text-white', act: () => count(s) };
     }
     if (!s.loading) return { icon: '📦', status: w('loading'), btn: `📦 ${w('startLoading')}`, btnCls: 'bg-violet-600 text-white', act: () => dispatch({ type: 'LOADING', id: s.id, point: 'Dock 1', phase: 'start', actor: me() }) };
@@ -125,7 +125,8 @@ export default function Staff({ go }: { go: Go }) {
           <span className="text-3xl leading-none">{st.icon}</span>
           <div className="min-w-0 flex-1">
             <div className="text-base font-bold text-slate-900 truncate">{s.returning ? w('backAccident') : incoming ? fromX(from, l) : toX(to, l)}</div>
-            <div className="text-xs text-slate-600">{st.status} · {loadName(s.id)}{s.truckNo ? ` · ${s.truckNo}` : ''}</div>
+            {s.truckNo && s.truckNo !== 'NOT KNOWN' && <div className="inline-block mt-0.5 px-2 py-0.5 rounded-md border-2 border-slate-800 bg-amber-50 font-mono font-bold text-sm text-slate-900">{s.truckNo}</div>}
+            <div className="text-xs text-slate-600">{st.status} · {loadName(s.id)}</div>
           </div>
         </div>
         {st.btn && <button id={`step-${s.id}`} onClick={st.act} className={`${big} ${st.btnCls}`}>{st.btn}</button>}

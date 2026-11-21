@@ -11,7 +11,7 @@ import { sharedMode } from '../sync.ts';
 import { getWho, me } from '../lib/who.ts';
 // Our own staff see "Store"; an outside party who opened the QR or link sees "Count".
 // shown under the count boxes
-const MISSING_HINT = 'Missing pieces: you don\'t enter them. After you submit, the app compares with what was sent and shows how many are missing.';
+const MISSING_HINT = 'Count only what is in the truck. You don\'t type missing pieces: after you submit, the app shows how many are missing.';
 const countTitle = () => (getWho() ? 'LoadMatch · Store' : 'LoadMatch · Count');
 
 // ---------- the Receive tab: your own floor staff ----------
@@ -291,12 +291,19 @@ function Done({ s, state, remote, lang, setLang, head }: { s: any; state: any; r
   // With the shared database the count already reached everyone; the WhatsApp message is just a note.
   const message = sharedMode ? resultText(state, s, lang) : `${resultText(state, s, lang)}\n\n${t('saveCountLink', lang)}:\n${appLink(countBackPath(s, s.receipt))}`;
   const matched = shipmentStatus(state, s) === 'MATCHED';
-  const showLines = state.settings.differencesTo !== 'owner';
+  // the count is locked now, so the counter can see what is missing or damaged (the owner still decides)
+  const showLines = true;
+  const tot = s.lines.reduce((a: any, l: any) => { const r = s.receipt.lines[l.id]; a.missing += Math.max(0, l.qty - r.counted); a.extra += Math.max(0, r.counted - l.qty); a.damaged += r.damaged || 0; return a; }, { missing: 0, extra: 0, damaged: 0 });
   return (
     <PhoneFrame title={countTitle()} sub={loadName(s.id)} lang={lang} setLang={setLang}>
       {head}
       <Note tone="go"><CheckCircle2 className="w-4 h-4 inline mr-1" />{t(remote ? 'savedSendNow' : 'submitted', lang)}</Note>
       <Note tone={matched ? 'go' : 'warn'}>{matched ? t('resultMatched', lang) : t('resultDiff', lang)}</Note>
+      <div id="count-summary" className="grid grid-cols-3 gap-2 text-center">
+        <div className={`rounded-xl border-2 p-2 ${tot.missing ? 'border-rose-300 bg-rose-50' : 'border-slate-200'}`}><div className="text-2xl font-bold">{tot.missing}</div><div className="text-xs font-bold">❌ {t('short', lang)}</div></div>
+        <div className={`rounded-xl border-2 p-2 ${tot.damaged ? 'border-amber-300 bg-amber-50' : 'border-slate-200'}`}><div className="text-2xl font-bold">{tot.damaged}</div><div className="text-xs font-bold">⚠️ {t('damagedWord', lang)}</div></div>
+        <div className={`rounded-xl border-2 p-2 ${tot.extra ? 'border-sky-300 bg-sky-50' : 'border-slate-200'}`}><div className="text-2xl font-bold">{tot.extra}</div><div className="text-xs font-bold">➕ {t('excess', lang)}</div></div>
+      </div>
       {showLines && <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">{t('compare', lang)}</div>}
       {showLines && <div className="rounded-xl border border-slate-200 divide-y divide-slate-100">
         {s.lines.map((l: any) => {

@@ -105,7 +105,7 @@ const T: Record<string, Tr> = {
   tellSender: { en: 'Tell the sender on WhatsApp', hi: 'भेजने वाले को WhatsApp पर बताएँ', kn: 'ಕಳುಹಿಸಿದವರಿಗೆ WhatsApp ನಲ್ಲಿ ತಿಳಿಸಿ', te: 'పంపినవారికి WhatsApp లో చెప్పండి' },
   resultMatched: { en: 'All matched. Nothing to do.', hi: 'सब सही है। कुछ करना नहीं है।', kn: 'ಎಲ್ಲವೂ ಸರಿ. ಏನೂ ಮಾಡಬೇಕಿಲ್ಲ.', te: 'అన్నీ సరిపోయాయి. ఏమీ చేయనక్కర్లేదు.' },
   resultDiff: { en: 'Difference found. The owner is reviewing it.', hi: 'अंतर मिला। मालिक देख रहे हैं।', kn: 'ವ್ಯತ್ಯಾಸ ಕಂಡುಬಂದಿದೆ. ಮಾಲೀಕರು ಪರಿಶೀಲಿಸುತ್ತಿದ್ದಾರೆ.', te: 'తేడా కనిపించింది. యజమాని చూస్తున్నారు.' },
-  short: { en: 'short', hi: 'कम', kn: 'ಕಡಿಮೆ', te: 'తక్కువ' },
+  short: { en: 'missing', hi: 'कम (गायब)', kn: 'ಕಡಿಮೆ (ಕಾಣೆ)', te: 'తక్కువ (లేవు)' },
   excess: { en: 'extra', hi: 'ज़्यादा', kn: 'ಹೆಚ್ಚು', te: 'ఎక్కువ' },
   damagedWord: { en: 'damaged', hi: 'खराब', kn: 'ಹಾಳಾದವು', te: 'పాడైనవి' },
   countThis: { en: 'Count', hi: 'गिनें', kn: 'ಎಣಿಸಿ', te: 'లెక్కించండి' },
