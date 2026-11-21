@@ -24,14 +24,16 @@ export const countedByUs = (s: any) => atGate(s.flow) || s.flow === 'transfer';
 // Job work: goods sent to another company to process and bring back. Inputs must come back within a year.
 export const JOBWORK_DAYS = 365;
 const DAY = 24 * 3600000;
-export const KIND_LABEL: Record<string, string> = { short: 'Short', excess: 'Extra', damaged: 'Damaged' };
+export const KIND_LABEL: Record<string, string> = { short: 'Missing', excess: 'Extra', damaged: 'Damaged' };
 // How a load is named on screens and in messages: "Load 1013"
 export const loadName = (id: string) => `Load ${String(id).replace(/^TRK-/, '')}`;
 
 // What the owner can do with a difference. due = stays open until a date; settles = closed at once;
 // loss = the business absorbs the value (needs an explicit confirmation above the limit).
 export const ACTIONS: Record<string, { label: string; due?: boolean; settles?: boolean; loss?: boolean; draft?: string }> = {
-  write_off: { label: 'We take the loss', settles: true, loss: true, draft: 'Stock journal to Transit Loss' },
+  write_off: { label: 'Lost for good: write it off', settles: true, loss: true, draft: 'Stock journal to Transit Loss' },
+  // between our own units the goods are usually not lost: left at the sender, or the transporter pays
+  unit_sends_rest: { label: 'Left behind: sending unit sends it in the next truck', due: true },
   correct_list: { label: 'Our list was wrong: they really got the extra', settles: true, draft: 'Stock journal between units' },
   replace: { label: 'Supplier sends it with the next load', due: true },
   adjust_next_bill: { label: 'Adjust it in the next bill', settles: true, draft: 'Debit or credit note, to adjust in the next bill' },
@@ -51,7 +53,7 @@ export const ACTIONS: Record<string, { label: string; due?: boolean; settles?: b
   claim: { label: 'Claim from the transporter or insurance', due: true },
 };
 export const OPTIONS: Record<string, Record<string, string[]>> = {
-  transfer: { short: ['write_off', 'investigate'], damaged: ['write_off', 'investigate'], excess: ['correct_list', 'investigate'] },
+  transfer: { short: ['unit_sends_rest', 'claim', 'investigate', 'write_off'], damaged: ['claim', 'investigate', 'write_off'], excess: ['correct_list', 'investigate'] },
   inbound: { short: ['replace', 'adjust_next_bill', 'debit_note', 'accept', 'investigate'], damaged: ['replace', 'adjust_next_bill', 'debit_note', 'accept', 'investigate'], excess: ['keep_extra', 'return_extra', 'investigate'] },
   outbound: { short: ['send_rest', 'adjust_next_bill', 'credit_note', 'investigate'], damaged: ['send_replacement', 'adjust_next_bill', 'credit_note', 'investigate'], excess: ['bill_extra', 'customer_returns', 'investigate'] },
   jobwork_out: { short: ['write_off', 'investigate'], damaged: ['write_off', 'investigate'], excess: ['correct_list', 'investigate'] },

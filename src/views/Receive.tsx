@@ -219,7 +219,18 @@ export default function Receive({ id, token, payload }: { id: string; token: str
             </div>
           </div>
           {bad && <div id="r-dmg-msg" className="text-xs font-bold text-rose-700">{t('dmgTooMany', lang)}</div>}
-          <div id="missing-hint" className="text-[11px] text-slate-500">{MISSING_HINT}</div>
+          {!state.settings.blindCount ? (() => {
+            const n = Number(c.counted);
+            const counted = c.counted !== '' && Number.isFinite(n);
+            const miss = counted ? Math.max(0, l.qty - n) : null;
+            const extra = counted ? Math.max(0, n - l.qty) : 0;
+            return (
+              <div id={`r-missing-${l.id}`} className={`flex items-center justify-between gap-2 rounded-xl border-2 px-3 py-2 ${miss ? 'border-rose-300 bg-rose-50' : extra ? 'border-sky-300 bg-sky-50' : 'border-slate-200 bg-slate-50'}`}>
+                <span className="text-xs font-bold text-slate-700">{extra ? `➕ ${t('excess', lang)}` : `❌ ${t('short', lang)}`}<span className="block font-normal text-[11px] text-slate-500">{t('sentQty', lang)} {l.qty} − {t('counted', lang)} {counted ? n : '?'}</span></span>
+                <span className={`text-2xl font-bold font-mono ${miss ? 'text-rose-700' : extra ? 'text-sky-700' : 'text-slate-900'}`}>{miss === null ? '?' : extra || miss}</span>
+              </div>
+            );
+          })() : <div id="missing-hint" className="text-[11px] text-slate-500">{MISSING_HINT}</div>}
         </div>
 
         <div className="grid grid-cols-2 gap-2">

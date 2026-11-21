@@ -112,6 +112,7 @@ function Stat({ n, label, cls }: { n: number; label: string; cls: string }) {
 function TruckHead({ s }: { s: any }) {
   const { state, dispatch } = useStore();
   const [fixing, setFixing] = useState(false);
+  const [more, setMore] = useState(false);
   const [why, setWhy] = useState('');
   // a wrong count can be reopened only before anything was decided or sent to the accountant
   const canFix = diffsOf(state, s.id).every((d: any) => d.status === 'open')
@@ -126,8 +127,10 @@ function TruckHead({ s }: { s: any }) {
         {s.loading && <div className="text-slate-500">Loaded at {s.loading.point}, {time(s.loading.startAt)}–{time(s.loading.endAt)}</div>}
         {s.accident && <div id={`accident-${s.id}`} className="text-rose-800 font-bold">Accident on the way{s.accident.place ? ` near ${s.accident.place}` : ''}: {s.accident.outcome === 'returned' ? 'goods collected and brought back, counted here' : `good pieces moved to truck ${s.truckNo}`}</div>}
         <div className="text-slate-500">Counted by <b className="text-slate-700">{s.receipt.by}</b>, {when(s.receipt.at)}</div>
-        <AgreeCount s={s} />
         {s.receipt.note && <div className="text-slate-700 italic">“{s.receipt.note}”</div>}
+        <button id={`more-${s.id}`} onClick={() => setMore(!more)} className="text-[11px] font-bold text-slate-500 underline cursor-pointer pt-1">{more ? '▲ Less' : '⋯ More for this truck (recount, photos, history, share)'}</button>
+        {more && <>
+        <AgreeCount s={s} />
         <div className="pt-1"><Chain s={s} lang="en" /></div>
         {canFix && !fixing && <button id={`fix-count-${s.id}`} onClick={() => setFixing(true)} className="text-[11px] font-bold text-slate-600 underline cursor-pointer">Count looks wrong? Ask for a recount</button>}
         {fixing && (
@@ -144,8 +147,10 @@ function TruckHead({ s }: { s: any }) {
         {((s.docs || []).length + (s.receipt.photos || []).length) > 0 && (
           <div className="pt-1.5"><PhotoStrip photos={[...(s.docs || []), ...(s.receipt.photos || []).map((p: any) => (typeof p === 'string' ? { id: p, name: p, kind: 'photo' } : p))]} /></div>
         )}
+        <div className="pt-1"><a href={shareWhatsApp(truckSummary(state, s))} target="_blank" rel="noreferrer" className="inline-flex text-[11px] font-bold text-emerald-800 border border-emerald-200 bg-white px-2 py-1 rounded-md flex items-center"><MessageCircle className="w-3.5 h-3.5 mr-1" />Share on WhatsApp</a></div>
+        </>}
       </div>
-      <a href={shareWhatsApp(truckSummary(state, s))} target="_blank" rel="noreferrer" className="self-start shrink-0 text-[11px] font-bold text-emerald-800 border border-emerald-200 bg-white px-2 py-1 rounded-md flex items-center"><MessageCircle className="w-3.5 h-3.5 mr-1" />Share on WhatsApp</a>
+
     </div>
   );
 }
@@ -157,6 +162,7 @@ function DiffCard({ d, s, startOpen }: { d: any; s: any; startOpen?: boolean }) 
   const [note, setNote] = useState('');
   const [confirm, setConfirm] = useState(false);
   const [evOpen, setEvOpen] = useState(!!startOpen || d.status === 'investigating');
+  const [more, setMore] = useState(d.status === 'investigating');
   const it = item(d.item);
   const l = lineOf(s, d.lineId);
   const r = s.receipt.lines[d.lineId];
@@ -207,9 +213,12 @@ function DiffCard({ d, s, startOpen }: { d: any; s: any; startOpen?: boolean }) 
         </div>
       )}
 
+      <button id={`dmore-${d.id}`} onClick={() => setMore(!more)} className="text-[11px] font-bold text-slate-500 underline cursor-pointer">{more ? '▲ Less' : '⋯ More (ask sender, proof)'}</button>
+      {more && <div className="space-y-2">
       {!atGate(s.flow) && <a id={`ask-${d.id}`} href={shareWhatsApp(`Please explain this difference on ${loadName(s.id)} (truck ${s.truckNo}, ${route(s)}, ref ${s.ref}):\n${it.name}: sent ${l.qty}, counted ${r.counted}${r.damaged ? `, damaged ${r.damaged}` : ''} → ${KIND_LABEL[d.kind].toLowerCase()} ${d.qty} ${it.unit}.${s.loading ? `\nLoaded at ${s.loading.point}, ${time(s.loading.startAt)}–${time(s.loading.endAt)}.` : ''}`)} target="_blank" rel="noreferrer" className="inline-flex text-[11px] font-bold text-emerald-800 border border-emerald-200 bg-white px-2 py-1 rounded-md items-center mr-2"><HelpCircle className="w-3.5 h-3.5 mr-1" />Ask sender to explain</a>}
       <button onClick={() => setEvOpen(!evOpen)} className="text-[11px] font-bold text-slate-600 inline-flex items-center cursor-pointer">{evOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}Proof to share{d.evidence.clips.length ? ` · ${d.evidence.clips.length} video${d.evidence.clips.length > 1 ? 's' : ''}` : ''}{d.evidence.shares.length ? ` · shared ${d.evidence.shares.length}×` : ''}</button>
       {evOpen && <Evidence d={d} />}
+      </div>}
       {d.history.length > 0 && <div className="text-[10px] text-slate-500 space-y-0.5">{d.history.map((h: any, i: number) => <div key={i}>{dateTime(h.at)} · {h.by}: {h.text}</div>)}</div>}
     </div>
   );

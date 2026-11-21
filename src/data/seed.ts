@@ -143,8 +143,9 @@ export const DEFAULT_SETTINGS = {
   // a truck not confirmed within this many hours shows as overdue
   receiptHours: 24,
   languages: { en: true, hi: true, kn: true, te: true },
-  // the receiver counts without seeing the sent quantity
-  blindCount: true,
+  // true = the receiver counts without seeing the sent quantity. Off by default: the store sees what was sent and
+  // the app shows what is missing as they count (the owner can turn blind counting on in Settings).
+  blindCount: false,
   // who hears about a difference: 'owner_sender' (owner and the sending staff) or 'owner' (owner only)
   differencesTo: 'owner', // from the interview: the receiver reports to the owner, not to the sender (fraud worry)
   // GSTIN and state per unit (same as the company unless the owner changes it)
