@@ -2,35 +2,38 @@ import React from 'react';
 import { X, BookOpen } from 'lucide-react';
 
 const SOPS: [string, string[]][] = [
-  ['1 · Dispatch (the person sending)', [
-    'Make the list before loading: type it, speak the numbers, or paste from Excel. Add the driver\'s name and phone, and a photo of the dispatch list, challan or order.',
-    'Between your own units, choose "No money (stock transfer)" or "With invoice and GST". The app suggests one from the units\' GSTINs; you decide. For no money, print the delivery challan from the app.',
-    'Tap "Loading started" and "Loading finished" and say where it is loaded. This time tells the owner where to look in the CCTV.',
-    'Goods worth more than ₹50,000 usually need an e-way bill, even when nothing is sold. Write its number in the list.',
-    'When the truck leaves, send the receiver link on WhatsApp. You will see the result here when they submit.',
-    'Most loads are "To our other unit": goods move between your own units. If the load was made from goods that came in earlier, pick it under "Made from".',
-    'If a truck comes back or never reaches, tap "Truck came back / did not reach" and write what happened. The receiver link stops working and the paperwork is undone.',
-    'Sending goods to another company to process and send back is under "Other" (job work). It is not a sale; print the challan from the app. The job worker counts on arrival through the link.',
-    'Carrying goods you promised a customer (the missing ones, or replacements)? Tick them on the list. When the customer counts them, the promise closes by itself.',
+  ['Two people use LoadMatch', [
+    'Staff: one person at each unit. Sends stock and receives stock.',
+    'Owner: sees everything, decides every difference, answers staff requests, and sets up the lists.',
+    'Nobody else needs a login. Customers and suppliers get a link from the company WhatsApp; the accountant gets a file.',
   ]],
-  ['2 · Receive (floor staff)', [
-    'Open the link, or the Receive tab for trucks coming to your unit, supplier deliveries at the gate, and goods coming back from job work (pick the load; what is still with the job worker is filled in).',
-    'If a supplier\'s delivery brings the replacement they promised, tick it on the list. When it is counted, the promise closes by itself.',
-    'Count one line at a time. Tap the mic and say the number, e.g. "48" or "48, 2 damaged", in your language. Check what was heard; fix with + and −.',
-    'The sent quantity is hidden while you count. Your count is saved on the phone as you go.',
-    'Add photos of damage or the delivery note, then submit once. The count locks; you then see what was sent next to what you counted, and can tell the sender on WhatsApp.',
-    'If something is short or damaged: before the driver leaves, write it on his lorry receipt (bilty), get it signed, and add a photo. Transport claims need this.',
+  ['1 · Staff: sending stock', [
+    'Tap Send stock, then Our other unit or Customer.',
+    'Pick items and type or say the numbers. Item not in the list? Tap “Ask owner”.',
+    'Save, then Loading started and Loading finished. The truck cannot leave before this (the time helps check CCTV).',
+    'Tap Truck left. Our other unit sees it straight away in its app; a customer gets the link from the company WhatsApp. The driver carries the challan with a QR code.',
+    'After Truck left the list is locked. Need a change (new truck, came back, accident)? Ask the owner from the truck page.',
   ]],
-  ['3 · Owner', [
-    'You see only what did not match; the app has already compared. For each one choose what happens: take the loss, ask for it to be sent or replaced, adjust it in the next bill, pay or charge less now, charge for the extra, or check first.',
-    'If a count looks wrong (for example 10 typed instead of 100), ask for a recount before deciding anything. The receiver gets the link again.',
-    'Ask the sender to explain with one tap. Add the CCTV video and share the proof only with the people who need it.',
-    'Losses above your limit need a tick to confirm. Promises get a due date; mark them done when they happen.',
-    'Job work: see what is still with each job worker and how many days are left of the one-year limit. Send a reminder from there.',
+  ['2 · Staff: receiving stock', [
+    '“Stock coming to you” at the top shows every truck on its way, and from where.',
+    'Tap Count. Count one item at a time; say the number into the mic or type it. Count damaged pieces separately.',
+    'The sent number is hidden so you count what is really there. You do not enter missing pieces: the app works them out after you submit.',
+    'Supplier at the gate? Receive stock → Supplier delivery, type what their bill says, then count.',
+    'Submit once; the count locks. Any difference goes only to the owner.',
+    'Short or damaged? Write it on the driver\'s lorry receipt before he leaves and add a photo.',
   ]],
-  ['4 · Accountant (no login)', [
-    'The owner sends a report to print, and one Tally file that is already in the right order to load. Until it is sent, the owner can undo a decision.',
-    'Ledger and godown names must match your Tally masters (Goods in Transit, Damaged Goods, Transit Loss, Branch Transfer). Try the file on a test company first. Invoices themselves are still made in Tally.',
+  ['3 · Staff: checking later', [
+    'To send and To receive: what is waiting for you now.',
+    'On the way: trucks your unit sent that are not counted yet.',
+    'Done: every old truck (sent, received, or with a difference). Read only.',
+    'Asked the owner: every request with the answer: Waiting, Owner said YES or Owner said NO, and the owner\'s note.',
+  ]],
+  ['4 · Owner', [
+    'Your day: today\'s trucks and money at risk.',
+    'Staff are asking you: say Yes or No, with a note. Staff see your answer.',
+    'Needs your decision: only what did not match, with its value and loading time. Choose: take the loss, ask for it to be sent or replaced, adjust in the next bill, or check first.',
+    'Setup: add units (with GST no.), staff, items (one by one or pasted from Excel) and customers or suppliers. Staff only pick from these lists.',
+    'For your accountant: one report and one Tally file. Send when ready.',
   ]],
 ];
 
