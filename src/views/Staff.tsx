@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Send, PackageCheck, ArrowRight, Truck, Clock, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { useStore, route, diffsOf, countedByUs, atGate, receiverPath, loadName } from '../store.tsx';
 import { UNITS } from '../data/seed.ts';
-import { getUnit, setUnit } from '../lib/who.ts';
+import { getUnit, setUnit, setMeName, me } from '../lib/who.ts';
 import { PhoneFrame, savedLang, saveLang, newToken } from './ui.tsx';
 import { when } from '../lib/format.ts';
 import type { Go } from './ui.tsx';
@@ -79,6 +79,7 @@ export default function Staff({ go }: { go: Go }) {
   const [mode, setMode] = useState<'' | 'send' | 'receive'>('');
   const [filter, setFilter] = useState('all');
   const pickUnit = (u: string) => { setUnit(u); setU(u); };
+  setMeName(staffName(state));
   const mine = state.shipments;
   const toLoad = mine.filter((s: any) => s.fromUnit === unit && !s.sentAt && !s.cancelledAt && !atGate(s.flow));
   const toCount = mine.filter((s: any) => !s.receipt && !s.cancelledAt && (s.returning ? s.fromUnit === unit : s.toUnit === unit && countedByUs(s) && (s.flow !== 'transfer' || s.sentAt)));
@@ -90,7 +91,7 @@ export default function Staff({ go }: { go: Go }) {
   const count = (s: any) => {
     if (s.sentAt) { window.location.hash = receiverPath(s, state.settings); return; }
     const token = newToken();
-    dispatch({ type: 'SEND_TO_RECEIVER', id: s.id, token, actor: 'Gate' });
+    dispatch({ type: 'SEND_TO_RECEIVER', id: s.id, token, actor: me() });
     window.location.hash = `#/r/${s.id}/${token}`;
   };
   const open = (s: any) => go('dispatch', { id: s.id });
@@ -187,7 +188,7 @@ export function AskAdd({ what, partyKind }: { what: 'item' | 'party'; partyKind?
   return (
     <div className="flex gap-2">
       <input id={`ask-add-name-${what}`} value={name} onChange={(e) => setName(e.target.value)} placeholder={what === 'item' ? 'Item name and size' : 'Party name'} className="flex-1 p-2 rounded-lg border border-slate-300 text-xs" />
-      <button id={`ask-add-send-${what}`} disabled={!name.trim()} onClick={() => { dispatch({ type: 'ASK_ADD', what, name, partyKind, by: `${staffName(state)} (staff)` }); setSent(name.trim()); }} className="px-3 rounded-lg bg-slate-900 text-white text-xs font-bold disabled:opacity-40 cursor-pointer">Ask</button>
+      <button id={`ask-add-send-${what}`} disabled={!name.trim()} onClick={() => { dispatch({ type: 'ASK_ADD', what, name, partyKind, by: me() }); setSent(name.trim()); }} className="px-3 rounded-lg bg-slate-900 text-white text-xs font-bold disabled:opacity-40 cursor-pointer">Ask</button>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 // Staff cannot change a load after it left: they ask the owner, the owner approves or says no.
 // Covers: new truck / driver / e-way bill, truck came back, accident on the way.
+import { me } from '../lib/who.ts';
 import React, { useState } from 'react';
 import { AlertTriangle, Clock, Check, X, Truck, Siren, Undo2, Send } from 'lucide-react';
 import { useStore, loadName, route, receiverPath } from '../store.tsx';
@@ -61,7 +62,7 @@ export function AskOwner({ s, lang }: { s: any; lang: string }) {
     : kind === 'details' && !Object.values(details).some((v) => v.trim()) ? w(lang, 'needOne')
     : kind === 'accident' && outcome === 'moved' && !details.truckNo.trim() ? w(lang, 'needTruck') : '';
   const send = () => {
-    dispatch({ type: 'REQUEST_CHANGE', id: s.id, kind, outcome: kind === 'accident' ? outcome : null, details, place: f.place || '', note: f.note, by: 'Dispatch staff', actor: 'Dispatch staff' });
+    dispatch({ type: 'REQUEST_CHANGE', id: s.id, kind, outcome: kind === 'accident' ? outcome : null, details, place: f.place || '', note: f.note, by: me(), actor: me() });
     setKind(null); setF({});
   };
   return (

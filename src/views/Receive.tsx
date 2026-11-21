@@ -8,7 +8,7 @@ import { PhoneFrame, Note, PhotoStrip, savedLang, saveLang, shareWhatsApp, newTo
 import { NewList, Chain } from './Dispatch.tsx';
 import { when, time } from '../lib/format.ts';
 import { sharedMode } from '../sync.ts';
-import { getWho } from '../lib/who.ts';
+import { getWho, me } from '../lib/who.ts';
 // Our own staff see "Store"; an outside party who opened the QR or link sees "Count".
 // shown under the count boxes
 const MISSING_HINT = 'Missing pieces: you don\'t enter them. After you submit, the app compares with what was sent and shows how many are missing.';
@@ -27,7 +27,7 @@ export function ReceiveTab({ initialAdd = null }: { initialAdd?: string | null }
   const start = (s: any) => {
     if (s.sentAt) { window.location.hash = receiverPath(s, state.settings); return; }
     const token = newToken();
-    dispatch({ type: 'SEND_TO_RECEIVER', id: s.id, token, actor: 'Gate' });
+    dispatch({ type: 'SEND_TO_RECEIVER', id: s.id, token, actor: me() });
     window.location.hash = `#/r/${s.id}/${token}`;
   };
   return (
@@ -366,8 +366,8 @@ function TrucksToLoad() {
           <div className="text-[11px] text-slate-600">{s.lines.map((l: any) => `${l.qty} ${item(l.item).name}`).join(' · ')}</div>
           <select id={`load-point-${s.id}`} disabled={!!s.loading} value={s.loading?.point || points[s.id] || LOADING_POINTS[0]} onChange={(e) => setPoints({ ...points, [s.id]: e.target.value })} className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs">{LOADING_POINTS.map((p) => <option key={p}>{p}</option>)}</select>
           <div className="grid grid-cols-2 gap-2">
-            <button id={`load-start-${s.id}`} disabled={!!s.loading} onClick={() => dispatch({ type: 'LOADING', id: s.id, point: points[s.id] || LOADING_POINTS[0], phase: 'start', actor: 'Store' })} className="py-2.5 rounded-lg border-2 border-slate-900 disabled:border-slate-200 disabled:text-slate-500 text-xs font-bold cursor-pointer">{s.loading ? `Started ${time(s.loading.startAt)}` : 'Loading started'}</button>
-            <button id={`load-end-${s.id}`} disabled={!s.loading} onClick={() => dispatch({ type: 'LOADING', id: s.id, phase: 'end', actor: 'Store' })} className="py-2.5 rounded-lg bg-slate-900 disabled:opacity-40 text-white text-xs font-bold cursor-pointer">Loading finished</button>
+            <button id={`load-start-${s.id}`} disabled={!!s.loading} onClick={() => dispatch({ type: 'LOADING', id: s.id, point: points[s.id] || LOADING_POINTS[0], phase: 'start', actor: me() })} className="py-2.5 rounded-lg border-2 border-slate-900 disabled:border-slate-200 disabled:text-slate-500 text-xs font-bold cursor-pointer">{s.loading ? `Started ${time(s.loading.startAt)}` : 'Loading started'}</button>
+            <button id={`load-end-${s.id}`} disabled={!s.loading} onClick={() => dispatch({ type: 'LOADING', id: s.id, phase: 'end', actor: me() })} className="py-2.5 rounded-lg bg-slate-900 disabled:opacity-40 text-white text-xs font-bold cursor-pointer">Loading finished</button>
           </div>
         </div>
       ))}

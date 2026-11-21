@@ -5,7 +5,7 @@ import { useVoice, findNumber } from '../lib/voice.ts';
 import { resultText } from './Receive.tsx';
 import { ITEMS, PARTIES, UNITS, LOADING_POINTS, COMPANY } from '../data/seed.ts';
 import { AskOwner } from './Requests.tsx';
-import { getUnit, getWho } from '../lib/who.ts';
+import { getUnit, getWho, me } from '../lib/who.ts';
 import { AskAdd } from './Staff.tsx';
 import { inr0 } from '../lib/format.ts';
 import { t, unitWord } from '../i18n.ts';
@@ -155,7 +155,7 @@ export function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: s
   const [fulfils, setFulfils] = useState<string[]>([]);
   const save = () => {
     const id = `TRK-${1000 + state.counters.trk + 1}`;
-    dispatch({ type: 'CREATE_SHIPMENT', id, flow, fromUnit: hasFrom ? fromUnit : null, toUnit: hasTo ? toUnit : null, party: flow === 'transfer' ? null : partyId, parentId: parentId || undefined, fulfils: fulfils.filter((id) => openPromises.some((d: any) => d.id === id)), truckNo, ref, driver, driverPhone, ewayBill, lines: clean, billing: flow === 'transfer' ? billing : undefined, docs, actor: gate ? 'Gate' : 'Dispatch staff' });
+    dispatch({ type: 'CREATE_SHIPMENT', id, flow, fromUnit: hasFrom ? fromUnit : null, toUnit: hasTo ? toUnit : null, party: flow === 'transfer' ? null : partyId, parentId: parentId || undefined, fulfils: fulfils.filter((id) => openPromises.some((d: any) => d.id === id)), truckNo, ref, driver, driverPhone, ewayBill, lines: clean, billing: flow === 'transfer' ? billing : undefined, docs, actor: me() });
     onSaved(id);
   };
   const sel = 'mt-1 w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm';
@@ -272,7 +272,7 @@ function TruckDetail({ lang, id, onBack }: { lang: string; id: string; onBack: (
   const msg = `${COMPANY.name}: ${t('linkMessage', lang)} ${loadName(s.id)} · ${s.truckNo} · ${route(s)}${s.driver ? ` · ${s.driver}` : ''}${s.driverPhone ? ` ${s.driverPhone}` : ''}\n${link}`;
   const sendOrCount = () => {
     const token = newToken();
-    dispatch({ type: 'SEND_TO_RECEIVER', id: s.id, token, actor: atGate(s.flow) ? 'Gate' : 'Dispatch staff' });
+    dispatch({ type: 'SEND_TO_RECEIVER', id: s.id, token, actor: me() });
     if (atGate(s.flow)) window.location.hash = `#/r/${s.id}/${token}`;
   };
   return (
@@ -306,7 +306,7 @@ function TruckDetail({ lang, id, onBack }: { lang: string; id: string; onBack: (
 
       <div className="space-y-1">
         <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">{t('papers', lang)}</div>
-        <PhotoStrip photos={s.docs || []} onAdd={(r) => dispatch({ type: 'ATTACH_DOC', id: s.id, docs: r, actor: s.flow === 'inbound' ? 'Gate' : 'Dispatch staff' })} label={t('addPaper', lang)} lang={lang} kinds={s.flow === 'inbound' ? ['supplier bill', 'order', 'delivery note'] : ['dispatch list', 'challan', 'order']} />
+        <PhotoStrip photos={s.docs || []} onAdd={(r) => dispatch({ type: 'ATTACH_DOC', id: s.id, docs: r, actor: me() })} label={t('addPaper', lang)} lang={lang} kinds={s.flow === 'inbound' ? ['supplier bill', 'order', 'delivery note'] : ['dispatch list', 'challan', 'order']} />
         {((s.flow === 'transfer' && s.billing === 'none') || s.flow === 'jobwork_out') && <button id="btn-challan" onClick={async () => { const QR = (await import('qrcode')).default; const qr = s.token ? await QR.toDataURL(appLink(receiverPath(s, state.settings)), { margin: 1, width: 240 }) : ''; printReport(challanHtml(state, s, qr)); }} className="w-full py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 cursor-pointer">{t('printChallan', lang)}</button>}
       </div>
       <Chain s={s} lang={lang} />
@@ -322,8 +322,8 @@ function TruckDetail({ lang, id, onBack }: { lang: string; id: string; onBack: (
             <select id="f-point" disabled={!!s.loading} value={s.loading?.point || point} onChange={(e) => setPoint(e.target.value)} className="mt-1 w-full p-2.5 rounded-lg border border-slate-300 bg-white text-sm">{LOADING_POINTS.map((p) => <option key={p}>{p}</option>)}</select>
           </label>
           <div className="grid grid-cols-2 gap-2">
-            <button id="btn-load-start" disabled={!!s.loading} onClick={() => dispatch({ type: 'LOADING', id: s.id, point, phase: 'start', actor: 'Dispatch staff' })} className="py-3 rounded-xl border-2 border-slate-900 text-slate-900 disabled:border-slate-200 disabled:text-slate-500 disabled:bg-slate-50 text-xs font-bold flex items-center justify-center cursor-pointer"><Play className="w-4 h-4 mr-1" />{s.loading ? time(s.loading.startAt) : t('startLoading', lang)}</button>
-            <button id="btn-load-end" disabled={!s.loading || !!s.loading.endAt} onClick={() => dispatch({ type: 'LOADING', id: s.id, phase: 'end', actor: 'Dispatch staff' })} className="py-3 rounded-xl border-2 border-slate-900 text-slate-900 disabled:border-slate-200 disabled:text-slate-500 disabled:bg-slate-50 text-xs font-bold flex items-center justify-center cursor-pointer"><Square className="w-4 h-4 mr-1" />{s.loading?.endAt ? time(s.loading.endAt) : t('endLoading', lang)}</button>
+            <button id="btn-load-start" disabled={!!s.loading} onClick={() => dispatch({ type: 'LOADING', id: s.id, point, phase: 'start', actor: me() })} className="py-3 rounded-xl border-2 border-slate-900 text-slate-900 disabled:border-slate-200 disabled:text-slate-500 disabled:bg-slate-50 text-xs font-bold flex items-center justify-center cursor-pointer"><Play className="w-4 h-4 mr-1" />{s.loading ? time(s.loading.startAt) : t('startLoading', lang)}</button>
+            <button id="btn-load-end" disabled={!s.loading || !!s.loading.endAt} onClick={() => dispatch({ type: 'LOADING', id: s.id, phase: 'end', actor: me() })} className="py-3 rounded-xl border-2 border-slate-900 text-slate-900 disabled:border-slate-200 disabled:text-slate-500 disabled:bg-slate-50 text-xs font-bold flex items-center justify-center cursor-pointer"><Square className="w-4 h-4 mr-1" />{s.loading?.endAt ? time(s.loading.endAt) : t('endLoading', lang)}</button>
           </div>
         </div>
       )}
@@ -337,7 +337,7 @@ function TruckDetail({ lang, id, onBack }: { lang: string; id: string; onBack: (
               <div className="font-bold text-rose-950">{t('cancelSure', lang)}</div>
               <div className="grid grid-cols-2 gap-2">
                 <button onClick={() => setCancelling(false)} className="py-2.5 rounded-lg border border-slate-300 bg-white font-bold cursor-pointer">{t('keepTruck', lang)}</button>
-                <button id="btn-cancel-ok" onClick={() => { dispatch({ type: 'CANCEL_SHIPMENT', id: s.id, actor: 'Dispatch staff' }); onBack(); }} className="py-2.5 rounded-lg bg-rose-600 text-white font-bold cursor-pointer">{t('yesCancel', lang)}</button>
+                <button id="btn-cancel-ok" onClick={() => { dispatch({ type: 'CANCEL_SHIPMENT', id: s.id, actor: me() }); onBack(); }} className="py-2.5 rounded-lg bg-rose-600 text-white font-bold cursor-pointer">{t('yesCancel', lang)}</button>
               </div>
             </div>)}
         </>
@@ -346,7 +346,7 @@ function TruckDetail({ lang, id, onBack }: { lang: string; id: string; onBack: (
         <div className="space-y-2">
           {receiptOverdue(state, s, now) && <Note tone="stop"><AlertTriangle className="w-4 h-4 inline mr-1" />{duration(now - s.sentAt)}</Note>}
           {s.returning ? null : s.flow === 'transfer'
-            ? <div id="in-app-note" className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-950"><Truck className="w-4 h-4 inline mr-1" />{UNITS[s.toUnit]?.name.split(' (')[0]} sees this truck in its LoadMatch app (Store), or scans the QR on the delivery challan. No WhatsApp needed.</div>
+            ? <div id="in-app-note" className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-950"><Truck className="w-4 h-4 inline mr-1" />{UNITS[s.toUnit]?.name.split(' (')[0]} sees this truck in its LoadMatch app (Staff → To do now), or scans the QR on the delivery challan. No WhatsApp needed.</div>
             : atGate(s.flow)
             ? <a id="btn-count" href={receiverPath(s, state.settings)} className="w-full min-h-[52px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center cursor-pointer"><PackageCheck className="w-5 h-5 mr-2" />{t('countNow', lang)}</a>
             : <>
