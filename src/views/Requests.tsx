@@ -5,6 +5,7 @@ import { AlertTriangle, Clock, Check, X, Truck, Siren, Undo2, Send } from 'lucid
 import { useStore, loadName, route, receiverPath } from '../store.tsx';
 import { newToken } from './ui.tsx';
 import { when } from '../lib/format.ts';
+import { getWho } from '../lib/who.ts';
 
 const L: Record<string, Record<string, string>> = {
   en: { ask: 'Something changed on the way? Ask the owner', details: 'New truck or driver', cameBack: 'Truck came back', accident: 'Accident on the way', truckNo: 'New truck number', driver: 'New driver', phone: 'Driver phone', eway: 'New e-way bill no.', why: 'What happened?', place: 'Where? (place)', moved: 'Good pieces moved to another truck, going on', returned: 'Goods collected, coming back to us', send: 'Send to owner', back: 'Back', waiting: 'Waiting for the owner', said: 'Owner said', yes: 'yes', no: 'no', needWhy: 'Say what happened', needTruck: 'Write the new truck number', needOne: 'Change at least one detail', countBack: 'Count what came back', returning: 'Accident: goods are coming back here. Count them when they arrive; whatever is missing or broken goes to the owner.', accidentMoved: 'Accident on the way: good pieces moved to truck' },
@@ -30,7 +31,8 @@ export function AskOwner({ s, lang }: { s: any; lang: string }) {
     return (
       <div className="space-y-2">
         <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-950"><Siren className="w-4 h-4 inline mr-1" />{w(lang, 'returning')}{s.accident?.note && <div className="mt-1 text-rose-800">“{s.accident.note}”</div>}</div>
-        <a id="btn-count-back" href={receiverPath(s, state.settings)} className="w-full min-h-[52px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center cursor-pointer"><Undo2 className="w-5 h-5 mr-2" />{w(lang, 'countBack')}</a>
+        {getWho() === 'dispatch' ? <div id="count-back-store" className="text-[11px] text-slate-700">The store will count them in LoadMatch (Store → Trucks to count) when they arrive.</div> :
+        <a id="btn-count-back" href={receiverPath(s, state.settings)} className="w-full min-h-[52px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center cursor-pointer"><Undo2 className="w-5 h-5 mr-2" />{w(lang, 'countBack')}</a>}
       </div>
     );
   }

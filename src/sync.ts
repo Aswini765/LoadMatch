@@ -54,11 +54,12 @@ export async function flush(): Promise<boolean> {
   if (!client || flushing) return false;
   flushing = true;
   try {
+    // Re-read the outbox after every upload: actions added while one is being sent (two quick taps) must not be lost.
     let box = outbox();
     while (box.length) {
       const { error } = await client.from(TABLE).insert({ workspace: WORKSPACE, action: box[0] });
       if (error) return false;
-      box = box.slice(1);
+      box = outbox().slice(1);
       write(OUTBOX_KEY, box);
     }
     return true;
@@ -66,6 +67,8 @@ export async function flush(): Promise<boolean> {
     return false;
   } finally {
     flushing = false;
+    // something was added just as this upload finished: send it too (after a pause, so a network error doesn't spin)
+    if (outbox().length) setTimeout(() => { flush(); }, 1500);
   }
 }
 

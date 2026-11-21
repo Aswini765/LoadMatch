@@ -17,7 +17,7 @@ export function ReceiveTab() {
   const setLang = (l: string) => { setLangState(l); saveLang(l); };
   const [adding, setAdding] = useState<string | null>(null);
   const open = state.shipments
-    .filter((s: any) => !s.receipt && !s.cancelledAt && !s.returning && countedByUs(s) && (s.flow !== 'transfer' || s.sentAt))
+    .filter((s: any) => !s.receipt && !s.cancelledAt && (s.returning || (countedByUs(s) && (s.flow !== 'transfer' || s.sentAt))))
     .sort((a: any, b: any) => (a.sentAt || a.createdAt) - (b.sentAt || b.createdAt));
   const start = (s: any) => {
     if (s.sentAt) { window.location.hash = receiverPath(s, state.settings); return; }
@@ -45,7 +45,7 @@ export function ReceiveTab() {
           {open.map((s: any) => (
             <button key={s.id} id={`count-${s.id}`} onClick={() => start(s)} className="w-full text-left bg-white hover:bg-slate-50 border border-slate-200 rounded-xl p-3 shadow-2xs cursor-pointer flex items-center justify-between">
               <div className="min-w-0">
-                <div className="flex items-center gap-2"><span className="text-xs font-bold text-slate-900">{s.truckNo}</span><span className="text-[10px] text-slate-500">{FLOW_LABEL[s.flow]}</span></div>
+                <div className="flex items-center gap-2"><span className="text-xs font-bold text-slate-900">{s.truckNo}</span><span className="text-[10px] text-slate-500">{FLOW_LABEL[s.flow]}</span>{s.returning && <span className="text-[10px] font-bold text-rose-700">Coming back after accident</span>}</div>
                 <div className="text-[11px] text-slate-600 mt-0.5 truncate">{route(s)}</div>
                 <div className="text-[11px] text-slate-500">{loadName(s.id)} • {s.lines.length} {s.lines.length === 1 ? 'item' : 'items'} • {s.sentAt ? when(s.sentAt) : when(s.createdAt)}</div>
               </div>

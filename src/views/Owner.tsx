@@ -119,6 +119,7 @@ function TruckHead({ s }: { s: any }) {
         <div className="text-slate-600">{FLOW_LABEL[s.flow]}{s.flow === 'transfer' ? (s.billing === 'invoice' ? ', with bill and GST' : ', no money') : ''} · {loadName(s.id)}</div>
         <div className="text-slate-500">Truck <b className="text-slate-700">{s.truckNo}</b> · {refWord} {s.ref}{s.driver ? <> · Driver {s.driver}</> : null}{s.driverPhone ? <> · <a href={`tel:${s.driverPhone}`} className="font-bold text-emerald-800">{s.driverPhone}</a></> : null}</div>
         {s.loading && <div className="text-slate-500">Loaded at {s.loading.point}, {time(s.loading.startAt)}–{time(s.loading.endAt)}</div>}
+        {s.accident && <div id={`accident-${s.id}`} className="text-rose-800 font-bold">Accident on the way{s.accident.place ? ` near ${s.accident.place}` : ''}: {s.accident.outcome === 'returned' ? 'goods collected and brought back, counted here' : `good pieces moved to truck ${s.truckNo}`}</div>}
         <div className="text-slate-500">Counted by <b className="text-slate-700">{s.receipt.by}</b>, {when(s.receipt.at)}</div>
         <AgreeCount s={s} />
         {s.receipt.note && <div className="text-slate-700 italic">“{s.receipt.note}”</div>}
