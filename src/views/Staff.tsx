@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useStore, route, diffsOf, countedByUs, atGate, receiverPath, loadName } from '../store.tsx';
 import { UNITS, COMPANY } from '../data/seed.ts';
 import { getUnit, setUnit, setMeName, me } from '../lib/who.ts';
@@ -75,6 +75,26 @@ export default function Staff({ go }: { go: Go }) {
   const receiving = live.filter((s: any) => (s.returning ? s.fromUnit === unit : s.toUnit === unit && countedByUs(s) && (s.flow !== 'transfer' || s.sentAt)));
   const old = state.shipments.filter((s: any) => (s.fromUnit === unit || s.toUnit === unit) && (s.receipt || s.cancelledAt))
     .sort((a: any, b: any) => (b.receipt?.at || b.cancelledAt) - (a.receipt?.at || a.cancelledAt)).slice(0, 10);
+
+  // Demo: there is always a truck coming to you, so the receive path can be tried again and again.
+  // When nothing is coming to this unit, a new one is added: Mysuru gets a supplier delivery, Bengaluru a truck from Mysuru.
+  const topped = useRef<Record<string, boolean>>({});
+  useEffect(() => {
+    if (receiving.length || topped.current[unit]) return;
+    topped.current[unit] = true;
+    const id = `TRK-${1000 + state.counters.trk + 1}`;
+    const plate = `KA ${unit === 'MYS' ? '19 D' : '09 B'} ${1000 + Math.floor(Math.random() * 9000)}`;
+    const ref = `${unit === 'MYS' ? 'PO' : 'DC'}-${100 + Math.floor(Math.random() * 900)}`;
+    if (unit === 'MYS') {
+      dispatch({ type: 'CREATE_SHIPMENT', id, flow: 'inbound', toUnit: 'MYS', party: 'coastal', truckNo: plate, ref, expectedOn: Date.now(), lines: [{ item: 'OKU-AB-91', qty: 200 }, { item: 'BRP-1136', qty: 150 }], actor: 'Owner' });
+      dispatch({ type: 'SEND_TO_RECEIVER', id, token: newToken(), actor: 'Owner' });
+    } else {
+      dispatch({ type: 'CREATE_SHIPMENT', id, flow: 'transfer', fromUnit: 'MYS', toUnit: unit, truckNo: plate, ref, driver: 'Manju', driverPhone: '9845012345', lines: [{ item: 'PLY-12', qty: 80 }, { item: 'PLY-18', qty: 45 }], actor: 'Ramesh (staff)' });
+      dispatch({ type: 'LOADING', id, point: 'Dock 1', phase: 'start', actor: 'Ramesh (staff)' });
+      dispatch({ type: 'LOADING', id, phase: 'end', actor: 'Ramesh (staff)' });
+      dispatch({ type: 'SEND_TO_RECEIVER', id, token: newToken(), actor: 'Ramesh (staff)' });
+    }
+  }, [unit, receiving.length]);
 
   const count = (s: any) => {
     if (s.sentAt) { window.location.hash = receiverPath(s, state.settings); return; }
