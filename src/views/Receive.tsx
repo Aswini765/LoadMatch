@@ -8,6 +8,9 @@ import { PhoneFrame, Note, PhotoStrip, savedLang, saveLang, shareWhatsApp, newTo
 import { NewList, Chain } from './Dispatch.tsx';
 import { when, time } from '../lib/format.ts';
 import { sharedMode } from '../sync.ts';
+import { getWho } from '../lib/who.ts';
+// Our own staff see "Store"; an outside party who opened the QR or link sees "Count".
+const countTitle = () => (getWho() ? 'LoadMatch · Store' : 'LoadMatch · Count');
 
 // ---------- the Receive tab: your own floor staff ----------
 // Trucks heading to your units, and supplier deliveries at the gate.
@@ -168,7 +171,7 @@ export default function Receive({ id, token, payload }: { id: string; token: str
     const c = get(l.id);
     const bad = c.counted !== '' && Number(c.damaged || 0) > Number(c.counted);
     return (
-      <PhoneFrame title="LoadMatch · Receive" sub={`${t('rcvTitle', lang)} · ${loadName(s.id)}`} lang={lang} setLang={setLang}>
+      <PhoneFrame title={countTitle()} sub={`${t('rcvTitle', lang)} · ${loadName(s.id)}`} lang={lang} setLang={setLang}>
         {head}
         <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
           <span>{fill(t('lineOf', lang), { n: step + 1, total: n })}</span>
@@ -227,7 +230,7 @@ export default function Receive({ id, token, payload }: { id: string; token: str
 
   // ----- review and submit (still blind) -----
   return (
-    <PhoneFrame title="LoadMatch · Receive" sub={`${t('checkSubmit', lang)} · ${loadName(s.id)}`} lang={lang} setLang={setLang}>
+    <PhoneFrame title={countTitle()} sub={`${t('checkSubmit', lang)} · ${loadName(s.id)}`} lang={lang} setLang={setLang}>
       {head}
       <div className="rounded-xl border border-slate-200 divide-y divide-slate-100">
         {s.lines.map((l: any, i: number) => {
@@ -287,7 +290,7 @@ function Done({ s, state, remote, lang, setLang, head }: { s: any; state: any; r
   const matched = shipmentStatus(state, s) === 'MATCHED';
   const showLines = state.settings.differencesTo !== 'owner';
   return (
-    <PhoneFrame title="LoadMatch · Receive" sub={loadName(s.id)} lang={lang} setLang={setLang}>
+    <PhoneFrame title={countTitle()} sub={loadName(s.id)} lang={lang} setLang={setLang}>
       {head}
       <Note tone="go"><CheckCircle2 className="w-4 h-4 inline mr-1" />{t(remote ? 'savedSendNow' : 'submitted', lang)}</Note>
       <Note tone={matched ? 'go' : 'warn'}>{matched ? t('resultMatched', lang) : t('resultDiff', lang)}</Note>
