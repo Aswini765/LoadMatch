@@ -18,7 +18,9 @@ export default function Dispatch({ go, initialId }: { go: Go; initialId?: string
   const [lang, setLangState] = useState(savedLang);
   const setLang = (l: string) => { setLangState(l); saveLang(l); };
   const [screen, setScreen] = useState<string>(initialId ? `truck:${initialId}` : 'list');
-  const sub = screen.startsWith('truck:') ? loadName(screen.slice(6)) : screen.startsWith('new:') ? t(screen === 'new:transfer' ? 'newTransfer' : screen === 'new:jobwork_out' ? 'newJobwork' : 'newCustomer', lang) : t('trucks', lang);
+  const { state } = useStore();
+  const cur = screen.startsWith('truck:') ? state.shipments.find((x: any) => x.id === screen.slice(6)) : null;
+  const sub = cur ? `${t('sendSide', lang)}: ${route(cur).split(' → ')[0]} · ${loadName(cur.id)}` : screen.startsWith('truck:') ? loadName(screen.slice(6)) : screen.startsWith('new:') ? t(screen === 'new:transfer' ? 'newTransfer' : screen === 'new:jobwork_out' ? 'newJobwork' : 'newCustomer', lang) : t('trucks', lang);
   return (
     <PhoneFrame title="LoadMatch · Dispatch" sub={sub} lang={lang} setLang={setLang}>
       {screen === 'list' && <TruckList lang={lang} open={(id) => setScreen(`truck:${id}`)} create={(f) => setScreen(`new:${f}`)} />}

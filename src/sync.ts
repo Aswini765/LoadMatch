@@ -42,6 +42,8 @@ export async function fetchSince(lastId: number): Promise<Ev[]> {
 }
 
 export function outbox(): any[] { return read(OUTBOX_KEY); }
+// Forget queued actions made before a reset.
+export function dropBefore(t: number) { const box = outbox(); const keep = box.filter((a: any) => !a.at || a.at >= t); if (keep.length !== box.length) write(OUTBOX_KEY, keep); }
 
 // Queue first (so nothing is lost if the godown has no signal), then try to send.
 export async function send(action: any): Promise<boolean> {

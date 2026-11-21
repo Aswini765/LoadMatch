@@ -11,6 +11,8 @@ export const LANGS: Record<string, { label: string; speech: string }> = {
 type Tr = { en: string; hi: string; kn: string; te: string };
 const T: Record<string, Tr> = {
   // receiver
+  sendSide: { en: 'Sending side', hi: 'भेजने वाली तरफ़', kn: 'ಕಳುಹಿಸುವ ಕಡೆ', te: 'పంపే వైపు' },
+  recvSide: { en: 'Receiving side', hi: 'लेने वाली तरफ़', kn: 'ಸ್ವೀಕರಿಸುವ ಕಡೆ', te: 'అందుకునే వైపు' },
   rcvTitle: { en: 'Count what arrived', hi: 'जो आया उसे गिनें', kn: 'ಬಂದದ್ದನ್ನು ಎಣಿಸಿ', te: 'వచ్చినవి లెక్కించండి' },
   rcvIntro: {
     en: 'Count each line and enter what you see. The sent quantity is hidden, so count carefully.',

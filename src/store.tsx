@@ -11,7 +11,13 @@ type Ctx = {
 };
 const StoreCtx = createContext<Ctx | null>(null);
 
-const replay = (events: sync.Ev[], from = buildInitialState()) => events.reduce((s, e) => reducer(s, e.action), from);
+// A phone that was offline can upload actions made before someone pressed Reset; those belong to the old demo, so skip them.
+let resetAt = 0;
+const replay = (events: sync.Ev[], from = buildInitialState()) => events.reduce((s, e) => {
+  if (e.action.type === 'RESET') { resetAt = e.action.at || 0; sync.dropBefore(resetAt); }
+  else if (e.action.at && e.action.at < resetAt) return s;
+  return reducer(s, e.action);
+}, from);
 
 // The log always begins with a RESET whose time anchors the demo data, so every device replays the same story.
 function initialLocal() {

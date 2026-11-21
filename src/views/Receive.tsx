@@ -43,7 +43,7 @@ export function ReceiveTab() {
             </button>
           )}
           <TrucksToLoad />
-          <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wide pt-1">{t('toCount', lang)}</div>
+          <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wide pt-1">{t('toCount', lang)} · {t('recvSide', lang)}</div>
           {!open.length && <Note>{t('nothingToCount', lang)}</Note>}
           {open.map((s: any) => (
             <button key={s.id} id={`count-${s.id}`} onClick={() => start(s)} className="w-full text-left bg-white hover:bg-slate-50 border border-slate-200 rounded-xl p-3 shadow-2xs cursor-pointer flex items-center justify-between">
@@ -171,7 +171,7 @@ export default function Receive({ id, token, payload }: { id: string; token: str
     const c = get(l.id);
     const bad = c.counted !== '' && Number(c.damaged || 0) > Number(c.counted);
     return (
-      <PhoneFrame title={countTitle()} sub={`${t('rcvTitle', lang)} · ${loadName(s.id)}`} lang={lang} setLang={setLang}>
+      <PhoneFrame title={countTitle()} sub={`${t('recvSide', lang)}: ${route(s).split(' → ')[1]} · ${loadName(s.id)}`} lang={lang} setLang={setLang}>
         {head}
         <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
           <span>{fill(t('lineOf', lang), { n: step + 1, total: n })}</span>
@@ -356,7 +356,7 @@ function TrucksToLoad() {
   if (!list.length) return null;
   return (
     <div className="space-y-2">
-      <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wide pt-1">Trucks to load</div>
+      <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wide pt-1">Trucks to load · Sending side</div>
       {list.map((s: any) => (
         <div key={s.id} id={`load-${s.id}`} className="bg-white border border-slate-200 rounded-xl p-3 space-y-2 shadow-2xs">
           <div className="text-xs"><b>{s.truckNo}</b> · {route(s)} · {loadName(s.id)}</div>
