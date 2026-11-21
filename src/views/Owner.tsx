@@ -78,7 +78,6 @@ export default function Owner({ go, initialId }: { go: Go; initialId?: string | 
         </Panel>
       </div>
 
-      <JobworkPanel />
 
       <AccountantPanel />
 

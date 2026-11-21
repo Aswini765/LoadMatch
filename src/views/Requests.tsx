@@ -101,8 +101,14 @@ export function OwnerRequests() {
   const { state, dispatch } = useStore();
   const [notes, setNotes] = useState<Record<string, string>>({});
   const pending = (state.requests || []).filter((r: any) => r.status === 'pending');
-  if (!pending.length) return null;
+  const decided = (state.requests || []).filter((r: any) => r.status !== 'pending').sort((a: any, b: any) => b.decidedAt - a.decidedAt).slice(0, 3);
   const now = Date.now();
+  if (!pending.length) return (
+    <div id="owner-requests" className="bg-white border border-slate-200 rounded-xl p-4 space-y-2 text-xs">
+      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Staff requests · none waiting</div>
+      <Decided list={decided} now={now} />
+    </div>
+  );
   return (
     <div id="owner-requests" className="bg-white border-2 border-amber-300 rounded-xl p-4 space-y-3">
       <div className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Staff are asking you · {pending.length}</div>
@@ -141,6 +147,23 @@ export function OwnerRequests() {
         );
       })}
       <div className="text-[10px] text-slate-500"><AlertTriangle className="w-3 h-3 inline mr-1" />Nothing changes until you say yes. Every request and answer stays in the load's history.</div>
+      <Decided list={decided} now={now} />
+    </div>
+  );
+}
+
+// What the owner already answered (staff see the same answers on their Staff screen)
+function Decided({ list, now }: { list: any[]; now: number }) {
+  if (!list.length) return null;
+  return (
+    <div className="space-y-1 pt-1 border-t border-slate-100">
+      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">You answered</div>
+      {list.map((r: any) => (
+        <div key={r.id} className="text-[11px] text-slate-700 flex justify-between gap-2">
+          <span className="truncate">{r.kind === 'add' ? `Add “${r.name}”` : `${KIND_TEXT[r.kind]} · ${loadName(r.shipmentId)}`} · {r.by}</span>
+          <b className={r.status === 'approved' ? 'text-emerald-700 shrink-0' : 'text-rose-700 shrink-0'}>{r.status === 'approved' ? 'Yes' : 'No'} · {when(r.decidedAt, now)}</b>
+        </div>
+      ))}
     </div>
   );
 }

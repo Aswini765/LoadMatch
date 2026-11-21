@@ -10,6 +10,8 @@ import { when, time } from '../lib/format.ts';
 import { sharedMode } from '../sync.ts';
 import { getWho } from '../lib/who.ts';
 // Our own staff see "Store"; an outside party who opened the QR or link sees "Count".
+// shown under the count boxes
+const MISSING_HINT = 'Missing pieces: you don\'t enter them. After you submit, the app compares with what was sent and shows how many are missing.';
 const countTitle = () => (getWho() ? 'LoadMatch · Store' : 'LoadMatch · Count');
 
 // ---------- the Receive tab: your own floor staff ----------
@@ -217,6 +219,7 @@ export default function Receive({ id, token, payload }: { id: string; token: str
             </div>
           </div>
           {bad && <div id="r-dmg-msg" className="text-xs font-bold text-rose-700">{t('dmgTooMany', lang)}</div>}
+          <div id="missing-hint" className="text-[11px] text-slate-500">{MISSING_HINT}</div>
         </div>
 
         <div className="grid grid-cols-2 gap-2">

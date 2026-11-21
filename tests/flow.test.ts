@@ -29,7 +29,7 @@ console.log('LoadMatch flow tests');
 test('seed: one truck to decide, one promise waiting, one in transit, one loading, the rest matched', () => {
   const s = buildInitialState();
   assert.equal(status(s, 'TRK-1013'), 'TO_DECIDE');
-  assert.deepEqual(diffsOf(s, 'TRK-1013').map((d: any) => [d.kind, d.qty]), [['damaged', 2], ['short', 5]]);
+  assert.deepEqual(diffsOf(s, 'TRK-1013').map((d: any) => [d.kind, d.qty]), [['short', 5]]);
   assert.equal(status(s, 'TRK-1014'), 'WAITING');
   assert.equal(status(s, 'TRK-1015'), 'TO_DECIDE');
   assert.equal(diffsOf(s, 'TRK-1015')[0].kind, 'excess');
@@ -223,7 +223,7 @@ test('voice counts in any script: digits and Telugu, Kannada, Hindi words', () =
 
 test('replaying the same events gives the same state on every device', () => {
   const A = 1_794_450_000_000;
-  const events = [{ type: 'RESET', at: A }, { type: 'DECIDE', diffId: 'DIF-0002', action: 'investigate', at: A + 1 }];
+  const events = [{ type: 'RESET', at: A }, { type: 'DECIDE', diffId: 'DIF-0001', action: 'investigate', at: A + 1 }];
   const a = events.reduce(reducer, buildInitialState());
   const b = events.reduce(reducer, buildInitialState(A + 99999));
   assert.deepEqual(a, b);

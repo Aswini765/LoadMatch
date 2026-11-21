@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Send, PackageCheck, ArrowRight, Truck, Clock, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { useStore, route, diffsOf, countedByUs, atGate, sameGstin, receiverPath, loadName } from '../store.tsx';
+import { useStore, route, diffsOf, countedByUs, atGate, receiverPath, loadName } from '../store.tsx';
 import { UNITS } from '../data/seed.ts';
 import { getUnit, setUnit } from '../lib/who.ts';
 import { PhoneFrame, savedLang, saveLang, newToken } from './ui.tsx';
@@ -13,15 +13,14 @@ const staffName = (state: any) => (state.staff || []).find((p: any) => p.unit ==
 // Sending or receiving, and whether the other side has the same GST number (our unit) or another one
 export function sideTag(state: any, s: any, unit: string) {
   const sending = s.fromUnit === unit && !s.returning;
-  const same = s.flow === 'transfer' && sameGstin(state, s.fromUnit, s.toUnit);
-  const other = s.flow === 'transfer' ? `our ${uname(sending ? s.toUnit : s.fromUnit)}` : 'outside party';
-  return { sending, label: `${sending ? 'Sending' : 'Receiving'} · ${same ? 'Same GST' : 'Other GST'}`, other };
+  const other = s.flow === 'transfer' ? 'our unit' : s.flow === 'inbound' ? 'supplier' : s.flow === 'outbound' ? 'customer' : 'job work';
+  return { sending, label: `${sending ? 'Sending' : 'Receiving'} · ${other}`, other };
 }
 
 const SEND_RULES = [
   'Make the list before loading. Pick items from the list; missing? Ask owner.',
   'The truck cannot leave until loading is marked finished.',
-  'Paper: same GST → delivery challan. Other GST → invoice (check e-way bill with your accountant).',
+  'Papers: the app prints the delivery challan with a QR. Invoice and tax papers are done by the owner or office.',
   'After Truck left the list is locked. Changes only through the owner.',
 ];
 const RECEIVE_RULES = [
@@ -87,7 +86,6 @@ export default function Staff({ go }: { go: Go }) {
   const done = mine.filter((s: any) => (s.fromUnit === unit || s.toUnit === unit) && (s.receipt || s.cancelledAt))
     .filter((s: any) => filter === 'all' || (filter === 'sent' ? s.fromUnit === unit : filter === 'received' ? s.toUnit === unit : diffsOf(state, s.id).length > 0))
     .sort((a: any, b: any) => (b.receipt?.at || b.cancelledAt) - (a.receipt?.at || a.cancelledAt)).slice(0, 30);
-  const waiting = (state.requests || []).filter((r: any) => r.status === 'pending' && String(r.by).startsWith(staffName(state))).length;
   const count = (s: any) => {
     if (s.sentAt) { window.location.hash = receiverPath(s, state.settings); return; }
     const token = newToken();
@@ -113,18 +111,16 @@ export default function Staff({ go }: { go: Go }) {
         {mode === 'send' && (
           <div className="space-y-2">
             <div className="text-xs font-bold text-slate-900">Where is it going?</div>
-            <Choice id="send-unit" title={`Our other unit · Same GST`} sub="Stock transfer. Paper: delivery challan. They see it in their app." onClick={() => go('dispatch', { id: 'new:transfer' })} />
-            <Choice id="send-customer" title="Customer · Other GST" sub="Sale. Paper: invoice. Link goes from company WhatsApp." onClick={() => go('dispatch', { id: 'new:outbound' })} />
-            <Choice id="send-jobwork" title="Job worker · Other GST" sub="Sent for work, comes back. Paper: job work challan." onClick={() => go('dispatch', { id: 'new:jobwork_out' })} />
+            <Choice id="send-unit" title="Our other unit" sub="They see the truck in their app and count it there." onClick={() => go('dispatch', { id: 'new:transfer' })} />
+            <Choice id="send-customer" title="Customer" sub="The customer gets a count link from the company WhatsApp." onClick={() => go('dispatch', { id: 'new:outbound' })} />
             <Rules list={SEND_RULES} tone="border-violet-200 bg-violet-50 text-violet-950" />
           </div>
         )}
         {mode === 'receive' && (
           <div className="space-y-2">
             <div className="text-xs font-bold text-slate-900">Where is it coming from?</div>
-            <div id="recv-unit" className="bg-white border border-slate-200 rounded-xl p-3"><div className="text-sm font-bold text-slate-900">Our other unit · Same GST</div><div className="text-[11px] text-slate-500">Nothing to type. The truck is already listed below under <b>To do now → Count</b>.</div></div>
-            <Choice id="recv-supplier" title="Supplier delivery · Other GST" sub="Pick the supplier, then count what came." onClick={() => go('receive', { id: 'add:inbound' })} />
-            <Choice id="recv-jobwork" title="Back from job work · Other GST" sub="Goods we sent for work, coming back." onClick={() => go('receive', { id: 'add:jobwork_in' })} />
+            <div id="recv-unit" className="bg-white border border-slate-200 rounded-xl p-3"><div className="text-sm font-bold text-slate-900">Our other unit</div><div className="text-[11px] text-slate-500">Nothing to type. The truck is already listed below under <b>To do now → Count</b>.</div></div>
+            <Choice id="recv-supplier" title="Supplier delivery" sub="Pick the supplier and type what their bill says, then count what came." onClick={() => go('receive', { id: 'add:inbound' })} />
             <Rules list={RECEIVE_RULES} tone="border-sky-200 bg-sky-50 text-sky-950" />
           </div>
         )}
@@ -133,7 +129,8 @@ export default function Staff({ go }: { go: Go }) {
         {!toLoad.length && !toCount.length && <div id="nothing-pending" className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl p-3"><CheckCircle2 className="w-4 h-4 inline mr-1" />Nothing pending ✓</div>}
         {toLoad.map((s: any) => <Row key={s.id} s={s} unit={unit} state={state} action={s.loading?.endAt ? 'Truck left' : 'Load'} onClick={() => open(s)} />)}
         {toCount.map((s: any) => <Row key={s.id} s={s} unit={unit} state={state} action="Count" onClick={() => count(s)} />)}
-        {waiting > 0 && <div className="text-[11px] text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-2"><AlertTriangle className="w-3.5 h-3.5 inline mr-1" />{waiting} request(s) waiting for the owner.</div>}
+
+        <MyRequests />
 
         <Head icon={Truck} text={`On the way · ${onWay.length}`} />
         {!onWay.length && <div className="text-[11px] text-slate-500">No truck from {uname(unit)} is on the road.</div>}
@@ -153,6 +150,27 @@ export default function Staff({ go }: { go: Go }) {
   );
 }
 
+// Everything staff asked the owner, with the owner's answer: nothing disappears silently
+const ASKED: Record<string, string> = { details: 'Change truck or driver', came_back: 'Truck came back', accident: 'Accident', add: 'Add to list' };
+function MyRequests() {
+  const { state } = useStore();
+  const list = (state.requests || []).slice().sort((a: any, b: any) => (b.decidedAt || b.at) - (a.decidedAt || a.at)).slice(0, 6);
+  return (
+    <div id="my-requests" className="space-y-1.5">
+      <Head icon={AlertTriangle} text={`Asked the owner · ${list.filter((r: any) => r.status === 'pending').length} waiting`} />
+      {!list.length && <div className="text-[11px] text-slate-500">Nothing asked yet.</div>}
+      {list.map((r: any) => (
+        <div key={r.id} id={`myreq-${r.id}`} className={`rounded-xl border p-2.5 text-xs ${r.status === 'pending' ? 'border-amber-200 bg-amber-50' : r.status === 'approved' ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'}`}>
+          <div className="flex justify-between gap-2"><b className="text-slate-900">{ASKED[r.kind]}{r.kind === 'add' ? `: ${r.name}` : ` · ${loadName(r.shipmentId)}`}</b>
+            <span className={`text-[10px] font-bold shrink-0 ${r.status === 'pending' ? 'text-amber-800' : r.status === 'approved' ? 'text-emerald-800' : 'text-rose-800'}`}>{r.status === 'pending' ? 'Waiting for owner' : r.status === 'approved' ? 'Owner said YES' : 'Owner said NO'}</span></div>
+          <div className="text-slate-600">{r.by} · {when(r.at)}{r.decidedAt ? ` → answered ${when(r.decidedAt)}` : ''}</div>
+          {r.decidedNote && <div className="text-slate-800">Owner: “{r.decidedNote}”</div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // "Not in list? Ask owner": staff cannot add items or parties themselves, so the lists stay clean
 export function AskAdd({ what, partyKind }: { what: 'item' | 'party'; partyKind?: string }) {
   const { state, dispatch } = useStore();
@@ -160,7 +178,7 @@ export function AskAdd({ what, partyKind }: { what: 'item' | 'party'; partyKind?
   const [name, setName] = useState('');
   const [sent, setSent] = useState('');
   if (sent) return <div className="text-[11px] text-emerald-800">Asked the owner to add “{sent}”. It appears here once approved.</div>;
-  if (!open) return <button id={`ask-add-${what}`} onClick={() => setOpen(true)} className="text-[11px] font-bold text-sky-800 underline cursor-pointer text-left">Not in the list? Ask owner to add {what === 'item' ? 'an item' : `a ${partyKind || 'party'}`}</button>;
+  if (!open) return <button id={`ask-add-${what}`} onClick={() => setOpen(true)} className="text-[11px] font-bold text-sky-800 underline cursor-pointer text-left">{what === 'item' ? 'Item not in the list? Ask owner to add it' : partyKind === 'supplier' ? 'New supplier at the gate? Ask owner to add them' : `New ${partyKind || 'party'}? Ask owner to add them`}</button>;
   return (
     <div className="flex gap-2">
       <input id={`ask-add-name-${what}`} value={name} onChange={(e) => setName(e.target.value)} placeholder={what === 'item' ? 'Item name and size' : 'Party name'} className="flex-1 p-2 rounded-lg border border-slate-300 text-xs" />

@@ -5,7 +5,7 @@ import { useVoice, findNumber } from '../lib/voice.ts';
 import { resultText } from './Receive.tsx';
 import { ITEMS, PARTIES, UNITS, LOADING_POINTS, COMPANY } from '../data/seed.ts';
 import { AskOwner } from './Requests.tsx';
-import { getUnit } from '../lib/who.ts';
+import { getUnit, getWho } from '../lib/who.ts';
 import { AskAdd } from './Staff.tsx';
 import { inr0 } from '../lib/format.ts';
 import { t, unitWord } from '../i18n.ts';
@@ -204,7 +204,7 @@ export function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: s
           <div className="text-[10px] text-sky-800">{t('promiseHint', lang)}</div>
         </div>
       )}
-      {flow === 'transfer' && fromUnit !== toUnit && (
+      {flow === 'transfer' && fromUnit !== toUnit && getWho() === 'owner' && (
         <div className="space-y-1.5">
           <div className="text-[11px] font-bold text-slate-700">{t('moneyQ', lang)}</div>
           <div className="grid grid-cols-2 gap-2">
@@ -245,7 +245,7 @@ export function NewList({ lang, flow, onBack, onSaved }: { lang: string; flow: s
         <button id="btn-add-line" onClick={() => setLines([...lines, { item: '', qty: '' }])} className="text-[11px] font-bold text-slate-700 flex items-center cursor-pointer"><Plus className="w-3.5 h-3.5 mr-1" />{t('addLine', lang)}</button>
         <AskAdd what="item" />
       </div>
-      {!gate && (
+      {!gate && getWho() === 'owner' && (
         <label className="block text-[11px] font-bold text-slate-700">{t('ewayBill', lang)} <span className="font-normal text-slate-400">({t('optional', lang)})</span>
           <input id="f-eway" value={ewayBill} onChange={(e) => setEwayBill(e.target.value)} className={sel} />
           {clean.reduce((a, l) => a + l.qty * ITEMS[l.item].rate, 0) > 50000 && !ewayBill.trim() && <span className="block mt-1 font-normal text-amber-800">{t('ewayNeeded', lang)} ({inr0(clean.reduce((a, l) => a + l.qty * ITEMS[l.item].rate, 0))})</span>}
