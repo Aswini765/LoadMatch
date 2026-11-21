@@ -5,5 +5,7 @@ export const WHO: Record<string, { label: string; what: string; main: string; vi
   dispatch: { label: 'Dispatch', what: 'Office person. Makes the list of what goes on the truck, the papers (challan, e-way bill), taps Truck left, sends the link to outside parties.', main: 'dispatch', views: ['home', 'dispatch'] },
   store: { label: 'Store', what: 'Person at the dock, at any unit. Loads trucks that leave (loading start and end), unloads and counts trucks that arrive.', main: 'receive', views: ['home', 'receive'] },
 };
-export const getWho = () => { try { const w = localStorage.getItem('loadmatch-role') || ''; return WHO[w] ? w : ''; } catch { return ''; } };
-export const setWhoSaved = (w: string) => { try { if (w) localStorage.setItem('loadmatch-role', w); else localStorage.removeItem('loadmatch-role'); } catch { /* ignore */ } };
+// Kept only while the page is open: every refresh starts on Home with nobody chosen (demo).
+let current = '';
+export const getWho = () => current;
+export const setWhoSaved = (w: string) => { current = WHO[w] ? w : ''; };
