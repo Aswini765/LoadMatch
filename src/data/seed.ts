@@ -102,7 +102,7 @@ export function makeSeed(anchor: number) {
   ev.push({ type: 'LOADING', id: 'TRK-1013', point: 'Dock 2', phase: 'start', at: at(-11, -20), actor: 'Dispatch staff' });
   ev.push({ type: 'LOADING', id: 'TRK-1013', point: 'Dock 2', phase: 'end', at: at(-9, -5), actor: 'Dispatch staff' });
   ev.push({ type: 'SEND_TO_RECEIVER', id: 'TRK-1013', token: 'demo13k', at: at(-9), actor: 'Dispatch staff' });
-  ev.push({ type: 'SUBMIT_RECEIPT', id: 'TRK-1013', token: 'demo13k', by: 'Ravi (Bengaluru stores)', at: at(-1, -30), actor: 'Receiver',
+  ev.push({ type: 'SUBMIT_RECEIPT', id: 'TRK-1013', token: 'demo13k', by: 'Ravi', at: at(-1, -30), actor: 'Receiver',
     lines: { L1: { counted: 119, damaged: 0 }, L2: { counted: 248, damaged: 0 }, L3: { counted: 198, damaged: 0 }, L4: { counted: 208, damaged: 0 } },
     photos: ['unloading-bay.jpg'], note: 'Barpas 1148 count is short.' });
 

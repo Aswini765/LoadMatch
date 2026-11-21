@@ -28,15 +28,14 @@ export default function Owner({ go, initialId }: { go: Go; initialId?: string | 
   const [allRecent, setAllRecent] = useState(false);
   const [more, setMore] = useState(false);
   const recent = state.shipments.filter((s: any) => s.receipt && now - s.receipt.at < 36 * 3600000).sort((a: any, b: any) => b.receipt.at - a.receipt.at);
-  const byTruck = [...new Set(open.map((d: any) => d.shipmentId))].map((id) => shipmentOf(state, id as string));
+  const byTruck = [...new Set(open.map((d: any) => d.shipmentId))].map((id) => shipmentOf(state, id as string)).sort((a: any, b: any) => (b.receipt?.at || 0) - (a.receipt?.at || 0));
   const openValue = open.reduce((a: number, d: any) => a + d.value, 0);
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       <PageHeader title="Owner" sub="You see only what is missing, damaged or extra, and what staff ask you." />
 
-      <TodaySummary />
-      <button id="btn-expect-supplier" onClick={() => go('dispatch', { id: 'new:inbound' })} className="w-full py-3 rounded-xl border-2 border-dashed border-sky-300 bg-sky-50 text-sm font-bold text-sky-900 cursor-pointer">🚛 + Add expected supplier delivery</button>
+      <LatestFromStaff />
       <OwnerRequests go={go} />
       <Panel eyebrow="Needs your decision" title={open.length ? `${open.length} difference${open.length > 1 ? 's' : ''} on ${byTruck.length} truck${byTruck.length > 1 ? 's' : ''} · worth ${inr0(openValue)}` : 'Nothing to decide'}>
         {!open.length && <Note tone="go"><CheckCircle2 className="w-4 h-4 inline mr-1" />Every truck that was counted either matched or already has your decision.</Note>}
@@ -52,6 +51,8 @@ export default function Owner({ go, initialId }: { go: Go; initialId?: string | 
         </div>
       </Panel>
 
+      <TodaySummary />
+      <button id="btn-expect-supplier" onClick={() => go('dispatch', { id: 'new:inbound' })} className="w-full py-3 rounded-xl border-2 border-dashed border-sky-300 bg-sky-50 text-sm font-bold text-sky-900 cursor-pointer">🚛 + Add expected supplier delivery</button>
       <button id="btn-owner-more" onClick={() => setMore(!more)} className="w-full py-3 rounded-xl border border-slate-300 bg-white text-sm font-bold text-slate-700 cursor-pointer">{more ? '▲ Less' : '▼ More: trucks on the road, promises, accountant, recent trucks'}</button>
       {more && <>
       <div className="grid md:grid-cols-2 gap-6">
@@ -102,6 +103,37 @@ export default function Owner({ go, initialId }: { go: Go; initialId?: string | 
 
 function Stat({ n, label, cls }: { n: number; label: string; cls: string }) {
   return <div className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-center shadow-2xs"><div className={`text-lg font-bold leading-none ${n ? cls : 'text-slate-400'}`}>{n}</div><div className="text-[10px] text-slate-500 mt-0.5">{label}</div></div>;
+}
+
+// Newest things staff did, at the very top: counts submitted (matched or not) and requests
+function LatestFromStaff() {
+  const { state } = useStore();
+  const now = Date.now();
+  const items: { at: number; icon: string; text: string; tone: string; target: string }[] = [];
+  for (const s of state.shipments) {
+    if (!s.receipt || now - s.receipt.at > 24 * 3600000) continue;
+    const n = diffsOf(state, s.id).filter((d: any) => d.status === 'open' || d.status === 'investigating').length;
+    const bad = diffsOf(state, s.id).length > 0;
+    items.push({ at: s.receipt.at, icon: bad ? '⚠️' : '✅', text: `${s.receipt.by} counted ${loadName(s.id)} (${route(s)}): ${bad ? (n ? 'does not match. Decide below.' : 'does not match. Decided.') : 'all matched.'}`, tone: bad && n ? 'border-amber-300 bg-amber-50' : 'border-emerald-200 bg-emerald-50', target: n ? `own-truck-${s.id}` : '' });
+  }
+  for (const r of state.requests || []) {
+    if (r.status !== 'pending') continue;
+    items.push({ at: r.at, icon: '🙋', text: `${String(r.by).replace(' (staff)', '')} asks: ${r.kind === 'add' ? (r.what === 'delivery' ? `truck not in the list “${r.name}”` : `add “${r.name}”`) : r.kind === 'accident' ? `accident on ${loadName(r.shipmentId)}` : r.kind === 'came_back' ? `${loadName(r.shipmentId)} came back` : `change truck/driver on ${loadName(r.shipmentId)}`}. Answer below.`, tone: 'border-sky-300 bg-sky-50', target: `req-${r.id}` });
+  }
+  items.sort((a, b) => b.at - a.at);
+  if (!items.length) return null;
+  const go = (id: string) => id && document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  return (
+    <div id="latest-from-staff" className="bg-white border-2 border-slate-900 rounded-xl p-4 space-y-2">
+      <div className="text-sm font-bold text-slate-900">🆕 Latest from staff</div>
+      {items.slice(0, 5).map((x, i) => (
+        <button key={i} onClick={() => go(x.target)} className={`w-full text-left rounded-lg border px-3 py-2 text-sm flex items-start gap-2 ${x.tone} ${x.target ? 'cursor-pointer' : 'cursor-default'}`}>
+          <span className="text-lg leading-none">{x.icon}</span>
+          <span className="flex-1">{x.text}<span className="block text-[11px] text-slate-500">{when(x.at, now)}</span></span>
+        </button>
+      ))}
+    </div>
+  );
 }
 
 function TruckHead({ s }: { s: any }) {

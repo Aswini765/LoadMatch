@@ -101,7 +101,7 @@ const FIELD: Record<string, string> = { truckNo: 'Truck', driver: 'Driver', driv
 export function OwnerRequests({ go }: { go?: (v: string, o?: any) => void } = {}) {
   const { state, dispatch } = useStore();
   const [notes, setNotes] = useState<Record<string, string>>({});
-  const pending = (state.requests || []).filter((r: any) => r.status === 'pending');
+  const pending = (state.requests || []).filter((r: any) => r.status === 'pending').sort((a: any, b: any) => b.at - a.at); // newest first
   const decided = (state.requests || []).filter((r: any) => r.status !== 'pending').sort((a: any, b: any) => b.decidedAt - a.decidedAt).slice(0, 3);
   const now = Date.now();
   if (!pending.length) return (
