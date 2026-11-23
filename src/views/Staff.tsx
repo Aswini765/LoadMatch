@@ -171,6 +171,7 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
   return (
     <PhoneFrame title="LoadMatch" sub={`${staffName(state)} · ${uname(unit)}`} lang={lang} setLang={setLang}>
       <div className="space-y-4">
+        {open && <button id={open === 'send' ? 'btn-send-stock' : 'btn-receive-stock'} onClick={() => setOpen('')} className="-mt-1 inline-flex items-center rounded-lg border-2 border-slate-300 bg-white px-3 py-1.5 text-sm font-bold text-slate-700 cursor-pointer">← {w('back')}</button>}
         <div className="flex items-center gap-2 text-xs">
           <span className="text-slate-500">{w('iAmAt')}:</span>
           {Object.keys(UNITS).map((u) => <button key={u} id={`unit-${u}`} onClick={() => pickUnit(u)} className={`px-3 py-1.5 rounded-full border font-bold cursor-pointer ${u === unit ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-300'}`}>{uname(u)}</button>)}
@@ -182,13 +183,10 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
             <button id="btn-receive-stock" onClick={() => setOpen('receive')} className="min-h-[84px] rounded-2xl text-lg font-bold cursor-pointer flex flex-col items-center justify-center border-2 bg-sky-50 text-sky-900 border-sky-200"><span className="text-3xl">📥</span>{w('receive')}</button>
           </div>
         ) : (
-          // only the chosen side is on screen; a separate Back button returns to both
-          <div className="space-y-2">
-            <button id={open === 'send' ? 'btn-send-stock' : 'btn-receive-stock'} onClick={() => setOpen('')} className="inline-flex items-center gap-1 rounded-xl border-2 border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 cursor-pointer">← {w('back')}</button>
-            <div className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-white ${open === 'send' ? 'bg-violet-700' : 'bg-sky-700'}`}>
-              <span className="text-2xl">{open === 'send' ? '📤' : '📥'}</span>
-              <span className="text-lg font-bold">{w(open)}</span>
-            </div>
+          // only the chosen side is on screen; Back (top left) returns to both
+          <div className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-white ${open === 'send' ? 'bg-violet-700' : 'bg-sky-700'}`}>
+            <span className="text-2xl">{open === 'send' ? '📤' : '📥'}</span>
+            <span className="text-lg font-bold">{w(open)}</span>
           </div>
         )}
         {open === 'send' && (
