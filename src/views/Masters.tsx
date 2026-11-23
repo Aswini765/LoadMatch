@@ -21,8 +21,8 @@ function Card({ id, title, sub, children }: { id: string; title: string; sub: st
 export default function Masters() {
   const { state, dispatch } = useStore();
   const add = (what: string, data: any) => dispatch({ type: 'ADD_MASTER', what, data, actor: 'Owner' });
-  const [item, setItem] = useState({ name: 'Pine veneer 4 mm', unit: 'pcs', rate: '110' });
-  const [paste, setPaste] = useState('Pine plank 2 in, pcs, 90\nSal wood beam, pcs, 400');
+  const [item, setItem] = useState({ name: 'Pine veneer 4 mm (bundle of 100)', unit: 'bundles', rate: '15500' });
+  const [paste, setPaste] = useState('Pine plank 2 in (pack of 20), packs, 18000\nSal wood beam, pieces, 42000');
   const [party, setParty] = useState({ name: 'Hosur Crates', kind: 'customer', city: 'Hosur', gstin: '33GGGGG6666G1Z5', phone: '9876543210' });
   const [unit, setUnitF] = useState({ name: 'Hosur godown', gstin: '' });
   const [staff, setStaff] = useState({ name: 'Suma', unit: 'BLR' });

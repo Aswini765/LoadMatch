@@ -74,7 +74,7 @@ export default function Staff({ go }: { go: Go }) {
   const sending = live.filter((s: any) => s.fromUnit === unit && !s.returning && !atGate(s.flow));
   // trucks coming to this unit (our units' trucks, supplier trucks not yet counted, goods coming back after an accident)
   const receiving = live.filter((s: any) => (s.returning ? s.fromUnit === unit : s.toUnit === unit && countedByUs(s) && (s.flow !== 'transfer' || s.sentAt)));
-  const old = state.shipments.filter((s: any) => (s.fromUnit === unit || s.toUnit === unit) && (s.receipt || s.cancelledAt))
+  const old = state.shipments.filter((s: any) => (open === 'send' ? s.fromUnit === unit : open === 'receive' ? s.toUnit === unit : s.fromUnit === unit || s.toUnit === unit) && (s.receipt || s.cancelledAt))
     .sort((a: any, b: any) => (b.receipt?.at || b.cancelledAt) - (a.receipt?.at || a.cancelledAt)).slice(0, 10);
 
   // Demo: there is always a truck coming to you, so the receive path can be tried again and again.
@@ -105,28 +105,30 @@ export default function Staff({ go }: { go: Go }) {
   };
 
   // Updates: short lines with a picture, newest first
-  const news: { at: number; icon: string; text: string; tone: string; pin?: boolean }[] = [];
+  const news: { at: number; icon: string; text: string; tone: string; pin?: boolean; side?: string }[] = [];
   for (const s of state.shipments) {
     const [from, to] = route(s).split(' → ');
     if (s.cancelledAt) continue;
     if (s.toUnit === unit && s.flow === 'transfer' && s.sentAt && !s.arrivedAt && !s.receipt) news.push({ at: s.sentAt, pin: true, icon: '🚚', text: `${comingX(from, l)} · ${loadName(s.id)}`, tone: 'bg-sky-50 border-sky-200' });
     if (s.toUnit === unit && s.expectedOn && !s.arrivedAt && !s.receipt) news.push({ at: s.expectedOn, pin: true, icon: '🚛', text: `${comingX(from, l)} · ${w('expected')} ${dayText(s.expectedOn)}`, tone: 'bg-sky-50 border-sky-200' });
     if (s.returning && s.fromUnit === unit && !s.receipt) news.push({ at: s.accident?.at || s.sentAt, pin: true, icon: '⚠️', text: `${w('backAccident')} · ${loadName(s.id)}`, tone: 'bg-rose-50 border-rose-200' });
-    if (s.fromUnit === unit && s.arrivedAt && !s.receipt && !s.returning) news.push({ at: s.arrivedAt, icon: '📍', text: `${loadName(s.id)} ${reachedX(to, l)}`, tone: 'bg-sky-50 border-sky-200' });
+    if (s.fromUnit === unit && s.arrivedAt && !s.receipt && !s.returning) news.push({ side: 'send', at: s.arrivedAt, icon: '📍', text: `${loadName(s.id)} ${reachedX(to, l)}`, tone: 'bg-sky-50 border-sky-200' });
     if (s.fromUnit === unit && s.receipt && Date.now() - s.receipt.at < 48 * 3600000) {
       const bad = diffsOf(state, s.id).length > 0;
-      news.push({ at: s.receipt.at, icon: bad ? '⚠️' : '✅', text: `${loadName(s.id)} ${bad ? w('diff') : w('okCount')}`, tone: bad ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200' });
+      news.push({ side: 'send', at: s.receipt.at, icon: bad ? '⚠️' : '✅', text: `${loadName(s.id)} ${bad ? w('diff') : w('okCount')}`, tone: bad ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200' });
     }
   }
   for (const r of state.requests || []) {
     if (!String(r.by).startsWith(staffName(state))) continue;
     const what = r.kind === 'add' ? r.name : loadName(r.shipmentId);
-    if (r.status === 'pending') news.push({ at: r.at, icon: '⏳', text: `${w('waiting')} · ${what}`, tone: 'bg-amber-50 border-amber-200' });
-    else news.push({ at: r.decidedAt, icon: r.status === 'approved' ? '👍' : '👎', text: `${w(r.status === 'approved' ? 'yes' : 'no')} · ${what}${r.decidedNote ? ` · “${r.decidedNote}”` : ''}`, tone: r.status === 'approved' ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200' });
+    const rs = r.shipmentId && state.shipments.find((x: any) => x.id === r.shipmentId);
+    const side = rs ? (rs.fromUnit === unit && !rs.returning ? 'send' : 'receive') : r.what === 'delivery' ? 'receive' : r.what === 'item' ? 'send' : '';
+    if (r.status === 'pending') news.push({ side, at: r.at, icon: '⏳', text: `${w('waiting')} · ${what}`, tone: 'bg-amber-50 border-amber-200' });
+    else news.push({ side, at: r.decidedAt, icon: r.status === 'approved' ? '👍' : '👎', text: `${w(r.status === 'approved' ? 'yes' : 'no')} · ${what}${r.decidedNote ? ` · “${r.decidedNote}”` : ''}`, tone: r.status === 'approved' ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200' });
   }
   // trucks coming to you stay on top until they arrive; then newest first
   // trucks coming to you are in their own list above, so updates hold the rest, newest first
-  const updates = news.filter((n) => !n.pin).sort((a, b) => b.at - a.at);
+  const updates = news.filter((n) => !n.pin && (!open || !n.side || n.side === open)).sort((a, b) => b.at - a.at);
 
   // one big button: the next step for this truck
   const step = (s: any): { icon: string; status: string; btn?: string; btnCls?: string; act?: () => void } => {
@@ -170,7 +172,25 @@ export default function Staff({ go }: { go: Go }) {
           {Object.keys(UNITS).map((u) => <button key={u} id={`unit-${u}`} onClick={() => pickUnit(u)} className={`px-3 py-1.5 rounded-full border font-bold cursor-pointer ${u === unit ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-300'}`}>{uname(u)}</button>)}
         </div>
 
-        <div id="coming" className="rounded-2xl border-2 border-sky-300 bg-sky-50 p-3 space-y-2">
+        <div className="grid grid-cols-2 gap-3">
+          <button id="btn-send-stock" onClick={() => setOpen(open === 'send' ? '' : 'send')} className={`min-h-[84px] rounded-2xl text-lg font-bold cursor-pointer flex flex-col items-center justify-center border-2 ${open === 'send' ? 'bg-violet-700 text-white border-violet-700' : 'bg-violet-50 text-violet-900 border-violet-200'}`}><span className="text-3xl">📤</span>{w('send')}</button>
+          <button id="btn-receive-stock" onClick={() => setOpen(open === 'receive' ? '' : 'receive')} className={`min-h-[84px] rounded-2xl text-lg font-bold cursor-pointer flex flex-col items-center justify-center border-2 ${open === 'receive' ? 'bg-sky-700 text-white border-sky-700' : 'bg-sky-50 text-sky-900 border-sky-200'}`}><span className="text-3xl">📥</span>{w('receive')}</button>
+        </div>
+        {open === 'send' && (
+          <div className="grid grid-cols-2 gap-3">
+            <button id="send-unit" onClick={() => go('dispatch', { id: 'new:transfer' })} className={`${big} flex-col py-3 bg-white border-2 border-violet-300 text-violet-900`}><span className="text-2xl">🏭</span>{w('ourUnit')}</button>
+            <button id="send-customer" onClick={() => go('dispatch', { id: 'new:outbound' })} className={`${big} flex-col py-3 bg-white border-2 border-violet-300 text-violet-900`}><span className="text-2xl">🏪</span>{w('customer')}</button>
+          </div>
+        )}
+        {open === 'receive' && (
+          <div className="space-y-2">
+            <div className="text-xs text-slate-600">👆 {w('tapWhenHere')} (🚚 {w('comingToday')})</div>
+            <AskAdd what="delivery" label={w('notInList')} />
+          </div>
+        )}
+
+        <div className="space-y-2">
+          {open !== 'send' && <div id="coming" className="rounded-2xl border-2 border-sky-300 bg-sky-50 p-3 space-y-2">
           <div className="text-base font-bold text-sky-950">🚚 {w('comingToday')} · {receiving.length}</div>
           {!receiving.length && <div className="text-sm text-sky-900">{w('noneComing')}</div>}
           {receiving.length > 0 && <div className="text-xs text-sky-900">👆 {w('tapWhenHere')}</div>}
@@ -190,7 +210,7 @@ export default function Staff({ go }: { go: Go }) {
               </button>
             );
           })}
-        </div>
+        </div>}
 
         <div id="updates" className="space-y-1.5">
           <div className="text-sm font-bold text-slate-900">🔔 {w('updates')}</div>
@@ -199,25 +219,7 @@ export default function Staff({ go }: { go: Go }) {
           {updates.length > 3 && <button id="btn-news-all" onClick={() => setAllNews(!allNews)} className="text-xs font-bold text-slate-500 underline cursor-pointer">{allNews ? '−' : `+${Math.min(updates.length, 10) - 3}`}</button>}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <button id="btn-send-stock" onClick={() => setOpen(open === 'send' ? '' : 'send')} className={`min-h-[84px] rounded-2xl text-lg font-bold cursor-pointer flex flex-col items-center justify-center border-2 ${open === 'send' ? 'bg-violet-700 text-white border-violet-700' : 'bg-violet-50 text-violet-900 border-violet-200'}`}><span className="text-3xl">📤</span>{w('send')}</button>
-          <button id="btn-receive-stock" onClick={() => setOpen(open === 'receive' ? '' : 'receive')} className={`min-h-[84px] rounded-2xl text-lg font-bold cursor-pointer flex flex-col items-center justify-center border-2 ${open === 'receive' ? 'bg-sky-700 text-white border-sky-700' : 'bg-sky-50 text-sky-900 border-sky-200'}`}><span className="text-3xl">📥</span>{w('receive')}</button>
-        </div>
-        {open === 'send' && (
-          <div className="grid grid-cols-2 gap-3">
-            <button id="send-unit" onClick={() => go('dispatch', { id: 'new:transfer' })} className={`${big} flex-col py-3 bg-white border-2 border-violet-300 text-violet-900`}><span className="text-2xl">🏭</span>{w('ourUnit')}</button>
-            <button id="send-customer" onClick={() => go('dispatch', { id: 'new:outbound' })} className={`${big} flex-col py-3 bg-white border-2 border-violet-300 text-violet-900`}><span className="text-2xl">🏪</span>{w('customer')}</button>
-          </div>
-        )}
-        {open === 'receive' && (
-          <div className="space-y-2">
-            <div className="text-xs text-slate-600">👆 {w('tapWhenHere')} (🚚 {w('comingToday')})</div>
-            <AskAdd what="delivery" label={w('notInList')} />
-          </div>
-        )}
-
-        <div className="space-y-2">
-          {open !== 'receive' && <div className="text-sm font-bold text-slate-900">📤 {w('myTrucks')}</div>}
+        {open !== 'receive' && <div className="text-sm font-bold text-slate-900">📤 {w('myTrucks')}</div>}
           {!mine.length && open !== 'receive' && <div id="nothing-pending" className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{w('nothing')}</div>}
           {open !== 'receive' && sending.map((s: any) => <Card key={s.id} s={s} />)}
         </div>

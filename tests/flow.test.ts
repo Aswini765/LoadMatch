@@ -94,7 +94,7 @@ test('transfer short and damaged: differences per line, goods-in-transit journal
   let [s, id] = sentTransfer(buildInitialState());
   s = run(s, { type: 'SUBMIT_RECEIPT', id, token: 'tok123', by: 'Ravi', lines: { L1: { counted: 95, damaged: 0 }, L2: { counted: 50, damaged: 3 } } });
   const ds = diffsOf(s, id);
-  assert.deepEqual(ds.map((d: any) => [d.kind, d.qty, d.value]), [['short', 5, 700], ['damaged', 3, 255]]);
+  assert.deepEqual(ds.map((d: any) => [d.kind, d.qty, d.value]), [['short', 5, 132500], ['damaged', 3, 55500]]);
   assert.equal(status(s, id), 'TO_DECIDE');
   const rj = draftsFor(s, id).find((d: any) => d.purpose === 'receipt');
   assert.deepEqual(rj.moves.map((m: any) => [m.item, m.qty, m.to]), [['BRP-1148', 95, 'Bengaluru Unit'], ['OKU-AB-91', 47, 'Bengaluru Unit'], ['OKU-AB-91', 3, 'Damaged Goods']]);
@@ -111,9 +111,9 @@ test('a loss above the owner limit needs an explicit confirmation', () => {
   let [s, id] = sentTransfer(buildInitialState(), [{ item: 'PLY-18', qty: 20 }]);
   s = run(s, { type: 'SUBMIT_RECEIPT', id, token: 'tok123', by: 'Ravi', lines: { L1: { counted: 15, damaged: 0 } } });
   const d = diffsOf(s, id)[0];
-  assert.equal(d.value, 10250);
+  assert.equal(d.value, 256250);
   const before = s;
-  assert.equal(run(s, { type: 'DECIDE', diffId: d.id, action: 'write_off' }), before, '₹10,250 is above the ₹5,000 limit');
+  assert.equal(run(s, { type: 'DECIDE', diffId: d.id, action: 'write_off' }), before, '₹2,56,250 is above the ₹2,00,000 limit');
   s = run(s, { type: 'DECIDE', diffId: d.id, action: 'write_off', confirm: true });
   assert.equal(diffOf(s, d.id).status, 'settled');
 });
@@ -163,7 +163,7 @@ test('supplier short settled by debit note: GST draft balances', () => {
   const d = diffsOf(s, id)[0];
   s = run(s, { type: 'DECIDE', diffId: d.id, action: 'debit_note' });
   const dn = draftsFor(s, id).find((x: any) => x.type === 'debit_note');
-  assert.equal(taxLines(dn.lines, PARTIES.coastal).total, 2006); // 20 × ₹85 = ₹1,700 + 18% GST
+  assert.equal(taxLines(dn.lines, PARTIES.coastal).total, 436600); // 20 × ₹18,500 = ₹3,70,000 + 18% GST
   const xml = voucherXml(dn);
   assert.match(xml, /VCHTYPE="Debit Note"/); assert.match(xml, /Input CGST/); assert.doesNotMatch(xml, /VOUCHERNUMBER/);
 });
@@ -181,7 +181,7 @@ test('customer excess: bill the extra; customer short: credit note against the i
   s = run(s, { type: 'DECIDE', diffId: sh.id, action: 'credit_note' });
   const cn = draftsFor(s, 'TRK-1017').find((d: any) => d.type === 'credit_note');
   const t = taxLines(cn.lines, PARTIES.deccan);
-  assert.equal(t.igst, 151.2, 'Tamil Nadu customer: IGST');
+  assert.equal(t.igst, 7560, 'Tamil Nadu customer: IGST');
   assert.match(voucherXml(cn), /Output IGST/);
 });
 

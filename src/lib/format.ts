@@ -3,6 +3,14 @@ export const inr = (n, dp = 2) =>
 
 export const inr0 = (n) => inr(n, 0);
 
+// big amounts the way an Indian owner reads them: ₹5.6 L, ₹1.2 Cr
+export const inrL = (n) => {
+  const v = Number(n || 0);
+  if (Math.abs(v) >= 1e7) return `₹${(v / 1e7).toFixed(2).replace(/\.?0+$/, '')} Cr`;
+  if (Math.abs(v) >= 1e5) return `₹${(v / 1e5).toFixed(2).replace(/\.?0+$/, '')} L`;
+  return inr0(v);
+};
+
 export const time = (ms) =>
   new Date(ms).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false });
 

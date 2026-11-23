@@ -20,16 +20,16 @@ export const GODOWNS = { transit: 'Goods in Transit', damaged: 'Damaged Goods', 
 
 export type Item = { code: string; name: string; unit: string; hsn: string; rate: number; gst: number };
 export const ITEMS: Record<string, Item> = {
-  'OKU-AB-91': { code: 'OKU-AB-91', name: 'Face veneer Okoume AB, 91 × 45.5 × 6 mm', unit: 'pcs', hsn: '4408', rate: 85, gst: 18 },
-  'OKU-DG-90': { code: 'OKU-DG-90', name: 'Face veneer Okoume D/G, 90 × 48 × 15 mm', unit: 'pcs', hsn: '4408', rate: 120, gst: 18 },
-  'BRP-1148': { code: 'BRP-1148', name: 'Face veneer Barpas, 1148 × 452 × 6 mm', unit: 'pcs', hsn: '4408', rate: 140, gst: 18 },
-  'BRP-1136': { code: 'BRP-1136', name: 'Face veneer Barpas, 1136 × 452 × 6 mm', unit: 'pcs', hsn: '4408', rate: 138, gst: 18 },
-  'PLY-12': { code: 'PLY-12', name: 'Plywood 12 mm, 8 × 4 ft', unit: 'pcs', hsn: '4412', rate: 1450, gst: 18 },
-  'PLY-18': { code: 'PLY-18', name: 'Plywood 18 mm, 8 × 4 ft', unit: 'pcs', hsn: '4412', rate: 2050, gst: 18 },
-  'BOX-RB': { code: 'BOX-RB', name: 'RB box, nailed, 600 × 400 × 400 mm', unit: 'pcs', hsn: '4415', rate: 380, gst: 18 },
-  'BOX-NL': { code: 'BOX-NL', name: 'Nail-less box, 800 × 600 × 500 mm', unit: 'pcs', hsn: '4415', rate: 420, gst: 18 },
-  'LOG-RW': { code: 'LOG-RW', name: 'Rubberwood logs, bundle', unit: 'bundles', hsn: '4403', rate: 2400, gst: 18 },
-  'LOG-SIL': { code: 'LOG-SIL', name: 'Silver oak logs, bundle', unit: 'bundles', hsn: '4403', rate: 2100, gst: 18 },
+  'OKU-AB-91': { code: 'OKU-AB-91', name: 'Face veneer Okoume AB, 91 × 45.5 × 6 mm (bundle of 100)', unit: 'bundles', hsn: '4408', rate: 18500, gst: 18 },
+  'OKU-DG-90': { code: 'OKU-DG-90', name: 'Face veneer Okoume D/G, 90 × 48 × 15 mm (bundle of 100)', unit: 'bundles', hsn: '4408', rate: 24000, gst: 18 },
+  'BRP-1148': { code: 'BRP-1148', name: 'Face veneer Barpas, 1148 × 452 × 6 mm (bundle of 100)', unit: 'bundles', hsn: '4408', rate: 26500, gst: 18 },
+  'BRP-1136': { code: 'BRP-1136', name: 'Face veneer Barpas, 1136 × 452 × 6 mm (bundle of 100)', unit: 'bundles', hsn: '4408', rate: 26000, gst: 18 },
+  'PLY-12': { code: 'PLY-12', name: 'Plywood 12 mm, 8 × 4 ft (pack of 25)', unit: 'packs', hsn: '4412', rate: 36250, gst: 18 },
+  'PLY-18': { code: 'PLY-18', name: 'Plywood 18 mm, 8 × 4 ft (pack of 25)', unit: 'packs', hsn: '4412', rate: 51250, gst: 18 },
+  'BOX-RB': { code: 'BOX-RB', name: 'RB box, nailed, 600 × 400 × 400 mm (bundle of 50)', unit: 'bundles', hsn: '4415', rate: 19000, gst: 18 },
+  'BOX-NL': { code: 'BOX-NL', name: 'Nail-less box, 800 × 600 × 500 mm (bundle of 50)', unit: 'bundles', hsn: '4415', rate: 21000, gst: 18 },
+  'LOG-RW': { code: 'LOG-RW', name: 'Rubberwood logs, bundle', unit: 'bundles', hsn: '4403', rate: 48000, gst: 18 },
+  'LOG-SIL': { code: 'LOG-SIL', name: 'Silver oak logs, bundle', unit: 'bundles', hsn: '4403', rate: 42000, gst: 18 },
 };
 
 export const PARTIES: Record<string, { id: string; name: string; kind: 'supplier' | 'customer' | 'jobworker'; city: string; state: string; gstin: string }> = {
@@ -139,7 +139,7 @@ export function makeSeed(anchor: number) {
 
 export const DEFAULT_SETTINGS = {
   // losses above this value need an explicit confirmation from the owner
-  writeOffLimit: 5000,
+  writeOffLimit: 200000,
   // a truck not confirmed within this many hours shows as overdue
   receiptHours: 24,
   languages: { en: true, hi: true, kn: true, te: true },

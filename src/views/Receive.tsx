@@ -110,6 +110,8 @@ export default function Receive({ id, token, payload }: { id: string; token: str
   const [note, setNote] = useState(saved?.note || '');
   const [step, setStep] = useState<number>(saved?.step ?? 0); // 0..n-1 lines, n = review
   const [confirming, setConfirming] = useState(false);
+  // the receiver first says the truck is here, then counts (a link opened early does not start counting)
+  const [arrivedHere, setArrivedHere] = useState(false);
   const [heard, setHeard] = useState<{ text: string; ok: boolean } | null>(null);
   const stepRef = useRef(step);
   stepRef.current = step;
@@ -147,6 +149,23 @@ export default function Receive({ id, token, payload }: { id: string; token: str
   );
 
   if (s.receipt) return <Done s={s} state={state} remote={Boolean(remote)} lang={lang} setLang={setLang} head={head} />;
+
+  if (!s.arrivedAt && !arrivedHere && !saved?.step && (!atGate(s.flow) || s.expectedOn)) {
+    return (
+      <PhoneFrame title="LoadMatch" sub={loadName(s.id)} lang={lang} setLang={setLang}>
+        <div className="space-y-4">
+          {head}
+          <div id="not-arrived" className="rounded-2xl border-2 border-sky-300 bg-sky-50 p-4 text-center space-y-2">
+            <div className="text-4xl">🚚</div>
+            <div className="text-base font-bold text-sky-950">{loadName(s.id)} is on the way</div>
+            <div className="text-sm text-sky-900">From {route(s).split(' → ')[0]} · truck <span className="font-mono font-bold">{s.truckNo}</span></div>
+            <div className="text-xs text-slate-600">When this truck is at your gate, tap the button and count what came.</div>
+          </div>
+          <button id="btn-arrived" onClick={() => { if (!remote) store.dispatch({ type: 'ARRIVED', id: s.id, by: me(), actor: me() }); setArrivedHere(true); }} className="w-full min-h-[56px] rounded-2xl bg-emerald-600 text-white text-base font-bold cursor-pointer">📍 Truck arrived → 🔢 Count</button>
+        </div>
+      </PhoneFrame>
+    );
+  }
 
   const n = s.lines.length;
   const get = (lineId: string): Count => counts[lineId] || { counted: '', damaged: '0' };

@@ -7,7 +7,7 @@ import { batchXml, download } from '../lib/tally.ts';
 import { tallyDate } from '../lib/format.ts';
 import { Chain } from './Dispatch.tsx';
 import { PageHeader, Panel, StatusBadge, Note, PhotoStrip, shareWhatsApp, appLink, newToken, type Go } from './ui.tsx';
-import { inr, inr0, when, duration, dateTime, time } from '../lib/format.ts';
+import { inr, inr0, inrL, when, duration, dateTime, time } from '../lib/format.ts';
 import { COMPANY } from '../data/seed.ts';
 
 const KIND_CLS: Record<string, string> = {
@@ -111,7 +111,7 @@ function Inbox({ go, initialId }: { go: Go; initialId?: string | null }) {
       rows.push({ kind: 'ok', at: s.receipt.at, s, icon: '✅', tone: 'border-l-emerald-500', title: `${loadName(s.id)} · all matched`, sub: `${route(s)} · counted by ${s.receipt.by}`, done: !ds.length });
       if (ds.length) rows[rows.length - 1].title = `${loadName(s.id)} · decided`;
     }
-    if (s.flow === 'outbound' && s.sentAt && !s.receipt && !s.linkSentAt) rows.push({ kind: 'link', at: s.sentAt, s, icon: '🚚', tone: 'border-l-violet-500', title: `${loadName(s.id)} left for ${party(s.party).name}`, sub: `Truck ${s.truckNo} · send them the count link` });
+    if (s.flow === 'outbound' && s.sentAt && !s.receipt && !s.linkSentAt) rows.push({ kind: 'link', at: s.sentAt, s, icon: '🚚', tone: 'border-l-violet-500', title: `${loadName(s.id)} left for ${party(s.party).name}`, sub: `Truck ${s.truckNo} · send ${party(s.party).name} the link so they count it when it arrives` });
   }
   for (const r of state.requests || []) {
     if (r.status !== 'pending') continue;
@@ -146,11 +146,11 @@ function Inbox({ go, initialId }: { go: Go; initialId?: string | null }) {
             <div role="button" onClick={() => x.kind === 'truck' && setOpenId(isOpen ? '' : x.s.id)} className={`p-3 flex items-center gap-3 ${x.kind === 'truck' ? 'cursor-pointer' : ''}`}>
               <span className="text-2xl leading-none">{x.icon}</span>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-bold text-slate-900">{x.title}{x.value ? <span className="text-rose-700"> · {inr0(x.value)}</span> : null}</div>
+                <div className="text-sm font-bold text-slate-900">{x.title}{x.value ? <span className="text-rose-700"> · {inrL(x.value)}</span> : null}</div>
                 <div className="text-xs text-slate-500 truncate">{x.sub}{x.sub ? ' · ' : ''}{when(x.at, now)}</div>
               </div>
               {x.kind === 'truck' && <span className={`${btn} ${isOpen ? 'bg-slate-100 text-slate-700' : 'bg-slate-900 text-white'}`}>{isOpen ? 'Close' : 'Decide'}</span>}
-              {x.kind === 'link' && <a id={`send-link-${x.s.id}`} href={shareWhatsApp(`${COMPANY.name}: ${loadName(x.s.id)} is on the way (truck ${x.s.truckNo}). When it arrives, please count and submit here:\n${appLink(receiverPath(x.s, state.settings))}`)} target="_blank" rel="noreferrer" onClick={(e) => { e.stopPropagation(); dispatch({ type: 'LINK_SENT', id: x.s.id, actor: 'Owner' }); }} className={`${btn} bg-emerald-600 text-white`}>💬 Send link</a>}
+              {x.kind === 'link' && <a id={`send-link-${x.s.id}`} href={shareWhatsApp(`${COMPANY.name}: ${loadName(x.s.id)} is on the way (truck ${x.s.truckNo}). When it reaches you, open this link, tap Truck arrived and count:\n${appLink(receiverPath(x.s, state.settings))}`)} target="_blank" rel="noreferrer" onClick={(e) => { e.stopPropagation(); dispatch({ type: 'LINK_SENT', id: x.s.id, actor: 'Owner' }); }} className={`${btn} bg-emerald-600 text-white`}>💬 Send to {party(x.s.party).name.split(' ')[0]} on WhatsApp</a>}
             </div>
             {x.kind === 'req' && (
               <div className="px-3 pb-3 flex gap-2 items-center">
@@ -419,7 +419,7 @@ export function AccountantPanel({ mode = 'owner' }: { mode?: 'owner' | 'accounta
           <div className="flex flex-wrap gap-2">
             <button id="btn-print-report" onClick={() => printReport(reportHtml(state, ready, `Not yet sent · ${dateTime(now)}`))} className="px-3 py-2 rounded-lg border border-slate-300 bg-white text-xs font-bold flex items-center cursor-pointer"><Printer className="w-3.5 h-3.5 mr-1.5" />Report to print</button>
             <button id="btn-tally-file" onClick={() => download(`loadmatch-tally-${stamp}.xml`, batchXml(ready))} className="px-3 py-2 rounded-lg border border-slate-300 bg-white text-xs font-bold flex items-center cursor-pointer"><FileCode className="w-3.5 h-3.5 mr-1.5" />Tally file</button>
-            <a id="btn-wa-accountant" href={shareWhatsApp(packSummary(state, ready, now))} target="_blank" rel="noreferrer" className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold flex items-center"><MessageCircle className="w-3.5 h-3.5 mr-1.5" />WhatsApp summary</a>
+            {/* no WhatsApp here: the accountant prints the report or downloads the Tally file */}
           </div>
           {mode === 'accountant' && <div id="acc-todo-head" className="text-sm font-bold text-slate-900">To do · {listed.length}{stockOnly ? <span className="font-normal text-xs text-slate-500"> (plus {stockOnly} routine stock entries, already in the Tally file)</span> : null}</div>}
           {mode === 'accountant' && !listed.length && <div className="text-xs text-emerald-800">✓ Nothing to do from the owner's decisions.</div>}
