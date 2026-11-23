@@ -124,6 +124,7 @@ export function makeSeed(anchor: number) {
   ev.push({ type: 'LOADING', id: 'TRK-1016', point: 'Dock 1', phase: 'start', at: at(-3, -50), actor: 'Dispatch staff' });
   ev.push({ type: 'LOADING', id: 'TRK-1016', point: 'Dock 1', phase: 'end', at: at(-3, -10), actor: 'Dispatch staff' });
   ev.push({ type: 'SEND_TO_RECEIVER', id: 'TRK-1016', token: 'demo16k', at: at(-3), actor: 'Dispatch staff' });
+  ev.push({ type: 'LINK_SENT', id: 'TRK-1016', at: at(-3) + 60000, actor: 'Owner' }); // owner told Bengaluru it is coming
   // Ravi at Bengaluru asked the owner to add an item that is not in the list yet
   ev.push({ type: 'ASK_ADD', what: 'item', name: 'Teak veneer 6 mm', by: 'Ravi (staff)', at: at(-1), actor: 'Ravi (staff)' });
 

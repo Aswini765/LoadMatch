@@ -634,7 +634,7 @@ export function reducer(state: any, action: any): any {
 
     // The owner sends the ready entries to the accountant (printable report + Tally file). The owner's decision
     // is the approval; a sent entry is kept with the pack it went in.
-    // The owner sends the count link to the customer from the company WhatsApp (staff don't)
+    // The owner tells the receiver a truck is coming: our other unit (in the app) or a customer (WhatsApp). Staff don't.
     case 'LINK_SENT': {
       const s = shipmentOf(state, action.id);
       if (!s || !s.sentAt || s.receipt || actor !== 'Owner') return state;

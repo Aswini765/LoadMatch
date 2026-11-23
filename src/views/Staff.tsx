@@ -34,6 +34,7 @@ const W: Record<string, Record<L, string>> = {
   customer: { en: 'Customer', hi: 'ग्राहक', kn: 'ಗ್ರಾಹಕ', te: 'కస్టమర్' },
   supplierGate: { en: 'Supplier truck at the gate', hi: 'सप्लायर की गाड़ी गेट पर', kn: 'ಸರಬರಾಜುದಾರರ ಲಾರಿ ಗೇಟ್‌ನಲ್ಲಿ', te: 'సరఫరాదారు లారీ గేటు వద్ద' },
   fromOur: { en: 'Every truck coming to you (our unit or a supplier) is below. Tap Truck arrived, then Count.', hi: 'आपके पास आने वाली हर गाड़ी नीचे है। “गाड़ी पहुँच गई” दबाएँ, फिर गिनें।', kn: 'ನಿಮಗೆ ಬರುವ ಪ್ರತಿ ಲಾರಿ ಕೆಳಗಿದೆ. “ಲಾರಿ ಬಂತು” ಒತ್ತಿ, ನಂತರ ಎಣಿಸಿ.', te: 'మీకు వచ్చే ప్రతి లారీ కింద ఉంది. “లారీ వచ్చింది” నొక్కి, తర్వాత లెక్కించండి.' },
+  ownerTells: { en: 'owner will tell them', hi: 'मालिक उन्हें बताएंगे', kn: 'ಮಾಲೀಕರು ಅವರಿಗೆ ತಿಳಿಸುತ್ತಾರೆ', te: 'యజమాని వారికి చెబుతారు' },
   ownerSends: { en: 'The owner sends the count link to the customer.', hi: 'मालिक ग्राहक को गिनती का लिंक भेजेंगे।', kn: 'ಮಾಲೀಕರು ಗ್ರಾಹಕರಿಗೆ ಎಣಿಕೆ ಲಿಂಕ್ ಕಳುಹಿಸುತ್ತಾರೆ.', te: 'యజమాని కస్టమర్‌కు లెక్క లింక్ పంపుతారు.' },
   waLink: { en: 'Send count link on WhatsApp', hi: 'WhatsApp पर गिनती लिंक भेजें', kn: 'WhatsApp‌ನಲ್ಲಿ ಎಣಿಕೆ ಲಿಂಕ್ ಕಳುಹಿಸಿ', te: 'WhatsAppలో లెక్క లింక్ పంపండి' },
   yes: { en: 'Owner said YES', hi: 'मालिक ने हाँ कहा', kn: 'ಮಾಲೀಕರು ಹೌದು ಎಂದರು', te: 'యజమాని సరే అన్నారు' },
@@ -75,7 +76,7 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
   // newest first, so a truck just saved is at the top
   const sending = live.filter((s: any) => s.fromUnit === unit && !s.returning && !atGate(s.flow)).sort((a: any, b: any) => (b.id === initialId ? 1 : 0) - (a.id === initialId ? 1 : 0) || b.createdAt - a.createdAt);
   // trucks coming to this unit (our units' trucks, supplier trucks not yet counted, goods coming back after an accident)
-  const receiving = live.filter((s: any) => (s.returning ? s.fromUnit === unit : s.toUnit === unit && countedByUs(s) && (s.flow !== 'transfer' || s.sentAt)));
+  const receiving = live.filter((s: any) => (s.returning ? s.fromUnit === unit : s.toUnit === unit && countedByUs(s) && (s.flow !== 'transfer' || (s.sentAt && s.linkSentAt))));
   const old = state.shipments.filter((s: any) => (open === 'send' ? s.fromUnit === unit : open === 'receive' ? s.toUnit === unit : s.fromUnit === unit || s.toUnit === unit) && (s.receipt || s.cancelledAt))
     .sort((a: any, b: any) => (b.receipt?.at || b.cancelledAt) - (a.receipt?.at || a.cancelledAt)).slice(0, 10);
 
@@ -96,6 +97,7 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
       dispatch({ type: 'LOADING', id, point: 'Dock 1', phase: 'start', actor: 'Ramesh (staff)' });
       dispatch({ type: 'LOADING', id, phase: 'end', actor: 'Ramesh (staff)' });
       dispatch({ type: 'SEND_TO_RECEIVER', id, token: newToken(), actor: 'Ramesh (staff)' });
+      dispatch({ type: 'LINK_SENT', id, actor: 'Owner' });
     }
   }, [unit, receiving.length]);
 
@@ -111,7 +113,7 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
   for (const s of state.shipments) {
     const [from, to] = route(s).split(' → ');
     if (s.cancelledAt) continue;
-    if (s.toUnit === unit && s.flow === 'transfer' && s.sentAt && !s.arrivedAt && !s.receipt) news.push({ at: s.sentAt, pin: true, icon: '🚚', text: `${comingX(from, l)} · ${loadName(s.id)}`, tone: 'bg-sky-50 border-sky-200' });
+    if (s.toUnit === unit && s.flow === 'transfer' && s.sentAt && s.linkSentAt && !s.arrivedAt && !s.receipt) news.push({ at: s.sentAt, pin: true, icon: '🚚', text: `${comingX(from, l)} · ${loadName(s.id)}`, tone: 'bg-sky-50 border-sky-200' });
     if (s.toUnit === unit && s.expectedOn && !s.arrivedAt && !s.receipt) news.push({ at: s.expectedOn, pin: true, icon: '🚛', text: `${comingX(from, l)} · ${w('expected')} ${dayText(s.expectedOn)}`, tone: 'bg-sky-50 border-sky-200' });
     if (s.returning && s.fromUnit === unit && !s.receipt) news.push({ at: s.accident?.at || s.sentAt, pin: true, icon: '⚠️', text: `${w('backAccident')} · ${loadName(s.id)}`, tone: 'bg-rose-50 border-rose-200' });
     if (s.fromUnit === unit && s.arrivedAt && !s.receipt && !s.returning) news.push({ side: 'send', at: s.arrivedAt, icon: '📍', text: `${loadName(s.id)} ${reachedX(to, l)}`, tone: 'bg-sky-50 border-sky-200' });
@@ -141,7 +143,7 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
     if (!s.loading) return { icon: '📦', status: w('loading'), btn: `📦 ${w('startLoading')}`, btnCls: 'bg-violet-600 text-white', act: () => dispatch({ type: 'LOADING', id: s.id, point: 'Dock 1', phase: 'start', actor: me() }) };
     if (!s.loading.endAt) return { icon: '📦', status: w('loading'), btn: `✅ ${w('loadingDone')}`, btnCls: 'bg-violet-600 text-white', act: () => dispatch({ type: 'LOADING', id: s.id, phase: 'end', actor: me() }) };
     if (!s.sentAt) return { icon: '📦', status: w('loadingDone'), btn: `🚚 ${w('truckLeft')}`, btnCls: 'bg-emerald-600 text-white', act: () => dispatch({ type: 'SEND_TO_RECEIVER', id: s.id, token: newToken(), actor: me() }) };
-    return { icon: s.arrivedAt ? '📍' : '🚚', status: s.arrivedAt ? w('reached') : w('onTheWay') };
+    return { icon: s.arrivedAt ? '📍' : '🚚', status: s.arrivedAt ? w('reached') : s.linkSentAt ? w('onTheWay') : `${w('onTheWay')} · ${w('ownerTells')}` };
   };
 
   const Card = ({ s }: { s: any }) => {
@@ -180,11 +182,13 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
             <button id="btn-receive-stock" onClick={() => setOpen('receive')} className="min-h-[84px] rounded-2xl text-lg font-bold cursor-pointer flex flex-col items-center justify-center border-2 bg-sky-50 text-sky-900 border-sky-200"><span className="text-3xl">📥</span>{w('receive')}</button>
           </div>
         ) : (
-          // only the chosen side is on screen; the small back button returns to both
-          <div className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-white ${open === 'send' ? 'bg-violet-700' : 'bg-sky-700'}`}>
-            <button id={open === 'send' ? 'btn-send-stock' : 'btn-receive-stock'} onClick={() => setOpen('')} className="shrink-0 rounded-xl bg-white/20 px-3 py-2 text-sm font-bold cursor-pointer">← {w('back')}</button>
-            <span className="text-2xl">{open === 'send' ? '📤' : '📥'}</span>
-            <span className="text-lg font-bold">{w(open)}</span>
+          // only the chosen side is on screen; a separate Back button returns to both
+          <div className="space-y-2">
+            <button id={open === 'send' ? 'btn-send-stock' : 'btn-receive-stock'} onClick={() => setOpen('')} className="inline-flex items-center gap-1 rounded-xl border-2 border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 cursor-pointer">← {w('back')}</button>
+            <div className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-white ${open === 'send' ? 'bg-violet-700' : 'bg-sky-700'}`}>
+              <span className="text-2xl">{open === 'send' ? '📤' : '📥'}</span>
+              <span className="text-lg font-bold">{w(open)}</span>
+            </div>
           </div>
         )}
         {open === 'send' && (
