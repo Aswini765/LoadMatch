@@ -111,6 +111,9 @@ function Inbox({ go, initialId }: { go: Go; initialId?: string | null }) {
       rows.push({ kind: 'ok', at: s.receipt.at, s, icon: '✅', tone: 'border-l-emerald-500', title: `${loadName(s.id)} · all matched`, sub: `${route(s)} · counted by ${s.receipt.by}`, done: !ds.length });
       if (ds.length) rows[rows.length - 1].title = `${loadName(s.id)} · decided`;
     }
+    // every truck that leaves tells the owner; our other unit sees it in its app, so nothing to forward
+    if (s.flow === 'transfer' && s.sentAt && !s.receipt && !s.returning) rows.push({ kind: 'left', at: s.arrivedAt || s.sentAt, s, icon: s.arrivedAt ? '📍' : '🚚', tone: 'border-l-slate-400', title: s.arrivedAt ? `${loadName(s.id)} reached ${route(s).split(' → ')[1]}` : `${loadName(s.id)} left ${route(s).split(' → ')[0]} for ${route(s).split(' → ')[1]}`, sub: s.arrivedAt ? `Being counted now · truck ${s.truckNo}` : `${route(s).split(' → ')[1]} sees it in their app · truck ${s.truckNo}` });
+    if (s.flow === 'outbound' && s.sentAt && !s.receipt && s.linkSentAt) rows.push({ kind: 'left', at: s.linkSentAt, s, icon: '💬', tone: 'border-l-slate-400', title: `${loadName(s.id)} · link sent to ${party(s.party).name}`, sub: `Waiting for their count · truck ${s.truckNo}` });
     if (s.flow === 'outbound' && s.sentAt && !s.receipt && !s.linkSentAt) rows.push({ kind: 'link', at: s.sentAt, s, icon: '🚚', tone: 'border-l-violet-500', title: `${loadName(s.id)} left for ${party(s.party).name}`, sub: `Truck ${s.truckNo} · send ${party(s.party).name} the link so they count it when it arrives` });
   }
   for (const r of state.requests || []) {
@@ -125,7 +128,7 @@ function Inbox({ go, initialId }: { go: Go; initialId?: string | null }) {
     rows.push({ kind: 'req', at: r.at, r, icon: r.kind === 'accident' ? '🚨' : '🙋', tone: r.kind === 'accident' ? 'border-l-rose-500' : 'border-l-sky-500', title, sub: r.note ? `“${r.note}”` : '' });
   }
   rows.sort((a, b) => b.at - a.at);
-  const need = rows.filter((x) => x.kind !== 'ok').length;
+  const need = rows.filter((x) => x.kind !== 'ok' && x.kind !== 'left').length;
   const firstTruck = rows.find((x) => x.kind === 'truck');
   const expanded = (x: any) => openId === x.s?.id || (openId === null && (x === firstTruck || (initialId && (x.s?.id === initialId || x.openDs?.some((d: any) => d.id === initialId)))));
   const yes = (r: any) => dispatch({ type: 'DECIDE_REQUEST', reqId: r.id, approve: true, note: notes[r.id] || '', token: newToken(), actor: 'Owner' });
@@ -142,7 +145,7 @@ function Inbox({ go, initialId }: { go: Go; initialId?: string | null }) {
         const id = x.kind === 'truck' ? `own-truck-${x.s.id}` : x.kind === 'req' ? `req-${x.r.id}` : `row-${x.kind}-${x.s.id}`;
         const isOpen = x.kind === 'truck' && expanded(x);
         return (
-          <div key={id + i} id={id} className={`bg-white border border-slate-200 border-l-4 ${x.tone} rounded-xl overflow-hidden ${x.kind === 'ok' ? 'opacity-80' : ''}`}>
+          <div key={id + i} id={id} className={`bg-white border border-slate-200 border-l-4 ${x.tone} rounded-xl overflow-hidden ${x.kind === 'ok' || x.kind === 'left' ? 'opacity-80' : ''}`}>
             <div role="button" onClick={() => x.kind === 'truck' && setOpenId(isOpen ? '' : x.s.id)} className={`p-3 flex items-center gap-3 ${x.kind === 'truck' ? 'cursor-pointer' : ''}`}>
               <span className="text-2xl leading-none">{x.icon}</span>
               <div className="flex-1 min-w-0">

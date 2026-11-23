@@ -25,7 +25,7 @@ export default function Dispatch({ go, initialId }: { go: Go; initialId?: string
   return (
     <PhoneFrame title={getWho() === 'owner' ? 'LoadMatch · Trucks' : 'LoadMatch · Send'} sub={sub} lang={lang} setLang={setLang}>
       {screen === 'list' && <TruckList lang={lang} open={(id) => setScreen(`truck:${id}`)} create={(f) => setScreen(`new:${f}`)} />}
-      {screen.startsWith('new:') && <NewList lang={lang} flow={screen.slice(4)} onBack={() => (getWho() === 'owner' ? setScreen('list') : go('staff'))} onSaved={(id) => (getWho() === 'owner' ? setScreen(`truck:${id}`) : go('staff'))} />}
+      {screen.startsWith('new:') && <NewList lang={lang} flow={screen.slice(4)} onBack={() => (getWho() === 'owner' ? setScreen('list') : go('staff'))} onSaved={(id) => (getWho() === 'owner' ? setScreen(`truck:${id}`) : go('staff', { id }))} />}
       {screen.startsWith('truck:') && <TruckDetail lang={lang} id={screen.slice(6)} onBack={() => (getWho() === 'owner' ? setScreen('list') : go('staff'))} />}
     </PhoneFrame>
   );

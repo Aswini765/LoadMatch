@@ -157,7 +157,7 @@ export default function App() {
             {who && view === 'dispatch' && <Dispatch go={go} initialId={openId} key={nav} />}
             {who && view === 'owner' && <Owner go={go} initialId={openId} key={`${openId || 'list'}-${nav}`} />}
             {who && view === 'receive' && <ReceiveTab key={nav} initialAdd={openId?.startsWith('add:') ? openId.slice(4) : null} />}
-            {who && view === 'staff' && <Staff go={go} key={nav} />}
+            {who && view === 'staff' && <Staff go={go} key={nav} initialId={openId} />}
             {who === 'owner' && view === 'setup' && <Masters />}
             {who && view === 'accountant' && <Accountant />}
             {who && view === 'reports' && <Reports go={go} />}

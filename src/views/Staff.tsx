@@ -12,6 +12,7 @@ const staffName = (state: any) => (state.staff || []).find((p: any) => p.unit ==
 
 type L = 'en' | 'hi' | 'kn' | 'te';
 const W: Record<string, Record<L, string>> = {
+  back: { en: 'Back', hi: 'वापस', kn: 'ಹಿಂದೆ', te: 'వెనక్కి' },
   iAmAt: { en: 'I am at', hi: 'मैं यहाँ हूँ', kn: 'ನಾನು ಇಲ್ಲಿದ್ದೇನೆ', te: 'నేను ఉన్నది' },
   updates: { en: 'Updates', hi: 'खबर', kn: 'ಸುದ್ದಿ', te: 'సమాచారం' },
   send: { en: 'Send', hi: 'भेजें', kn: 'ಕಳುಹಿಸಿ', te: 'పంపండి' },
@@ -56,14 +57,14 @@ const reachedX = (x: string, l: L) => ({ en: `reached ${x}`, hi: `${x} पहु
 
 const big = 'w-full min-h-[56px] rounded-2xl text-base font-bold flex items-center justify-center cursor-pointer';
 
-export default function Staff({ go }: { go: Go }) {
+export default function Staff({ go, initialId = null }: { go: Go; initialId?: string | null }) {
   const { state, dispatch } = useStore();
   const [lang, setLangState] = useState(savedLang);
   const setLang = (l: string) => { setLangState(l); saveLang(l); };
   const l = (['en', 'hi', 'kn', 'te'].includes(lang) ? lang : 'en') as L;
   const w = (k: string) => W[k][l];
   const [unit, setU] = useState(getUnit());
-  const [open, setOpen] = useState<'' | 'send' | 'receive'>('');
+  const [open, setOpen] = useState<'' | 'send' | 'receive'>(initialId ? 'send' : '');
   const [showOld, setShowOld] = useState(false);
   const [allNews, setAllNews] = useState(false);
   const pickUnit = (u: string) => { setUnit(u); setU(u); };
@@ -71,7 +72,8 @@ export default function Staff({ go }: { go: Go }) {
 
   const live = state.shipments.filter((s: any) => !s.cancelledAt && !s.receipt);
   // trucks this unit loads and sends
-  const sending = live.filter((s: any) => s.fromUnit === unit && !s.returning && !atGate(s.flow));
+  // newest first, so a truck just saved is at the top
+  const sending = live.filter((s: any) => s.fromUnit === unit && !s.returning && !atGate(s.flow)).sort((a: any, b: any) => (b.id === initialId ? 1 : 0) - (a.id === initialId ? 1 : 0) || b.createdAt - a.createdAt);
   // trucks coming to this unit (our units' trucks, supplier trucks not yet counted, goods coming back after an accident)
   const receiving = live.filter((s: any) => (s.returning ? s.fromUnit === unit : s.toUnit === unit && countedByUs(s) && (s.flow !== 'transfer' || s.sentAt)));
   const old = state.shipments.filter((s: any) => (open === 'send' ? s.fromUnit === unit : open === 'receive' ? s.toUnit === unit : s.fromUnit === unit || s.toUnit === unit) && (s.receipt || s.cancelledAt))
@@ -147,7 +149,7 @@ export default function Staff({ go }: { go: Go }) {
     const [from, to] = route(s).split(' → ');
     const incoming = receiving.includes(s);
     return (
-      <div id={`staff-${s.id}`} className={`rounded-2xl border-2 p-3 space-y-2 bg-white ${incoming ? 'border-sky-200' : 'border-violet-200'}`}>
+      <div id={`staff-${s.id}`} className={`rounded-2xl border-2 p-3 space-y-2 ${s.id === initialId && !s.sentAt ? 'bg-violet-50 border-violet-500 ring-2 ring-violet-300' : `bg-white ${incoming ? 'border-sky-200' : 'border-violet-200'}`}`}>
         <div className="flex items-center gap-3">
           <span className="text-3xl leading-none">{st.icon}</span>
           <div className="min-w-0 flex-1">
@@ -172,10 +174,19 @@ export default function Staff({ go }: { go: Go }) {
           {Object.keys(UNITS).map((u) => <button key={u} id={`unit-${u}`} onClick={() => pickUnit(u)} className={`px-3 py-1.5 rounded-full border font-bold cursor-pointer ${u === unit ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-300'}`}>{uname(u)}</button>)}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <button id="btn-send-stock" onClick={() => setOpen(open === 'send' ? '' : 'send')} className={`min-h-[84px] rounded-2xl text-lg font-bold cursor-pointer flex flex-col items-center justify-center border-2 ${open === 'send' ? 'bg-violet-700 text-white border-violet-700' : 'bg-violet-50 text-violet-900 border-violet-200'}`}><span className="text-3xl">📤</span>{w('send')}</button>
-          <button id="btn-receive-stock" onClick={() => setOpen(open === 'receive' ? '' : 'receive')} className={`min-h-[84px] rounded-2xl text-lg font-bold cursor-pointer flex flex-col items-center justify-center border-2 ${open === 'receive' ? 'bg-sky-700 text-white border-sky-700' : 'bg-sky-50 text-sky-900 border-sky-200'}`}><span className="text-3xl">📥</span>{w('receive')}</button>
-        </div>
+        {!open ? (
+          <div className="grid grid-cols-2 gap-3">
+            <button id="btn-send-stock" onClick={() => setOpen('send')} className="min-h-[84px] rounded-2xl text-lg font-bold cursor-pointer flex flex-col items-center justify-center border-2 bg-violet-50 text-violet-900 border-violet-200"><span className="text-3xl">📤</span>{w('send')}</button>
+            <button id="btn-receive-stock" onClick={() => setOpen('receive')} className="min-h-[84px] rounded-2xl text-lg font-bold cursor-pointer flex flex-col items-center justify-center border-2 bg-sky-50 text-sky-900 border-sky-200"><span className="text-3xl">📥</span>{w('receive')}</button>
+          </div>
+        ) : (
+          // only the chosen side is on screen; the small back button returns to both
+          <div className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-white ${open === 'send' ? 'bg-violet-700' : 'bg-sky-700'}`}>
+            <button id={open === 'send' ? 'btn-send-stock' : 'btn-receive-stock'} onClick={() => setOpen('')} className="shrink-0 rounded-xl bg-white/20 px-3 py-2 text-sm font-bold cursor-pointer">← {w('back')}</button>
+            <span className="text-2xl">{open === 'send' ? '📤' : '📥'}</span>
+            <span className="text-lg font-bold">{w(open)}</span>
+          </div>
+        )}
         {open === 'send' && (
           <div className="grid grid-cols-2 gap-3">
             <button id="send-unit" onClick={() => go('dispatch', { id: 'new:transfer' })} className={`${big} flex-col py-3 bg-white border-2 border-violet-300 text-violet-900`}><span className="text-2xl">🏭</span>{w('ourUnit')}</button>
