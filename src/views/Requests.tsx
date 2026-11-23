@@ -95,8 +95,15 @@ export function AskOwner({ s, lang }: { s: any; lang: string }) {
 }
 
 // ---------- owner's side: requests waiting for a yes or no ----------
-const KIND_TEXT: Record<string, string> = { details: 'Change truck or driver', came_back: 'Truck came back', accident: 'Accident on the way' };
-const FIELD: Record<string, string> = { truckNo: 'Truck', driver: 'Driver', driverPhone: 'Driver phone', ewayBill: 'E-way bill' };
+export const KIND_TEXT: Record<string, string> = { details: 'Change truck or driver', came_back: 'Truck came back', accident: 'Accident on the way' };
+export const FIELD: Record<string, string> = { truckNo: 'Truck', driver: 'Driver', driverPhone: 'Driver phone', ewayBill: 'E-way bill' };
+
+export function OwnerAnswered() {
+  const { state } = useStore();
+  const decided = (state.requests || []).filter((r: any) => r.status !== 'pending').sort((a: any, b: any) => b.decidedAt - a.decidedAt).slice(0, 3);
+  if (!decided.length) return null;
+  return <div id="owner-requests" className="bg-white border border-slate-200 rounded-xl p-3 text-xs"><Decided list={decided} now={Date.now()} /></div>;
+}
 
 export function OwnerRequests({ go }: { go?: (v: string, o?: any) => void } = {}) {
   const { state, dispatch } = useStore();

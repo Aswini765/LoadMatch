@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { MessageCircle, Film, Share2, CheckCircle2, Clock, AlertTriangle, Truck, ChevronDown, ChevronRight, ShieldCheck, Link2, HelpCircle, Printer, FileCode, Send, Undo2 } from 'lucide-react';
-import { OwnerRequests } from './Requests.tsx';
+import { OwnerAnswered, KIND_TEXT, FIELD } from './Requests.tsx';
 import { useStore, item, party, route, atGate, jobworkOpen, jobworkBalance, jobworkDueAt, shipmentOf, diffsOf, lineOf, shipmentStatus, receiptOverdue, diffOverdue, receiverPath, evidencePath, evidenceText, truckSummary, importOrder, ACTIONS, OPTIONS, optionsFor, countedByUs, KIND_LABEL, FLOW_LABEL, DRAFT_LABEL, DRAFT_PLAIN, loadName } from '../store.tsx';
 import { reportHtml, printReport, packSummary, entryAmount, entryLines } from '../lib/report.ts';
 import { batchXml, download } from '../lib/tally.ts';
@@ -35,21 +35,8 @@ export default function Owner({ go, initialId }: { go: Go; initialId?: string | 
     <div className="space-y-6 max-w-5xl mx-auto">
       <PageHeader title="Owner" sub="You see only what is missing, damaged or extra, and what staff ask you." />
 
-      <LatestFromStaff />
-      <OwnerRequests go={go} />
-      <Panel eyebrow="Needs your decision" title={open.length ? `${open.length} difference${open.length > 1 ? 's' : ''} on ${byTruck.length} truck${byTruck.length > 1 ? 's' : ''} · worth ${inr0(openValue)}` : 'Nothing to decide'}>
-        {!open.length && <Note tone="go"><CheckCircle2 className="w-4 h-4 inline mr-1" />Every truck that was counted either matched or already has your decision.</Note>}
-        <div className="space-y-4">
-          {byTruck.map((s: any) => (
-            <div key={s.id} id={`own-truck-${s.id}`} className="rounded-xl border border-slate-200 overflow-hidden">
-              <TruckHead s={s} />
-              <div className="divide-y divide-slate-100">
-                {diffsOf(state, s.id).filter((d: any) => d.status === 'open' || d.status === 'investigating').map((d: any) => <DiffCard key={d.id} d={d} s={s} startOpen={initialId === d.id || initialId === s.id} />)}
-              </div>
-            </div>
-          ))}
-        </div>
-      </Panel>
+      <Inbox go={go} initialId={initialId} />
+      <OwnerAnswered />
 
       <TodaySummary />
       <button id="btn-expect-supplier" onClick={() => go('dispatch', { id: 'new:inbound' })} className="w-full py-3 rounded-xl border-2 border-dashed border-sky-300 bg-sky-50 text-sm font-bold text-sky-900 cursor-pointer">🚛 + Add expected supplier delivery</button>
@@ -103,6 +90,91 @@ export default function Owner({ go, initialId }: { go: Go; initialId?: string | 
 
 function Stat({ n, label, cls }: { n: number; label: string; cls: string }) {
   return <div className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-center shadow-2xs"><div className={`text-lg font-bold leading-none ${n ? cls : 'text-slate-400'}`}>{n}</div><div className="text-[10px] text-slate-500 mt-0.5">{label}</div></div>;
+}
+
+// One list, newest first: everything staff sent the owner. Each row reads in a second and has one action.
+function Inbox({ go, initialId }: { go: Go; initialId?: string | null }) {
+  const { state, dispatch } = useStore();
+  const now = Date.now();
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [notes, setNotes] = useState<Record<string, string>>({});
+  const rows: any[] = [];
+  for (const s of state.shipments) {
+    if (s.cancelledAt) continue;
+    const ds = diffsOf(state, s.id);
+    const openDs = ds.filter((d: any) => d.status === 'open' || d.status === 'investigating');
+    if (s.receipt && openDs.length) {
+      const sum = (k: string) => openDs.filter((d: any) => d.kind === k).reduce((a: number, d: any) => a + d.qty, 0);
+      const parts = [['short', 'missing'], ['damaged', 'damaged'], ['excess', 'extra']].map(([k, w]) => (sum(k) ? `${sum(k)} ${w}` : '')).filter(Boolean).join(', ');
+      rows.push({ kind: 'truck', at: s.receipt.at, s, icon: '⚠️', tone: 'border-l-amber-500', title: `${loadName(s.id)} · ${parts}`, value: openDs.reduce((a: number, d: any) => a + d.value, 0), sub: `${route(s)} · counted by ${s.receipt.by}`, openDs });
+    } else if (s.receipt && now - s.receipt.at < 24 * 3600000) {
+      rows.push({ kind: 'ok', at: s.receipt.at, s, icon: '✅', tone: 'border-l-emerald-500', title: `${loadName(s.id)} · all matched`, sub: `${route(s)} · counted by ${s.receipt.by}`, done: !ds.length });
+      if (ds.length) rows[rows.length - 1].title = `${loadName(s.id)} · decided`;
+    }
+    if (s.flow === 'outbound' && s.sentAt && !s.receipt && !s.linkSentAt) rows.push({ kind: 'link', at: s.sentAt, s, icon: '🚚', tone: 'border-l-violet-500', title: `${loadName(s.id)} left for ${party(s.party).name}`, sub: `Truck ${s.truckNo} · send them the count link` });
+  }
+  for (const r of state.requests || []) {
+    if (r.status !== 'pending') continue;
+    const who = String(r.by).replace(' (staff)', '');
+    let title = '';
+    if (r.kind === 'add') title = r.what === 'delivery' ? `${who}: a truck not in the list came · “${r.name}”` : `${who}: please add “${r.name}”`;
+    else {
+      const ch = Object.entries(r.details || {}).filter(([, v]) => String(v || '').trim()).map(([k, v]) => `${FIELD[k] || k} ${v}`).join(', ');
+      title = `${who}: ${KIND_TEXT[r.kind]} · ${loadName(r.shipmentId)}${r.kind === 'accident' ? (r.outcome === 'moved' ? ' · goods moved to another truck' : ' · goods coming back') : ''}${ch ? ` · ${ch}` : ''}`;
+    }
+    rows.push({ kind: 'req', at: r.at, r, icon: r.kind === 'accident' ? '🚨' : '🙋', tone: r.kind === 'accident' ? 'border-l-rose-500' : 'border-l-sky-500', title, sub: r.note ? `“${r.note}”` : '' });
+  }
+  rows.sort((a, b) => b.at - a.at);
+  const need = rows.filter((x) => x.kind !== 'ok').length;
+  const firstTruck = rows.find((x) => x.kind === 'truck');
+  const expanded = (x: any) => openId === x.s?.id || (openId === null && (x === firstTruck || (initialId && (x.s?.id === initialId || x.openDs?.some((d: any) => d.id === initialId)))));
+  const yes = (r: any) => dispatch({ type: 'DECIDE_REQUEST', reqId: r.id, approve: true, note: notes[r.id] || '', token: newToken(), actor: 'Owner' });
+  const no = (r: any) => dispatch({ type: 'DECIDE_REQUEST', reqId: r.id, approve: false, note: notes[r.id] || '', actor: 'Owner' });
+  const btn = 'shrink-0 px-3 py-2 rounded-lg text-xs font-bold cursor-pointer';
+  return (
+    <div id="latest-from-staff" className="space-y-2">
+      <div className="flex items-baseline justify-between">
+        <div className="text-lg font-bold text-slate-950">{need ? `${need} need${need === 1 ? 's' : ''} you` : 'All clear ✓'}</div>
+        <div className="text-xs text-slate-500">Newest first</div>
+      </div>
+      {!rows.length && <Note tone="go">Nothing from staff yet today.</Note>}
+      {rows.map((x, i) => {
+        const id = x.kind === 'truck' ? `own-truck-${x.s.id}` : x.kind === 'req' ? `req-${x.r.id}` : `row-${x.kind}-${x.s.id}`;
+        const isOpen = x.kind === 'truck' && expanded(x);
+        return (
+          <div key={id + i} id={id} className={`bg-white border border-slate-200 border-l-4 ${x.tone} rounded-xl overflow-hidden ${x.kind === 'ok' ? 'opacity-80' : ''}`}>
+            <div role="button" onClick={() => x.kind === 'truck' && setOpenId(isOpen ? '' : x.s.id)} className={`p-3 flex items-center gap-3 ${x.kind === 'truck' ? 'cursor-pointer' : ''}`}>
+              <span className="text-2xl leading-none">{x.icon}</span>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-bold text-slate-900">{x.title}{x.value ? <span className="text-rose-700"> · {inr0(x.value)}</span> : null}</div>
+                <div className="text-xs text-slate-500 truncate">{x.sub}{x.sub ? ' · ' : ''}{when(x.at, now)}</div>
+              </div>
+              {x.kind === 'truck' && <span className={`${btn} ${isOpen ? 'bg-slate-100 text-slate-700' : 'bg-slate-900 text-white'}`}>{isOpen ? 'Close' : 'Decide'}</span>}
+              {x.kind === 'link' && <a id={`send-link-${x.s.id}`} href={shareWhatsApp(`${COMPANY.name}: ${loadName(x.s.id)} is on the way (truck ${x.s.truckNo}). When it arrives, please count and submit here:\n${appLink(receiverPath(x.s, state.settings))}`)} target="_blank" rel="noreferrer" onClick={(e) => { e.stopPropagation(); dispatch({ type: 'LINK_SENT', id: x.s.id, actor: 'Owner' }); }} className={`${btn} bg-emerald-600 text-white`}>💬 Send link</a>}
+            </div>
+            {x.kind === 'req' && (
+              <div className="px-3 pb-3 flex gap-2 items-center">
+                <input value={notes[x.r.id] || ''} onChange={(e) => setNotes({ ...notes, [x.r.id]: e.target.value })} placeholder="Note to staff (optional)" className="flex-1 min-w-0 p-2 rounded-lg border border-slate-300 text-xs" />
+                {x.r.kind === 'add' && x.r.what === 'delivery' ? <>
+                  <button id={`req-no-${x.r.id}`} onClick={() => dispatch({ type: 'DECIDE_REQUEST', reqId: x.r.id, approve: false, note: notes[x.r.id] || 'Do not unload. Not ordered.', actor: 'Owner' })} className={`${btn} border border-slate-300 bg-white`}>Not ours</button>
+                  <button id={`req-add-delivery-${x.r.id}`} onClick={() => { dispatch({ type: 'DECIDE_REQUEST', reqId: x.r.id, approve: true, note: 'Added; please count it.', actor: 'Owner' }); go('dispatch', { id: 'new:inbound' }); }} className={`${btn} bg-emerald-600 text-white`}>+ Add delivery</button>
+                </> : <>
+                  <button id={`req-no-${x.r.id}`} onClick={() => no(x.r)} className={`${btn} border border-slate-300 bg-white`}>No</button>
+                  <button id={`req-yes-${x.r.id}`} onClick={() => yes(x.r)} className={`${btn} bg-emerald-600 text-white`}>Yes</button>
+                </>}
+              </div>
+            )}
+            {isOpen && (
+              <div className="border-t border-slate-100">
+                <div className="px-4 pt-2 text-[11px] text-slate-500">Truck {x.s.truckNo}{x.s.driver ? ` · driver ${x.s.driver}` : ''}{x.s.loading?.startAt ? ` · loaded ${time(x.s.loading.startAt)}–${time(x.s.loading.endAt)}` : ''}</div>
+                <div className="divide-y divide-slate-100">{x.openDs.map((d: any) => <DiffCard key={d.id} d={d} s={x.s} startOpen={initialId === d.id || initialId === x.s.id} />)}</div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 // Newest things staff did, at the very top: counts submitted (matched or not) and requests
