@@ -618,6 +618,13 @@ export function reducer(state: any, action: any): any {
       return putDiff(state, { ...d, status: 'settled', settledAt: at, history: [...d.history, { at, by: actor, text: `Done${action.note ? `: ${action.note}` : ''}` }] });
     }
 
+    // A promise was not kept (the rest did not come): back to the owner to choose again
+    case 'PROMISE_BROKEN': {
+      const d = diffOf(state, action.diffId);
+      if (!d || d.status !== 'waiting' || actor !== 'Owner') return state;
+      return putDiff(state, { ...d, status: 'open', decision: null, history: [...d.history, { at, by: actor, text: `Did not come${action.note ? `: ${action.note}` : ''}. Choose again.` }] });
+    }
+
     case 'ATTACH_CLIP': {
       const d = diffOf(state, action.diffId);
       if (!d || actor !== 'Owner' || !String(action.name || action.link || '').trim()) return state;

@@ -38,7 +38,7 @@ test('seed: one truck to decide, one promise waiting, one in transit, one loadin
   assert.ok(s.shipments.filter((x: any) => status(s, x.id) === 'MATCHED').length >= 12);
   // last month's entries already went to the accountant; only this week's trucks are waiting
   const pending = s.drafts.filter((d: any) => d.status === 'pending');
-  assert.deepEqual([...new Set(pending.map((d: any) => d.shipmentId))].sort(), ['TRK-1013', 'TRK-1014', 'TRK-1016']);
+  assert.deepEqual([...new Set(pending.map((d: any) => d.shipmentId))].sort(), ['TRK-1013', 'TRK-1014', 'TRK-1016', 'TRK-1021']);
   assert.equal(s.drafts.filter((d: any) => d.status === 'sent').length, 15);
   // the job work example: 50 of 200 still with the job worker, due within the year
   assert.equal(jobworkBalance(s, shipmentOf(s, 'TRK-1018'))[0].pending, 50);
@@ -531,6 +531,18 @@ test('expected supplier delivery: owner adds it, store marks arrived, then count
   assert.deepEqual(diffsOf(s, 'TRK-1020').map((d: any) => [d.kind, d.qty]), [['short', 10]]);
   s = run(s, { type: 'ASK_ADD', what: 'delivery', name: 'Coastal Veneers (at Mysuru unit)', by: 'Ramesh (staff)' });
   assert.equal(s.requests.at(-1).what, 'delivery');
+});
+
+test('owner choices: check first keeps it with the owner; next load waits; not kept → choose again', () => {
+  let s = buildInitialState();
+  const d = diffsOf(s, 'TRK-1013')[0];
+  s = run(s, { type: 'DECIDE', diffId: d.id, action: 'investigate', actor: 'Owner' });
+  assert.equal(diffOf(s, d.id).status, 'investigating', 'check first: still the owner\'s, nothing for the accountant');
+  s = run(s, { type: 'DECIDE', diffId: d.id, action: 'unit_sends_rest', dueAt: Date.now() + 86400000, actor: 'Owner' });
+  assert.equal(diffOf(s, d.id).status, 'waiting');
+  assert.equal(run(s, { type: 'PROMISE_BROKEN', diffId: d.id, actor: 'Ramesh (staff)' }), s);
+  s = run(s, { type: 'PROMISE_BROKEN', diffId: d.id, actor: 'Owner' });
+  assert.equal(diffOf(s, d.id).status, 'open');
 });
 
 console.log(`\n${passed} tests passed`);

@@ -103,13 +103,22 @@ function Inbox({ go, initialId }: { go: Go; initialId?: string | null }) {
     if (s.cancelledAt) continue;
     const ds = diffsOf(state, s.id);
     const openDs = ds.filter((d: any) => d.status === 'open' || d.status === 'investigating');
+    const qtyText = (list: any[]) => [['short', 'missing'], ['damaged', 'damaged'], ['excess', 'extra']].map(([k, w]) => { const n = list.filter((d: any) => d.kind === k).reduce((a: number, d: any) => a + d.qty, 0); return n ? `${n} ${w}` : ''; }).filter(Boolean).join(', ');
     if (s.receipt && openDs.length) {
-      const sum = (k: string) => openDs.filter((d: any) => d.kind === k).reduce((a: number, d: any) => a + d.qty, 0);
-      const parts = [['short', 'missing'], ['damaged', 'damaged'], ['excess', 'extra']].map(([k, w]) => (sum(k) ? `${sum(k)} ${w}` : '')).filter(Boolean).join(', ');
-      rows.push({ kind: 'truck', at: s.receipt.at, s, icon: '⚠️', tone: 'border-l-amber-500', title: `${loadName(s.id)} · ${parts}`, value: openDs.reduce((a: number, d: any) => a + d.value, 0), sub: `${route(s)} · counted by ${s.receipt.by}`, openDs });
-    } else if (s.receipt && now - s.receipt.at < 24 * 3600000) {
-      rows.push({ kind: 'ok', at: s.receipt.at, s, icon: '✅', tone: 'border-l-emerald-500', title: `${loadName(s.id)} · all matched`, sub: `${route(s)} · counted by ${s.receipt.by}`, done: !ds.length });
-      if (ds.length) rows[rows.length - 1].title = `${loadName(s.id)} · decided`;
+      const checking = openDs.every((d: any) => d.status === 'investigating');
+      rows.push({ kind: 'truck', at: checking ? Math.max(...openDs.map((d: any) => d.decision?.at || 0)) : s.receipt.at, s, icon: checking ? '🔍' : '⚠️', tone: checking ? 'border-l-violet-500' : 'border-l-amber-500', title: `${loadName(s.id)} · ${checking ? 'you are checking: ' : ''}${qtyText(openDs)}`, value: openDs.reduce((a: number, d: any) => a + d.value, 0), sub: checking ? 'When you know what happened, open it and choose' : `${route(s)} · counted by ${s.receipt.by}`, openDs });
+    } else if (s.receipt && now - s.receipt.at < 24 * 3600000 && !ds.length) {
+      rows.push({ kind: 'ok', at: s.receipt.at, s, icon: '✅', tone: 'border-l-emerald-500', title: `${loadName(s.id)} · all matched`, sub: `${route(s)} · counted by ${s.receipt.by}` });
+    }
+    // what each decision did: waiting for the rest, or sent to the accountant
+    for (const d of ds) {
+      if (d.status === 'waiting') {
+        const late = diffOverdue(d, now);
+        rows.push({ kind: 'promise', at: late ? d.decision.dueAt : d.decision.at, s, d, icon: late ? '⏰' : '⏳', tone: late ? 'border-l-rose-500' : 'border-l-slate-400', need: late, title: `${loadName(s.id)} · ${qtyText([d])}: ${ACTIONS[d.decision.action].label.toLowerCase()}`, sub: late ? `Late: was due ${dateTime(d.decision.dueAt)}` : `Due ${dateTime(d.decision.dueAt)} · ${item(d.item).name}` });
+      } else if (d.status === 'settled' && d.settledAt && now - d.settledAt < 24 * 3600000) {
+        const toAcc = state.drafts.some((x: any) => x.diffId === d.id);
+        rows.push({ kind: 'ok', at: d.settledAt, s, icon: '✅', tone: 'border-l-emerald-500', title: `${loadName(s.id)} · ${qtyText([d])}: decided`, sub: `${d.decision ? ACTIONS[d.decision.action].label : 'Done'}${toAcc ? ' · sent to the accountant' : ''}` });
+      }
     }
     // every truck that leaves tells the owner; our other unit sees it in its app, so nothing to forward
     if (s.flow === 'transfer' && s.sentAt && !s.receipt && !s.returning && !s.linkSentAt) rows.push({ kind: 'link', at: s.sentAt, s, icon: '🚚', tone: 'border-l-violet-500', title: `${loadName(s.id)} left ${route(s).split(' → ')[0]} for ${route(s).split(' → ')[1]}`, sub: `Truck ${s.truckNo} · send it to ${route(s).split(' → ')[1]} on WhatsApp` });
@@ -129,7 +138,7 @@ function Inbox({ go, initialId }: { go: Go; initialId?: string | null }) {
     rows.push({ kind: 'req', at: r.at, r, icon: r.kind === 'accident' ? '🚨' : '🙋', tone: r.kind === 'accident' ? 'border-l-rose-500' : 'border-l-sky-500', title, sub: r.note ? `“${r.note}”` : '' });
   }
   rows.sort((a, b) => b.at - a.at);
-  const need = rows.filter((x) => x.kind !== 'ok' && x.kind !== 'left').length;
+  const need = rows.filter((x) => (x.kind !== 'ok' && x.kind !== 'left' && x.kind !== 'promise') || x.need).length;
   const firstTruck = rows.find((x) => x.kind === 'truck');
   const expanded = (x: any) => openId === x.s?.id || (openId === null && (x === firstTruck || (initialId && (x.s?.id === initialId || x.openDs?.some((d: any) => d.id === initialId)))));
   const yes = (r: any) => dispatch({ type: 'DECIDE_REQUEST', reqId: r.id, approve: true, note: notes[r.id] || '', token: newToken(), actor: 'Owner' });
@@ -143,10 +152,10 @@ function Inbox({ go, initialId }: { go: Go; initialId?: string | null }) {
       </div>
       {!rows.length && <Note tone="go">Nothing from staff yet today.</Note>}
       {rows.map((x, i) => {
-        const id = x.kind === 'truck' ? `own-truck-${x.s.id}` : x.kind === 'req' ? `req-${x.r.id}` : `row-${x.kind}-${x.s.id}`;
+        const id = x.kind === 'truck' ? `own-truck-${x.s.id}` : x.kind === 'req' ? `req-${x.r.id}` : x.kind === 'promise' ? `promise-${x.d.id}` : `row-${x.kind}-${x.s.id}${x.kind === 'ok' && x.sub?.includes('decided') ? '' : ''}`;
         const isOpen = x.kind === 'truck' && expanded(x);
         return (
-          <div key={id + i} id={id} className={`bg-white border border-slate-200 border-l-4 ${x.tone} rounded-xl overflow-hidden ${x.kind === 'ok' || x.kind === 'left' ? 'opacity-80' : ''}`}>
+          <div key={id + i} id={id} className={`bg-white border border-slate-200 border-l-4 ${x.tone} rounded-xl overflow-hidden ${x.kind === 'ok' || x.kind === 'left' || (x.kind === 'promise' && !x.need) ? 'opacity-90' : ''}`}>
             <div role="button" onClick={() => x.kind === 'truck' && setOpenId(isOpen ? '' : x.s.id)} className={`p-3 flex items-center gap-3 ${x.kind === 'truck' ? 'cursor-pointer' : ''}`}>
               <span className="text-2xl leading-none">{x.icon}</span>
               <div className="flex-1 min-w-0">
@@ -157,6 +166,12 @@ function Inbox({ go, initialId }: { go: Go; initialId?: string | null }) {
               {x.kind === 'link' && x.s.flow === 'transfer' && <a id={`send-link-${x.s.id}`} href={shareWhatsApp(`${COMPANY.name}: ${loadName(x.s.id)} left ${route(x.s).split(' → ')[0]} for ${route(x.s).split(' → ')[1]} (truck ${x.s.truckNo}). It is in your LoadMatch app under Coming to you. When it reaches you, tap it and count. Link:\n${appLink(receiverPath(x.s, state.settings))}`)} target="_blank" rel="noreferrer" onClick={(e) => { e.stopPropagation(); dispatch({ type: 'LINK_SENT', id: x.s.id, actor: 'Owner' }); }} className={`${btn} bg-emerald-600 text-white`}>💬 Send to receiver</a>}
               {x.kind === 'link' && x.s.flow === 'outbound' && <a id={`send-link-${x.s.id}`} href={shareWhatsApp(`${COMPANY.name}: ${loadName(x.s.id)} is on the way (truck ${x.s.truckNo}). When it reaches you, open this link, tap Truck arrived and count:\n${appLink(receiverPath(x.s, state.settings))}`)} target="_blank" rel="noreferrer" onClick={(e) => { e.stopPropagation(); dispatch({ type: 'LINK_SENT', id: x.s.id, actor: 'Owner' }); }} className={`${btn} bg-emerald-600 text-white`}>💬 Send to receiver</a>}
             </div>
+            {x.kind === 'promise' && (
+              <div className="px-3 pb-3 grid grid-cols-2 gap-2">
+                <button id={`settle-${x.d.id}`} onClick={() => dispatch({ type: 'SETTLE', diffId: x.d.id, note: 'It came', actor: 'Owner' })} className={`${btn} bg-emerald-600 text-white`}>✓ It came</button>
+                <button id={`broken-${x.d.id}`} onClick={() => dispatch({ type: 'PROMISE_BROKEN', diffId: x.d.id, actor: 'Owner' })} className={`${btn} border border-slate-300 bg-white`}>Did not come</button>
+              </div>
+            )}
             {x.kind === 'req' && (
               <div className="px-3 pb-3 flex gap-2 items-center">
                 <input value={notes[x.r.id] || ''} onChange={(e) => setNotes({ ...notes, [x.r.id]: e.target.value })} placeholder="Note to staff (optional)" className="flex-1 min-w-0 p-2 rounded-lg border border-slate-300 text-xs" />
@@ -298,6 +313,7 @@ function DiffCard({ d, s, startOpen }: { d: any; s: any; startOpen?: boolean }) 
         <div className="text-right"><div className="text-sm font-bold text-slate-900">{inr(d.value, 0)}</div><div className="text-[10px] text-slate-400">{inr(it.rate, 0)} each</div></div>
       </div>
 
+      {d.status === 'investigating' && <div id={`checking-${d.id}`} className="rounded-lg bg-violet-50 border border-violet-200 px-3 py-2 text-xs text-violet-950">🔍 You chose <b>Check first</b> {when(d.decision?.at)}. Nothing goes to the accountant yet. Talk to the driver and the sender; when you know what happened, choose below.</div>}
       <div className="flex flex-wrap gap-1.5">
         {optionsFor(s, d).filter((o) => !(o === 'investigate' && d.status === 'investigating')).map((o) => (
           <button key={o} id={`opt-${d.id}-${o}`} onClick={() => { setChoice(choice === o ? null : o); setConfirm(false); }}
@@ -416,11 +432,11 @@ export function AccountantPanel({ mode = 'owner' }: { mode?: 'owner' | 'accounta
   const stockOnly = ready.filter((d: any) => !d.diffId).length;
   const packDrafts = (p: any) => p.ids.map((id: string) => state.drafts.find((d: any) => d.id === id)).filter(Boolean).sort(importOrder);
   return (
-    <Panel eyebrow="For your accountant" title={ready.length ? `${ready.length} item${ready.length === 1 ? '' : 's'} ready to send` : 'Nothing new for your accountant'} right={ready.length > 0 && (
-      <button id="btn-send-accountant" onClick={() => dispatch({ type: 'SEND_TO_ACCOUNTANT', ids: ready.map((d: any) => d.id), actor: mode === 'accountant' ? 'Accountant' : 'Owner' })} className="px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-bold flex items-center cursor-pointer"><Send className="w-3.5 h-3.5 mr-1" />Mark as sent</button>)}>
+    <Panel eyebrow={mode === 'accountant' ? 'Tally' : 'For your accountant'} title={ready.length ? (mode === 'accountant' ? `${ready.length} entr${ready.length === 1 ? 'y' : 'ies'} to put in Tally` : `${ready.length} item${ready.length === 1 ? '' : 's'} ready to send`) : (mode === 'accountant' ? 'Nothing new to enter' : 'Nothing new for your accountant')} right={ready.length > 0 && (
+      <button id="btn-send-accountant" onClick={() => dispatch({ type: 'SEND_TO_ACCOUNTANT', ids: ready.map((d: any) => d.id), actor: mode === 'accountant' ? 'Accountant' : 'Owner' })} className="px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-bold flex items-center cursor-pointer"><Send className="w-3.5 h-3.5 mr-1" />{mode === 'accountant' ? 'Mark all as entered' : 'Mark as sent'}</button>)}>
       {ready.length > 0 && (
         <>
-          <div className="text-xs text-slate-600">Made from the counts and your decisions. Send your accountant the report (to print) or the Tally file, then tap “Mark as sent”.</div>
+          <div className="text-xs text-slate-600">{mode === 'accountant' ? 'Made from the counts and the owner’s decisions. Print the report or download the Tally file, enter them, then tap “Mark all as entered”.' : 'Made from the counts and your decisions. Send your accountant the report (to print) or the Tally file, then tap “Mark as sent”.'}</div>
           <div className="flex flex-wrap gap-2">
             <button id="btn-print-report" onClick={() => printReport(reportHtml(state, ready, `Not yet sent · ${dateTime(now)}`))} className="px-3 py-2 rounded-lg border border-slate-300 bg-white text-xs font-bold flex items-center cursor-pointer"><Printer className="w-3.5 h-3.5 mr-1.5" />Report to print</button>
             <button id="btn-tally-file" onClick={() => download(`loadmatch-tally-${stamp}.xml`, batchXml(ready))} className="px-3 py-2 rounded-lg border border-slate-300 bg-white text-xs font-bold flex items-center cursor-pointer"><FileCode className="w-3.5 h-3.5 mr-1.5" />Tally file</button>

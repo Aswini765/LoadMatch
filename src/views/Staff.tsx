@@ -34,6 +34,9 @@ const W: Record<string, Record<L, string>> = {
   customer: { en: 'Customer', hi: 'ग्राहक', kn: 'ಗ್ರಾಹಕ', te: 'కస్టమర్' },
   supplierGate: { en: 'Supplier truck at the gate', hi: 'सप्लायर की गाड़ी गेट पर', kn: 'ಸರಬರಾಜುದಾರರ ಲಾರಿ ಗೇಟ್‌ನಲ್ಲಿ', te: 'సరఫరాదారు లారీ గేటు వద్ద' },
   fromOur: { en: 'Every truck coming to you (our unit or a supplier) is below. Tap Truck arrived, then Count.', hi: 'आपके पास आने वाली हर गाड़ी नीचे है। “गाड़ी पहुँच गई” दबाएँ, फिर गिनें।', kn: 'ನಿಮಗೆ ಬರುವ ಪ್ರತಿ ಲಾರಿ ಕೆಳಗಿದೆ. “ಲಾರಿ ಬಂತು” ಒತ್ತಿ, ನಂತರ ಎಣಿಸಿ.', te: 'మీకు వచ్చే ప్రతి లారీ కింద ఉంది. “లారీ వచ్చింది” నొక్కి, తర్వాత లెక్కించండి.' },
+  checking: { en: 'does not match. Owner is checking it', hi: 'मेल नहीं खाता, मालिक जाँच रहे हैं', kn: 'ಹೊಂದುತ್ತಿಲ್ಲ, ಮಾಲೀಕರು ಪರಿಶೀಲಿಸುತ್ತಿದ್ದಾರೆ', te: 'సరిపోలలేదు, యజమాని పరిశీలిస్తున్నారు' },
+  restComing: { en: 'does not match. The rest will come in the next load', hi: 'मेल नहीं खाता, बाकी अगली गाड़ी में आएगा', kn: 'ಹೊಂದುತ್ತಿಲ್ಲ, ಉಳಿದದ್ದು ಮುಂದಿನ ಲೋಡ್‌ನಲ್ಲಿ ಬರುತ್ತದೆ', te: 'సరిపోలలేదు, మిగతాది తదుపరి లోడ్‌లో వస్తుంది' },
+  decided: { en: 'does not match. Owner has decided', hi: 'मेल नहीं खाता, मालिक ने फैसला कर दिया', kn: 'ಹೊಂದುತ್ತಿಲ್ಲ, ಮಾಲೀಕರು ನಿರ್ಧರಿಸಿದ್ದಾರೆ', te: 'సరిపోలలేదు, యజమాని నిర్ణయించారు' },
   ownerTells: { en: 'owner will tell them', hi: 'मालिक उन्हें बताएंगे', kn: 'ಮಾಲೀಕರು ಅವರಿಗೆ ತಿಳಿಸುತ್ತಾರೆ', te: 'యజమాని వారికి చెబుతారు' },
   ownerSends: { en: 'The owner sends the count link to the customer.', hi: 'मालिक ग्राहक को गिनती का लिंक भेजेंगे।', kn: 'ಮಾಲೀಕರು ಗ್ರಾಹಕರಿಗೆ ಎಣಿಕೆ ಲಿಂಕ್ ಕಳುಹಿಸುತ್ತಾರೆ.', te: 'యజమాని కస్టమర్‌కు లెక్క లింక్ పంపుతారు.' },
   waLink: { en: 'Send count link on WhatsApp', hi: 'WhatsApp पर गिनती लिंक भेजें', kn: 'WhatsApp‌ನಲ್ಲಿ ಎಣಿಕೆ ಲಿಂಕ್ ಕಳುಹಿಸಿ', te: 'WhatsAppలో లెక్క లింక్ పంపండి' },
@@ -41,7 +44,7 @@ const W: Record<string, Record<L, string>> = {
   no: { en: 'Owner said NO', hi: 'मालिक ने ना कहा', kn: 'ಮಾಲೀಕರು ಬೇಡ ಎಂದರು', te: 'యజమాని వద్దు అన్నారు' },
   waiting: { en: 'Waiting for owner', hi: 'मालिक के जवाब का इंतज़ार', kn: 'ಮಾಲೀಕರ ಉತ್ತರಕ್ಕೆ ಕಾಯುತ್ತಿದೆ', te: 'యజమాని సమాధానం కోసం' },
   okCount: { en: 'counted, all OK', hi: 'गिनती ठीक', kn: 'ಎಣಿಕೆ ಸರಿ', te: 'లెక్క సరిగ్గా ఉంది' },
-  diff: { en: 'does not match. Owner is checking', hi: 'मेल नहीं खाता, मालिक देख रहे हैं', kn: 'ಹೊಂದುತ್ತಿಲ್ಲ, ಮಾಲೀಕರು ನೋಡುತ್ತಿದ್ದಾರೆ', te: 'సరిపోలలేదు, యజమాని చూస్తున్నారు' },
+  diff: { en: 'does not match. Waiting for the owner', hi: 'मेल नहीं खाता, मालिक के फैसले का इंतज़ार', kn: 'ಹೊಂದುತ್ತಿಲ್ಲ, ಮಾಲೀಕರ ನಿರ್ಧಾರಕ್ಕೆ ಕಾಯುತ್ತಿದೆ', te: 'సరిపోలలేదు, యజమాని నిర్ణయం కోసం' },
   backAccident: { en: 'Coming back after accident', hi: 'दुर्घटना के बाद वापस', kn: 'ಅಪಘಾತದ ನಂತರ ವಾಪಸ್', te: 'ప్రమాదం తర్వాత తిరిగి' },
   expected: { en: 'Expected', hi: 'आने वाली', kn: 'ಬರಬೇಕಿದೆ', te: 'రావాల్సింది' },
   notInList: { en: 'A truck came that is not in the list? Tell owner', hi: 'सूची में नहीं है ऐसी गाड़ी आई? मालिक को बताएं', kn: 'ಪಟ್ಟಿಯಲ್ಲಿಲ್ಲದ ಲಾರಿ ಬಂತೇ? ಮಾಲೀಕರಿಗೆ ತಿಳಿಸಿ', te: 'జాబితాలో లేని లారీ వచ్చిందా? యజమానికి చెప్పండి' },
@@ -119,7 +122,9 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
     if (s.fromUnit === unit && s.arrivedAt && !s.receipt && !s.returning) news.push({ side: 'send', at: s.arrivedAt, icon: '📍', text: `${loadName(s.id)} ${reachedX(to, l)}`, tone: 'bg-sky-50 border-sky-200' });
     if (s.fromUnit === unit && s.receipt && Date.now() - s.receipt.at < 48 * 3600000) {
       const bad = diffsOf(state, s.id).length > 0;
-      news.push({ side: 'send', at: s.receipt.at, icon: bad ? '⚠️' : '✅', text: `${loadName(s.id)} ${bad ? w('diff') : w('okCount')}`, tone: bad ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200' });
+      const dd = diffsOf(state, s.id);
+      const state2 = !bad ? '' : dd.some((d: any) => d.status === 'open') ? w('diff') : dd.some((d: any) => d.status === 'investigating') ? w('checking') : dd.some((d: any) => d.status === 'waiting') ? w('restComing') : w('decided');
+      news.push({ side: 'send', at: Math.max(s.receipt.at, ...dd.map((d: any) => d.decision?.at || 0)), icon: bad ? (dd.some((d: any) => d.status === 'open') ? '⚠️' : '🔎') : '✅', text: `${loadName(s.id)} ${bad ? state2 : w('okCount')}`, tone: bad ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200' });
     }
   }
   for (const r of state.requests || []) {
