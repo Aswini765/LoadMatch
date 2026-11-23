@@ -106,7 +106,7 @@ export default function App() {
               <div className="w-7 h-7 rounded-md bg-slate-900 text-white font-bold text-xs flex items-center justify-center tracking-tight">LM</div>
               <div className="flex flex-col">
                 <span className="font-bold text-sm tracking-tight text-slate-950 leading-tight">LoadMatch</span>
-                <span className="text-[11px] font-medium text-slate-500 leading-none">Sent vs received, for every truck</span>
+                <span className="text-[11px] font-medium text-slate-500 leading-none">Every load, counted at both ends</span>
               </div>
             </div>
           </div>
