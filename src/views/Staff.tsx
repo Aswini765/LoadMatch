@@ -378,7 +378,14 @@ function SendTruck({ unit, w, onSent }: { unit: string; w: (k: string) => string
   const leave = () => {
     const id = `TRK-${1000 + n}`;
     const who = me();
-    dispatch({ type: 'CREATE_SHIPMENT', id, flow, fromUnit: unit, ...(flow === 'transfer' ? { toUnit: to } : { party: to }), truckNo: plate, ref, driver: driver!.name, driverPhone: driver!.phone, lines: allLines, fulfils: useOwed.map((d: any) => d.id), docs: [{ id: newToken(), name: `${ref}.jpg`, kind: 'challan photo' }], actor: who });
+    // demo: a skipped photo or driver step is filled with the sample data, so Start loading always works
+    const demoLines = flow === 'transfer' ? [{ item: 'PLY-12', qty: 80 }, { item: 'PLY-18', qty: 45 }] : [{ item: 'BOX-NL', qty: 150 }, { item: 'BOX-RB', qty: 60 }];
+    const base = lines || demoLines;
+    const goLines = useOwed.reduce((acc: any[], d: any) => { const i = acc.findIndex((x) => x.item === d.item); return i >= 0 ? acc.map((x, j) => (j === i ? { ...x, qty: x.qty + d.qty } : x)) : [...acc, { item: d.item, qty: d.qty }]; }, base).filter((x: any) => x.qty > 0);
+    const goRef = ref || `${flow === 'transfer' ? 'DC' : 'INV'}-${700 + n}`;
+    const goPlate = plate || PLATES[n % PLATES.length];
+    const goDriver = driver || lastDriver || { name: 'Manju', phone: '9845012345' };
+    dispatch({ type: 'CREATE_SHIPMENT', id, flow, fromUnit: unit, ...(flow === 'transfer' ? { toUnit: to } : { party: to }), truckNo: goPlate, ref: goRef, driver: goDriver.name, driverPhone: goDriver.phone, lines: goLines, fulfils: useOwed.map((d: any) => d.id), docs: [{ id: newToken(), name: `${goRef}.jpg`, kind: 'challan photo' }], actor: who });
     dispatch({ type: 'LOADING', id, point: 'Dock 1', phase: 'start', actor: who });
     onSent(id);
   };
@@ -434,7 +441,7 @@ function SendTruck({ unit, w, onSent }: { unit: string; w: (k: string) => string
         </div>}
         {driver && <div id="driver-read" className="text-xs text-slate-700">🧑‍✈️ <b>{driver.name}</b> · 📞 {driver.phone} {driver !== lastDriver && <span className="text-emerald-800">({w('newSaved')})</span>} <button id="btn-change-driver" onClick={() => { setDriver(null); setNewDriver({ name: '', phone: '' }); }} className="underline text-slate-500 cursor-pointer ml-1">{w('change')}</button></div>}
       </div>
-      <button id="btn-start-loading" disabled={!ready} onClick={leave} className={`${big} bg-violet-700 text-white disabled:opacity-40`}>📦 {w('startLoading')}</button>
+      <button id="btn-start-loading" disabled={Boolean(reading)} onClick={leave} className={`${big} bg-violet-700 text-white disabled:opacity-40`}>📦 {w('startLoading')}</button>
     </div>
   );
 }
