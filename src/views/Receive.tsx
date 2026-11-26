@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Mic, MicOff, Camera, Lock, CheckCircle2, AlertTriangle, Minus, Plus, ChevronLeft, ChevronRight, MessageCircle, PackageCheck, Warehouse, ArrowRight, Wrench } from 'lucide-react';
-import { useStore, item, party, route, shipmentOf, diffsOf, shipmentStatus, receiverPath, countBackPath, unpackLoad, unpackCount, reducer, countedByUs, atGate, jobworkOpen, loadName, FLOW_LABEL, REPLIES } from '../store.tsx';
+import { useStore, item, party, route, shipmentOf, diffsOf, shipmentStatus, receiverPath, countBackPath, unpackLoad, unpackCount, reducer, countedByUs, atGate, jobworkOpen, loadName, FLOW_LABEL, REPLIES, ACTIONS } from '../store.tsx';
 import { Stepper } from './Staff.tsx';
+import { TruckSheet } from './Owner.tsx';
 import { CameraButton, DateChips, dayLabel } from './sim.tsx';
 import { LOADING_POINTS, COMPANY } from '../data/seed.ts';
 import { t, fill, unitWord } from '../i18n.ts';
@@ -83,8 +84,8 @@ const R: Record<string, Record<RL, string>> = {
   arrivedCount: { en: 'Truck arrived → Count', hi: 'गाड़ी पहुँची → गिनें', kn: 'ಲಾರಿ ಬಂತು → ಎಣಿಸಿ', te: 'లారీ వచ్చింది → లెక్కించండి' },
   iAmOwner: { en: 'I am the owner: save it to my company', hi: 'मैं मालिक हूँ: अपनी कंपनी में जोड़ें', kn: 'ನಾನು ಮಾಲೀಕ: ನನ್ನ ಕಂಪನಿಗೆ ಸೇರಿಸಿ', te: 'నేను యజమాని: నా కంపెనీలో చేర్చండి' },
   iAmStore: { en: 'I am at the store:', hi: 'मैं स्टोर पर हूँ:', kn: 'ನಾನು ಸ್ಟೋರ್‌ನಲ್ಲಿದ್ದೇನೆ:', te: 'నేను స్టోర్‌లో ఉన్నాను:' },
-  savedCo: { en: 'Saved to your company. Your store staff now see it under “Coming to you” and count it when it arrives.', hi: 'आपकी कंपनी में जुड़ गया। स्टोर स्टाफ इसे “आपके पास आ रही हैं” में देखेंगे और आने पर गिनेंगे।', kn: 'ನಿಮ್ಮ ಕಂಪನಿಗೆ ಸೇರಿಸಲಾಗಿದೆ. ಸ್ಟೋರ್ ಸಿಬ್ಬಂದಿ ಇದನ್ನು “ನಿಮಗೆ ಬರುತ್ತಿವೆ” ಅಡಿ ನೋಡಿ, ಬಂದಾಗ ಎಣಿಸುತ್ತಾರೆ.', te: 'మీ కంపెనీలో చేర్చబడింది. స్టోర్ సిబ్బంది దీన్ని “మీకు వస్తున్నవి”లో చూసి, వచ్చాక లెక్కిస్తారు.' },
-  openApp: { en: 'Open the store screen', hi: 'स्टोर स्क्रीन खोलें', kn: 'ಸ್ಟೋರ್ ಪರದೆ ತೆರೆಯಿರಿ', te: 'స్టోర్ స్క్రీన్ తెరవండి' },
+  savedCo: { en: 'Saved to your company. Your store staff see it under “Coming to you” and count it when it arrives; you see the result on your Owner screen.', hi: 'आपकी कंपनी में जुड़ गया। स्टोर स्टाफ इसे “आपके पास आ रही हैं” में देखेंगे और आने पर गिनेंगे।', kn: 'ನಿಮ್ಮ ಕಂಪನಿಗೆ ಸೇರಿಸಲಾಗಿದೆ. ಸ್ಟೋರ್ ಸಿಬ್ಬಂದಿ ಇದನ್ನು “ನಿಮಗೆ ಬರುತ್ತಿವೆ” ಅಡಿ ನೋಡಿ, ಬಂದಾಗ ಎಣಿಸುತ್ತಾರೆ.', te: 'మీ కంపెనీలో చేర్చబడింది. స్టోర్ సిబ్బంది దీన్ని “మీకు వస్తున్నవి”లో చూసి, వచ్చాక లెక్కిస్తారు.' },
+  openApp: { en: 'Open your LoadMatch', hi: 'अपना LoadMatch खोलें', kn: 'ನಿಮ್ಮ LoadMatch ತೆರೆಯಿರಿ', te: 'మీ LoadMatch తెరవండి' },
   backStore: { en: 'Back to the store screen', hi: 'स्टोर स्क्रीन पर वापस', kn: 'ಸ್ಟೋರ್ ಪರದೆಗೆ ಹಿಂದೆ', te: 'స్టోర్ స్క్రీన్‌కు వెనక్కి' },
   sent: { en: 'Sent', hi: 'भेजा', kn: 'ಕಳುಹಿಸಿದ್ದು', te: 'పంపినవి' },
   allCame: { en: 'All came', hi: 'सब आ गया', kn: 'ಎಲ್ಲಾ ಬಂತು', te: 'అన్నీ వచ్చాయి' },
@@ -188,7 +189,7 @@ export default function Receive({ id, token, payload }: { id: string; token: str
           {!staff && !savedCo && <button id="btn-save-company" onClick={() => { saveToCompany(s, window.location.hash); setSavedCo(true); }} className="w-full min-h-[56px] rounded-2xl bg-slate-900 text-white text-base font-bold cursor-pointer">🏢 {w('iAmOwner')}</button>}
           {!staff && !savedCo && <div className="text-[11px] text-slate-500 text-center">{party(s.party)?.name}</div>}
           {savedCo && <div id="saved-company" className="rounded-xl border-2 border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-950">✅ {w('savedCo')}</div>}
-          {savedCo && <a id="btn-open-store" href={`#/co/${s.party}`} className="w-full min-h-[52px] rounded-2xl bg-emerald-600 text-white text-base font-bold flex items-center justify-center">📦 {w('openApp')} →</a>}
+          {savedCo && <a id="btn-open-store" href={`#/co/${s.party}/home`} className="w-full min-h-[52px] rounded-2xl bg-emerald-600 text-white text-base font-bold flex items-center justify-center">📦 {w('openApp')} →</a>}
           {staff && <button id="btn-arrived" onClick={() => { if (!remote) store.dispatch({ type: 'ARRIVED', id: s.id, by: me(), actor: me() }); setArrivedHere(true); }} className="w-full min-h-[56px] rounded-2xl bg-emerald-600 text-white text-base font-bold cursor-pointer">📍 {w('arrivedCount')}</button>}
         </div>
       </PhoneFrame>
@@ -308,7 +309,7 @@ function Done({ s, state, remote, lang, setLang, head, w }: { s: any; state: any
             );
           })}
         </div>}
-        {(() => { try { return sessionStorage.getItem('lm-as-store'); } catch { return null; } })() && <a id="btn-back-store" href={`#/co/${sessionStorage.getItem('lm-as-store')}`} className="block text-sm font-bold text-emerald-800 underline">← {w('backStore')}</a>}
+        {(() => { try { return sessionStorage.getItem('lm-as-store'); } catch { return null; } })() && <a id="btn-back-store" href={`#/co/${sessionStorage.getItem('lm-as-store')}/staff`} className="block text-sm font-bold text-emerald-800 underline">← {w('backStore')}</a>}
         <div className="text-[11px] text-slate-500 flex items-center"><Lock className="w-3.5 h-3.5 mr-1" />{w('lockedBy')} {s.receipt.by}, {when(s.receipt.at)}</div>
       </div>
     </PhoneFrame>
@@ -320,8 +321,98 @@ const coKey = (partyId: string) => `lm-co-${partyId}`;
 export function savedTrucks(partyId: string): any[] { try { return JSON.parse(localStorage.getItem(coKey(partyId)) || '[]'); } catch { return []; } }
 function saveToCompany(s: any, hash: string) {
   const list = savedTrucks(s.party).filter((x: any) => x.id !== s.id);
-  try { localStorage.setItem(coKey(s.party), JSON.stringify([{ id: s.id, hash, from: route(s).split(' → ')[0], plate: s.truckNo, at: Date.now() }, ...list])); } catch { /* ignore */ }
+  try { localStorage.setItem(coKey(s.party), JSON.stringify([{ id: s.id, hash, from: `${COMPANY.name}, ${route(s).split(' → ')[0].replace(' unit', '')}`, plate: s.truckNo, at: Date.now() }, ...list])); } catch { /* ignore */ }
 }
+// ---------- the customer's own LoadMatch: the same Home, Staff and Owner as ours, for the trucks their owner saved ----------
+export function PartnerApp({ partyId, tab }: { partyId: string; tab: string }) {
+  const p = party(partyId);
+  const tabs: [string, string][] = [['home', 'Home'], ['staff', 'Staff'], ['owner', 'Owner']];
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
+        <span className="text-sm font-bold text-slate-900 mr-2">🏢 {p?.name}</span>
+        {tabs.map(([k, label]) => <a key={k} id={`co-tab-${k}`} href={`#/co/${partyId}/${k}`} className={`px-3 py-1.5 rounded-lg text-sm font-bold ${tab === k ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{label}</a>)}
+        <span className="ml-auto text-[11px] text-slate-500">Their own LoadMatch (demo)</span>
+      </div>
+      {tab === 'staff' ? <PartnerStore partyId={partyId} /> : tab === 'owner' ? <PartnerOwner partyId={partyId} /> : <PartnerHome partyId={partyId} />}
+    </div>
+  );
+}
+
+const partnerRows = (state: any, partyId: string) => savedTrucks(partyId).map((x: any) => {
+  const s = shipmentOf(state, x.id);
+  const tok = x.hash.split('/')[3];
+  const remote = (() => { try { return JSON.parse(localStorage.getItem(remoteKey(x.id, tok)) || 'null'); } catch { return null; } })();
+  const receipt = s?.receipt || remote;
+  const ds = s ? diffsOf(state, s.id) : [];
+  return { x, s, receipt, ds };
+});
+
+function PartnerHome({ partyId }: { partyId: string }) {
+  const { state } = useStore();
+  const p = party(partyId);
+  const rows = partnerRows(state, partyId);
+  const toCount = rows.filter((r) => !r.receipt).length;
+  const news = rows.filter((r) => r.receipt).length;
+  const roles = [
+    { id: 'staff', icon: '📦', title: 'Staff', who: 'One person at the store', what: 'Sees the trucks coming in, taps the one that arrived and counts it: All came, or Something is wrong (tap or speak). Sends trucks with photos, no typing.', n: toCount, nLabel: 'to count' },
+    { id: 'owner', icon: '🏢', title: 'Owner', who: 'Sees everything', what: 'Saves trucks that suppliers send on WhatsApp, sees every count, and sees what the supplier decided when something was missing or damaged.', n: news, nLabel: 'counted' },
+  ];
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-950">What was sent. What arrived. What's missing.</h1>
+        <p className="text-sm text-slate-600">{p?.name} uses LoadMatch too. Trucks from {COMPANY.name} come in from a WhatsApp link: the owner saves them, the store counts them, and both owners see the same result.</p>
+      </div>
+      <div className="grid sm:grid-cols-2 gap-3">
+        {roles.map((r) => (
+          <a key={r.id} id={`co-home-${r.id}`} href={`#/co/${partyId}/${r.id}`} className="block rounded-xl border border-slate-200 bg-white p-4 space-y-2 hover:border-slate-400">
+            <div className="flex items-center justify-between"><span className="text-lg font-bold text-slate-900">{r.icon} {r.title}</span>{r.n > 0 && <span className="rounded-full bg-amber-100 text-amber-900 text-xs font-bold px-2 py-0.5">{r.n} {r.nLabel}</span>}</div>
+            <div className="text-xs font-bold text-slate-500">{r.who}</div>
+            <div className="text-sm text-slate-700">{r.what}</div>
+            <div className="text-sm font-bold text-emerald-700">Open →</div>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const SUPPLIER_PLAIN: Record<string, string> = {
+  send_rest: 'They send the rest in the next truck', send_replacement: 'They send a good one in the next truck',
+  credit_note: 'You pay less (they give a credit note)', bill_extra: 'They bill you for the extra', claim: 'Their transporter pays',
+  write_off: 'They take the loss', investigate: 'They are checking it',
+};
+function PartnerOwner({ partyId }: { partyId: string }) {
+  const { state } = useStore();
+  const [all, setAll] = useState(false);
+  const [sheet, setSheet] = useState('');
+  const rows = partnerRows(state, partyId).map((r) => {
+    const sender = `${COMPANY.name}`;
+    if (!r.receipt) return { ...r, at: r.x.at, icon: '🚚', tone: 'border-l-sky-500', title: `${loadName(r.x.id)} from ${sender} is on the way`, sub: `Truck ${r.x.plate} · your store counts it when it arrives`, status: '' };
+    const what = r.ds.length ? [['short', 'missing'], ['damaged', 'damaged'], ['excess', 'extra']].map(([k, w]) => { const n = r.ds.filter((d: any) => d.kind === k).reduce((a: number, d: any) => a + d.qty, 0); return n ? `${n} ${w}` : ''; }).filter(Boolean).join(', ') : '';
+    const st = r.ds.map((d: any) => d.came ? `Came in ${loadName(d.came.load)}` : d.decision ? `${SUPPLIER_PLAIN[d.decision.action] || ACTIONS_LABEL(d.decision.action)}${d.decision.dueAt ? ` · by ${dayLabel(d.decision.dueAt)}` : ''}` : `${sender}'s owner is told; waiting for their answer`);
+    return { ...r, at: r.receipt.at, icon: what ? '⚠️' : '✅', tone: what ? 'border-l-amber-500' : 'border-l-emerald-500', title: what ? `${loadName(r.x.id)} · ${what}` : `${loadName(r.x.id)} · all matched`, sub: `From ${r.x.from} · counted by ${r.receipt.by} · ${when(r.receipt.at)}`, status: [...new Set(st)].join(' · ') };
+  }).sort((a: any, b: any) => b.at - a.at);
+  const shown = all ? rows : rows.slice(0, 3);
+  return (
+    <div className="space-y-3">
+      <div><h1 className="text-2xl font-bold text-slate-950">Owner</h1><p className="text-sm text-slate-600">Trucks from your suppliers: what came, what did not, and what they decided.</p></div>
+      <div className="text-lg font-bold text-slate-950">{rows.length ? `${rows.length} truck${rows.length === 1 ? '' : 's'}` : 'No trucks yet'}</div>
+      {!rows.length && <Note tone="go">When a supplier sends you a LoadMatch link on WhatsApp, tap “I am the owner: save it to my company”. The truck shows here and at your store.</Note>}
+      {shown.map((r: any) => (
+        <button key={r.x.id} id={`co-own-${r.x.id}`} onClick={() => r.s && setSheet(r.x.id)} className={`w-full text-left bg-white border border-slate-200 border-l-4 ${r.tone} rounded-xl p-3 flex items-start gap-3 cursor-pointer`}>
+          <span className="text-2xl leading-none">{r.icon}</span>
+          <span className="flex-1 min-w-0"><span className="block text-sm font-bold text-slate-900 underline decoration-dotted">{r.title} ›</span><span className="block text-xs text-slate-500">{r.sub}</span>{r.status && <span className="block mt-1.5 rounded-lg bg-sky-50 border border-sky-200 px-3 py-1.5 text-xs text-sky-950">💬 {r.status}</span>}</span>
+        </button>
+      ))}
+      {rows.length > 3 && <button id="co-show-all" onClick={() => setAll(!all)} className="w-full min-h-[40px] rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-700 cursor-pointer">{all ? '▲ Show only 3' : `▼ Show ${rows.length - 3} more`}</button>}
+      {sheet && <TruckSheet id={sheet} onClose={() => setSheet('')} />}
+    </div>
+  );
+}
+const ACTIONS_LABEL = (a: string) => ACTIONS[a]?.label || a;
+
 export function PartnerStore({ partyId }: { partyId: string }) {
   const { state } = useStore();
   const [lang, setLangState] = useState(savedLang);
