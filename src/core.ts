@@ -298,6 +298,37 @@ export function addMaster(state: any, what: string, d: any, at: number) {
   return { ...state, counters, addedLog: [...(state.addedLog || []), { at, what, name }] };
 }
 
+// ---------- ask the sender, read the reply, suggest one decision ----------
+// The owner asks whoever loaded the truck what happened; their one-tap reply decides what the app suggests.
+export const REPLIES: Record<string, { icon: string; label: string }> = {
+  send_next: { icon: '📦', label: 'Left here. We will send it in the next truck' },
+  sent_full: { icon: '✅', label: 'We loaded it all (loading photo)' },
+  transporter: { icon: '🚚', label: 'Lost or broken on the road (transporter)' },
+};
+export const senderName = (s: any) => (s.flow === 'inbound' || s.flow === 'jobwork_in' ? PARTIES[s.party]?.name : UNITS[s.fromUnit]?.name.split(' (')[0]) || 'the sender';
+// our own unit loaded it (it answers in the app); a supplier answers from a WhatsApp link
+export const senderIsUs = (s: any) => !atGate(s.flow);
+const SUGGEST: Record<string, Record<string, Record<string, string>>> = {
+  transfer: { short: { send_next: 'unit_sends_rest', sent_full: 'claim', transporter: 'claim' }, damaged: { send_next: 'claim', sent_full: 'claim', transporter: 'claim' }, excess: { _: 'correct_list' } },
+  inbound: { short: { send_next: 'replace', sent_full: 'investigate', transporter: 'debit_note' }, damaged: { send_next: 'replace', sent_full: 'investigate', transporter: 'debit_note' }, excess: { _: 'keep_extra' } },
+  outbound: { short: { send_next: 'send_rest', sent_full: 'investigate', transporter: 'credit_note' }, damaged: { send_next: 'send_replacement', sent_full: 'investigate', transporter: 'credit_note' }, excess: { _: 'bill_extra' } },
+};
+export function suggestFor(s: any, d: any): string | null {
+  const opts = optionsFor(s, d);
+  const r = s.ask?.reply?.kind;
+  const m = SUGGEST[s.flow]?.[d.kind];
+  const a = d.cause === 'accident' ? 'claim' : m ? (m._ || (r ? m[r] : null)) : null;
+  return a && opts.includes(a) && a !== 'investigate' ? a : null;
+}
+// the agent's check: a later truck on the same route brought the promised item
+export function cameLater(state: any, d: any) {
+  const s = shipmentOf(state, d.shipmentId);
+  if (!s || !d.decision) return null;
+  return state.shipments.find((x: any) => x.id !== s.id && x.receipt && x.receipt.at >= d.decision.at && x.flow === s.flow
+    && (s.flow === 'transfer' ? x.fromUnit === s.fromUnit && x.toUnit === s.toUnit : x.party === s.party)
+    && x.lines.some((l: any) => l.item === d.item)) || null;
+}
+
 // ---------- reducer ----------
 export function reducer(state: any, action: any): any {
   const at = action.at || Date.now();
@@ -616,6 +647,21 @@ export function reducer(state: any, action: any): any {
       const d = diffOf(state, action.diffId);
       if (!d || d.status !== 'waiting') return state;
       return putDiff(state, { ...d, status: 'settled', settledAt: at, history: [...d.history, { at, by: actor, text: `Done${action.note ? `: ${action.note}` : ''}` }] });
+    }
+
+    case 'ASK_SENDER': {
+      const s = shipmentOf(state, action.id);
+      if (!s || !s.receipt || s.ask || actor !== 'Owner') return state;
+      if (!diffsOf(state, s.id).some((d: any) => d.status === 'open' || d.status === 'investigating')) return state;
+      return putShipment(state, audit({ ...s, ask: { at, token: action.token || s.token } }, at, actor, 'ASKED_SENDER', `Owner asked ${senderName(s)} what happened.`));
+    }
+
+    case 'SENDER_REPLY': {
+      const s = shipmentOf(state, action.id);
+      if (!s || !s.ask || s.ask.reply || !REPLIES[action.kind]) return state;
+      if (action.token !== undefined && action.token !== s.ask.token) return state;
+      const by = String(action.by || actor).trim();
+      return putShipment(state, audit({ ...s, ask: { ...s.ask, reply: { kind: action.kind, at, by, note: action.note || '' } } }, at, by, 'SENDER_REPLIED', `${by}: ${REPLIES[action.kind].label}.`));
     }
 
     // A promise was not kept (the rest did not come): back to the owner to choose again

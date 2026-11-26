@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Mic, MicOff, Camera, Lock, CheckCircle2, AlertTriangle, Minus, Plus, ChevronLeft, ChevronRight, MessageCircle, PackageCheck, Warehouse, ArrowRight, Wrench } from 'lucide-react';
-import { useStore, item, party, route, shipmentOf, diffsOf, shipmentStatus, receiverPath, countBackPath, unpackLoad, unpackCount, reducer, countedByUs, atGate, jobworkOpen, loadName, FLOW_LABEL } from '../store.tsx';
+import { useStore, item, party, route, shipmentOf, diffsOf, shipmentStatus, receiverPath, countBackPath, unpackLoad, unpackCount, reducer, countedByUs, atGate, jobworkOpen, loadName, FLOW_LABEL, REPLIES } from '../store.tsx';
+import { Stepper } from './Staff.tsx';
 import { LOADING_POINTS } from '../data/seed.ts';
 import { t, fill, unitWord } from '../i18n.ts';
 import { useVoice, parseCount } from '../lib/voice.ts';
@@ -73,10 +74,50 @@ const clearDraft = (id: string) => { try { localStorage.removeItem(draftKey(id))
 // The receiver's own finished count of a load from another phone (kept so reopening the link shows it again)
 const remoteKey = (id: string, token: string) => `loadmatch-remote-${id}-${token}`;
 
+// Words on the count screen, in the four languages
+type RL = 'en' | 'hi' | 'kn' | 'te';
+const R: Record<string, Record<RL, string>> = {
+  onWay: { en: 'is on the way', hi: 'रास्ते में है', kn: 'ದಾರಿಯಲ್ಲಿದೆ', te: 'దారిలో ఉంది' },
+  whenHere: { en: 'When this truck is at your gate, tap the button and count.', hi: 'गाड़ी गेट पर आए तो बटन दबाएँ और गिनें।', kn: 'ಲಾರಿ ಗೇಟ್‌ಗೆ ಬಂದಾಗ ಬಟನ್ ಒತ್ತಿ ಎಣಿಸಿ.', te: 'లారీ గేటుకు వచ్చినప్పుడు బటన్ నొక్కి లెక్కించండి.' },
+  arrivedCount: { en: 'Truck arrived → Count', hi: 'गाड़ी पहुँची → गिनें', kn: 'ಲಾರಿ ಬಂತು → ಎಣಿಸಿ', te: 'లారీ వచ్చింది → లెక్కించండి' },
+  iAmOwner: { en: 'I am the owner: save it to my company', hi: 'मैं मालिक हूँ: अपनी कंपनी में जोड़ें', kn: 'ನಾನು ಮಾಲೀಕ: ನನ್ನ ಕಂಪನಿಗೆ ಸೇರಿಸಿ', te: 'నేను యజమాని: నా కంపెనీలో చేర్చండి' },
+  iAmStore: { en: 'I am at the store:', hi: 'मैं स्टोर पर हूँ:', kn: 'ನಾನು ಸ್ಟೋರ್‌ನಲ್ಲಿದ್ದೇನೆ:', te: 'నేను స్టోర్‌లో ఉన్నాను:' },
+  savedCo: { en: 'Saved to your company. Your store staff now see it under “Coming to you” and count it when it arrives.', hi: 'आपकी कंपनी में जुड़ गया। स्टोर स्टाफ इसे “आपके पास आ रही हैं” में देखेंगे और आने पर गिनेंगे।', kn: 'ನಿಮ್ಮ ಕಂಪನಿಗೆ ಸೇರಿಸಲಾಗಿದೆ. ಸ್ಟೋರ್ ಸಿಬ್ಬಂದಿ ಇದನ್ನು “ನಿಮಗೆ ಬರುತ್ತಿವೆ” ಅಡಿ ನೋಡಿ, ಬಂದಾಗ ಎಣಿಸುತ್ತಾರೆ.', te: 'మీ కంపెనీలో చేర్చబడింది. స్టోర్ సిబ్బంది దీన్ని “మీకు వస్తున్నవి”లో చూసి, వచ్చాక లెక్కిస్తారు.' },
+  sent: { en: 'Sent', hi: 'भेजा', kn: 'ಕಳುಹಿಸಿದ್ದು', te: 'పంపినవి' },
+  allCame: { en: 'All came', hi: 'सब आ गया', kn: 'ಎಲ್ಲಾ ಬಂತು', te: 'అన్నీ వచ్చాయి' },
+  wrong: { en: 'Something is wrong', hi: 'कुछ गड़बड़ है', kn: 'ಏನೋ ಸರಿಯಿಲ್ಲ', te: 'ఏదో సరిగా లేదు' },
+  stackPhoto: { en: 'Photo of the unloaded stack', hi: 'उतारे गए माल की फोटो', kn: 'ಇಳಿಸಿದ ಸರಕಿನ ಫೋಟೋ', te: 'దించిన సరుకు ఫోటో' },
+  damagePhoto: { en: 'Photo of the damage', hi: 'खराब माल की फोटो', kn: 'ಹಾಳಾದ ಸರಕಿನ ಫೋಟೋ', te: 'పాడైన సరుకు ఫోటో' },
+  photoOk: { en: 'Photo added', hi: 'फोटो जुड़ गई', kn: 'ಫೋಟೋ ಸೇರಿತು', te: 'ఫోటో చేరింది' },
+  speak: { en: 'Say what is wrong', hi: 'बोलकर बताएं क्या गड़बड़ है', kn: 'ಏನು ಸರಿಯಿಲ್ಲ ಎಂದು ಹೇಳಿ', te: 'ఏమి సరిగా లేదో చెప్పండి' },
+  listening: { en: 'Listening…', hi: 'सुन रहे हैं…', kn: 'ಕೇಳುತ್ತಿದೆ…', te: 'వింటోంది…' },
+  heard: { en: 'Heard', hi: 'सुना', kn: 'ಕೇಳಿದ್ದು', te: 'విన్నది' },
+  orTap: { en: 'or tap − + on each item', hi: 'या हर माल पर − + दबाएँ', kn: 'ಅಥವಾ ಪ್ರತಿ ಸರಕಿನಲ್ಲಿ − + ಒತ್ತಿ', te: 'లేదా ప్రతి సరుకుపై − + నొక్కండి' },
+  missing: { en: 'Missing', hi: 'कम', kn: 'ಕಡಿಮೆ', te: 'తక్కువ' },
+  damaged: { en: 'Damaged', hi: 'खराब', kn: 'ಹಾಳು', te: 'పాడైనవి' },
+  extra: { en: 'Extra', hi: 'ज़्यादा', kn: 'ಹೆಚ್ಚು', te: 'ఎక్కువ' },
+  moreCame: { en: '+ More came than sent?', hi: '+ भेजे से ज़्यादा आया?', kn: '+ ಕಳುಹಿಸಿದ್ದಕ್ಕಿಂತ ಹೆಚ್ಚು ಬಂತೇ?', te: '+ పంపినదానికంటే ఎక్కువ వచ్చిందా?' },
+  counted: { en: 'Counted', hi: 'गिना', kn: 'ಎಣಿಸಿದ್ದು', te: 'లెక్కించినవి' },
+  sayCount: { en: 'Say the count', hi: 'गिनती बोलें', kn: 'ಎಣಿಕೆ ಹೇಳಿ', te: 'లెక్క చెప్పండి' },
+  sendOwner: { en: 'Send to owner', hi: 'मालिक को भेजें', kn: 'ಮಾಲೀಕರಿಗೆ ಕಳುಹಿಸಿ', te: 'యజమానికి పంపండి' },
+  nothingMarked: { en: 'Nothing marked yet. Tap − + or speak.', hi: 'अभी कुछ नहीं चुना। − + दबाएँ या बोलें।', kn: 'ಇನ್ನೂ ಏನೂ ಗುರುತಿಸಿಲ್ಲ. − + ಒತ್ತಿ ಅಥವಾ ಹೇಳಿ.', te: 'ఇంకా ఏమీ గుర్తించలేదు. − + నొక్కండి లేదా చెప్పండి.' },
+  allOkDone: { en: 'All matched. The owner is told.', hi: 'सब मिल गया। मालिक को खबर हो गई।', kn: 'ಎಲ್ಲಾ ಸರಿ. ಮಾಲೀಕರಿಗೆ ತಿಳಿಸಲಾಗಿದೆ.', te: 'అన్నీ సరిపోయాయి. యజమానికి తెలిసింది.' },
+  sentToOwner: { en: 'Sent to the owner', hi: 'मालिक को भेजा', kn: 'ಮಾಲೀಕರಿಗೆ ಕಳುಹಿಸಲಾಗಿದೆ', te: 'యజమానికి పంపబడింది' },
+  seeItems: { en: 'See items', hi: 'माल देखें', kn: 'ಸರಕು ನೋಡಿ', te: 'సరుకు చూడండి' },
+  yourName: { en: 'Your name', hi: 'आपका नाम', kn: 'ನಿಮ್ಮ ಹೆಸರು', te: 'మీ పేరు' },
+  lockedBy: { en: 'Locked. Counted by', hi: 'लॉक। गिना', kn: 'ಲಾಕ್. ಎಣಿಸಿದವರು', te: 'లాక్. లెక్కించినవారు' },
+};
+const SAMPLE: Record<RL, string> = { en: 'two bundles torn', hi: 'दो बंडल फटे हैं', kn: 'ಎರಡು ಬಂಡಲ್ ಹರಿದಿದೆ', te: 'రెండు బండిల్స్ చిరిగిపోయాయి' };
+const itemIco = (code: string) => (/^PLY/.test(code) ? '🟫' : /^BOX/.test(code) ? '📦' : /^LOG/.test(code) ? '🪵' : '📜');
+const shortN = (code: string) => item(code)?.name.split(',')[0] || code;
+type Marks = Record<string, { missing: number; damaged: number; extra: number; counted?: number }>;
+
 export default function Receive({ id, token, payload }: { id: string; token: string; payload?: string }) {
   const store = useStore();
   const [lang, setLangState] = useState(savedLang);
   const setLang = (l: string) => { setLangState(l); saveLang(l); };
+  const L = (['en', 'hi', 'kn', 'te'].includes(lang) ? lang : 'en') as RL;
+  const w = (k: string) => R[k][L];
   // This phone made the load (same truck and ref): its own record decides. Otherwise the load comes from the link.
   const mine = shipmentOf(store.state, id);
   const fromLink = payload ? unpackLoad(id, token, payload) : null;
@@ -98,39 +139,17 @@ export default function Receive({ id, token, payload }: { id: string; token: str
   };
   const s = sameLoad ? mine : remote ? shipmentOf(state, id) : null;
   const ok = s && s.token && s.token === token && !s.cancelledAt;
-  const saved = loadDraft(`${id}-${token}`);
-  // our staff: their own name; an outside receiver: the last name typed on this phone
-  const [by, setBy] = useState(() => saved?.by || (getWho() ? me().replace(' (staff)', '') : (() => { try { return localStorage.getItem('loadmatch-name') || (s?.party ? `${party(s.party)?.name.split(' ')[0]} stores` : 'Store person'); } catch { return 'Store person'; } })()));
-  // Prototype: counts open filled in with exactly what was sent (the happy path). For a sad path, press − to make some missing or + damaged.
-  const demoCounts = () => Object.fromEntries(s.lines.map((l: any) => [l.id, { counted: String(l.qty), damaged: '0' }]));
-  const [counts, setCounts] = useState<Record<string, Count>>(() => saved?.counts || (ok ? demoCounts() : {}));
-  // with the shared database the load can arrive a moment after this screen opens: fill the demo counts then
-  useEffect(() => { if (ok && !s.receipt && !saved?.counts && !Object.keys(counts).length) setCounts(demoCounts()); }, [ok]);
-  const [photos, setPhotos] = useState<any[]>(saved?.photos || []);
-  const [note, setNote] = useState(saved?.note || '');
-  const [step, setStep] = useState<number>(saved?.step ?? 0); // 0..n-1 lines, n = review
-  const [confirming, setConfirming] = useState(false);
-  // the receiver first says the truck is here, then counts (a link opened early does not start counting)
+  const staff = Boolean(getWho());
+  // our staff: their own name; an outside receiver: the last name used on this phone
+  const [by, setBy] = useState(() => (staff ? me().replace(' (staff)', '') : (() => { try { return localStorage.getItem('loadmatch-name') || (s?.party ? `${party(s.party)?.name.split(' ')[0]} stores` : 'Store person'); } catch { return 'Store person'; } })()));
   const [arrivedHere, setArrivedHere] = useState(false);
-  const [heard, setHeard] = useState<{ text: string; ok: boolean } | null>(null);
-  const stepRef = useRef(step);
-  stepRef.current = step;
-
-  useEffect(() => { if (ok && !s.receipt) saveDraft(`${id}-${token}`, { by, counts, photos, note, step }); }, [ok, s?.receipt, id, by, counts, photos, note, step]);
-
-  const lineIds: string[] = ok ? s.lines.map((l: any) => l.id) : [];
-  const onText = useCallback((alts: string[]) => {
-    const lineId = lineIds[stepRef.current];
-    if (!lineId) return;
-    const parsed = alts.map(parseCount).find((p) => p.counted != null || p.damaged != null);
-    if (!parsed) { setHeard({ text: alts[0] || '', ok: false }); return; }
-    setHeard({ text: alts[0], ok: true });
-    setCounts((c) => {
-      const cur = c[lineId] || { counted: '', damaged: '0' };
-      return { ...c, [lineId]: { counted: parsed.counted != null ? String(parsed.counted) : cur.counted, damaged: parsed.damaged != null ? String(parsed.damaged) : cur.damaged || '0' } };
-    });
-  }, [lineIds.join(',')]);
-  const voice = useVoice(lang, onText);
+  const [savedCo, setSavedCo] = useState(false);
+  const [mode, setMode] = useState<'' | 'ok' | 'wrong'>('');
+  const [marks, setMarks] = useState<Marks>({});
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [busy, setBusy] = useState<'' | 'voice' | 'photo'>('');
+  const [heard, setHeard] = useState('');
+  const [extraOpen, setExtraOpen] = useState<Record<string, boolean>>({});
 
   if (!ok) {
     return (
@@ -140,166 +159,104 @@ export default function Receive({ id, token, payload }: { id: string; token: str
     );
   }
 
+  const from = route(s).split(' → ')[0];
   const head = (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs space-y-0.5">
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs space-y-1">
       <div className="font-bold text-slate-900 text-sm">{route(s)}</div>
-      <div className="text-slate-600">{t('truck', lang)} <span className="font-mono font-bold">{s.truckNo}</span> • {t('ref', lang)} {s.ref} • {loadName(s.id)}</div>
-      {(s.driver || s.driverPhone) && <div className="text-slate-600">{t('driver', lang)}: {s.driver || '—'}{s.driverPhone && <a href={`tel:${s.driverPhone}`} className="ml-2 inline-block font-bold text-emerald-800">📞 {t('callDriver', lang)}</a>}</div>}
+      <div className="text-slate-600 flex flex-wrap items-center gap-x-2 gap-y-1"><span className="inline-block px-2 py-0.5 rounded-md border-2 border-slate-800 bg-amber-50 font-mono font-bold text-slate-900">{s.truckNo}</span>{loadName(s.id)}{s.driverPhone && <a href={`tel:${s.driverPhone}`} className="font-bold text-emerald-800">📞 {s.driver || t('driver', lang)}</a>}</div>
     </div>
   );
 
-  if (s.receipt) return <Done s={s} state={state} remote={Boolean(remote)} lang={lang} setLang={setLang} head={head} />;
+  if (s.receipt) return <Done s={s} state={state} remote={Boolean(remote)} lang={lang} setLang={setLang} head={head} w={w} />;
 
-  if (!s.arrivedAt && !arrivedHere && !saved?.step && (!atGate(s.flow) || s.expectedOn)) {
+  // the truck is on the way: our staff tap Truck arrived; someone outside who opened the link is asked who they are
+  if (!s.arrivedAt && !arrivedHere && (!atGate(s.flow) || s.expectedOn)) {
     return (
       <PhoneFrame title="LoadMatch" sub={loadName(s.id)} lang={lang} setLang={setLang}>
         <div className="space-y-4">
           {head}
           <div id="not-arrived" className="rounded-2xl border-2 border-sky-300 bg-sky-50 p-4 text-center space-y-2">
             <div className="text-4xl">🚚</div>
-            <div className="text-base font-bold text-sky-950">{loadName(s.id)} is on the way</div>
-            <div className="text-sm text-sky-900">From {route(s).split(' → ')[0]} · truck <span className="font-mono font-bold">{s.truckNo}</span></div>
-            <div className="text-xs text-slate-600">When this truck is at your gate, tap the button and count what came.</div>
+            <div className="text-base font-bold text-sky-950">{loadName(s.id)} {w('onWay')}</div>
+            <div className="text-sm text-sky-900">{from}</div>
+            <div className="text-xs text-slate-600">{w('whenHere')}</div>
           </div>
-          <button id="btn-arrived" onClick={() => { if (!remote) store.dispatch({ type: 'ARRIVED', id: s.id, by: me(), actor: me() }); setArrivedHere(true); }} className="w-full min-h-[56px] rounded-2xl bg-emerald-600 text-white text-base font-bold cursor-pointer">📍 Truck arrived → 🔢 Count</button>
+          {!staff && !savedCo && <button id="btn-save-company" onClick={() => setSavedCo(true)} className="w-full min-h-[52px] rounded-2xl border-2 border-slate-900 bg-white text-slate-900 text-sm font-bold cursor-pointer">🏢 {w('iAmOwner')}</button>}
+          {savedCo && <div id="saved-company" className="rounded-xl border-2 border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-950">✅ {w('savedCo')}</div>}
+          {!staff && <div className="text-xs font-bold text-slate-600">📦 {w('iAmStore')}</div>}
+          <button id="btn-arrived" onClick={() => { if (!remote) store.dispatch({ type: 'ARRIVED', id: s.id, by: me(), actor: me() }); setArrivedHere(true); }} className="w-full min-h-[56px] rounded-2xl bg-emerald-600 text-white text-base font-bold cursor-pointer">📍 {w('arrivedCount')}</button>
         </div>
       </PhoneFrame>
     );
   }
 
-  const n = s.lines.length;
-  const get = (lineId: string): Count => counts[lineId] || { counted: '', damaged: '0' };
-  const set = (lineId: string, k: keyof Count, v: string) => setCounts((c) => ({ ...c, [lineId]: { ...get(lineId), ...c[lineId], [k]: v.replace(/[^0-9]/g, '') } }));
-  const bump = (lineId: string, k: keyof Count, d: number) => set(lineId, k, String(Math.max(0, Number(get(lineId)[k] || 0) + d)));
-  const lineValid = (lineId: string) => { const c = get(lineId); return c.counted !== '' && Number(c.damaged || 0) <= Number(c.counted); };
-  const left = s.lines.filter((l: any) => !lineValid(l.id)).length;
-  const ready = left === 0 && by.trim().length > 0;
-  const go = (to: number) => { voice.stop(); setHeard(null); setStep(Math.max(0, Math.min(n, to))); };
-
+  const blind = Boolean(state.settings.blindCount);
+  const m = (lineId: string) => marks[lineId] || { missing: 0, damaged: 0, extra: 0 };
+  const put = (lineId: string, k: string, v: number) => setMarks((x) => ({ ...x, [lineId]: { ...m(lineId), ...x[lineId], [k]: v } }));
+  const countedOf = (l: any) => (blind ? m(l.id).counted ?? 0 : l.qty - m(l.id).missing + m(l.id).extra);
+  const anyMark = s.lines.some((l: any) => m(l.id).missing || m(l.id).damaged || m(l.id).extra);
+  // simulated: in a real build the phone records the voice and a speech model turns it into item + number
+  const speak = () => {
+    setBusy('voice'); setHeard('');
+    setTimeout(() => {
+      const l0 = s.lines[0];
+      if (blind) { s.lines.forEach((l: any) => put(l.id, 'counted', l.qty)); setHeard(`“${s.lines.map((l: any) => `${shortN(l.item)} ${l.qty}`).join(', ')}”`); }
+      else { put(l0.id, 'damaged', Math.min(l0.qty, m(l0.id).damaged + 2)); setHeard(`“${SAMPLE[L]}” → ${shortN(l0.item)}: 2 ${w('damaged').toLowerCase()}`); }
+      setBusy('');
+    }, 1200);
+  };
+  const photo = (name: string) => { setBusy('photo'); setTimeout(() => { setPhotos((p) => [...p, name]); setBusy(''); }, 700); };
+  const ready = by.trim() && (blind ? s.lines.every((l: any) => countedOf(l) >= m(l.id).damaged) : mode === 'ok' ? photos.includes('stack.jpg') : mode === 'wrong' && anyMark);
   const submit = () => {
     try { localStorage.setItem('loadmatch-name', by.trim()); } catch { /* ignore */ }
-    const lines = Object.fromEntries(s.lines.map((l: any) => [l.id, { counted: Number(get(l.id).counted), damaged: Number(get(l.id).damaged || 0) }]));
-    dispatch({ type: 'SUBMIT_RECEIPT', id: s.id, token, by: by.trim(), lines, photos, note: note.trim(), actor: 'Receiver' });
-    clearDraft(`${s.id}-${token}`);
-    setConfirming(false);
+    const lines = Object.fromEntries(s.lines.map((l: any) => [l.id, { counted: countedOf(l), damaged: Math.min(m(l.id).damaged, countedOf(l)) }]));
+    dispatch({ type: 'SUBMIT_RECEIPT', id: s.id, token, by: by.trim(), lines, photos, note: '', actor: 'Receiver' });
   };
+  const tile = 'rounded-2xl border-2 bg-white p-3 space-y-2';
+  const markRow = (l: any, k: 'missing' | 'damaged' | 'extra', icon: string, tone: string, max: number) => (
+    <div className="flex items-center justify-between gap-2"><span className="text-sm font-bold text-slate-700">{icon} {w(k)}</span><Stepper id={`r-${k}-${l.id}`} value={m(l.id)[k]} max={max} tone={tone} onChange={(v) => put(l.id, k, v)} /></div>
+  );
 
-  const num = 'w-20 p-2 rounded-lg border border-slate-300 text-center text-xl font-mono font-bold';
-  const stepBtn = 'w-11 h-11 rounded-lg border border-slate-300 bg-white flex items-center justify-center text-slate-700 cursor-pointer active:bg-slate-100';
-
-  // ----- one line at a time -----
-  if (step < n) {
-    const l = s.lines[step];
-    const c = get(l.id);
-    const bad = c.counted !== '' && Number(c.damaged || 0) > Number(c.counted);
-    return (
-      <PhoneFrame title={countTitle()} sub={`${t('recvSide', lang)}: ${route(s).split(' → ')[1]} · ${loadName(s.id)}`} lang={lang} setLang={setLang}>
-        {head}
-        <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
-          <span>{fill(t('lineOf', lang), { n: step + 1, total: n })}</span>
-          <span>{n - left}/{n} ✓</span>
-        </div>
-        <div className="flex gap-1">{s.lines.map((x: any, i: number) => <button key={x.id} aria-label={`line ${i + 1}`} onClick={() => go(i)} className={`h-1.5 flex-1 rounded-full cursor-pointer ${i === step ? 'bg-slate-900' : lineValid(x.id) ? 'bg-emerald-500' : 'bg-slate-200'}`} />)}</div>
-
-        <div id={`rline-${l.id}`} className="rounded-2xl border-2 border-slate-200 p-4 space-y-4">
-          <div>
-            <div className="text-base font-bold text-slate-900 leading-snug">{item(l.item).name}</div>
-            <div className="text-[11px] text-slate-500">{unitWord(item(l.item).unit, lang)}{!state.settings.blindCount && <> • {t('sentQty', lang)}: <b className="text-slate-800">{l.qty}</b></>}</div>
-          </div>
-
-          {voice.supported ? (
-            <div className="flex flex-col items-center gap-2">
-              <button id={`r-mic-${l.id}`} onClick={() => (voice.listening ? voice.stop() : (setHeard(null), voice.start()))}
-                className={`w-20 h-20 rounded-full flex items-center justify-center cursor-pointer shadow-md ${voice.listening ? 'bg-rose-600 text-white animate-pulse' : 'bg-slate-900 text-white'}`} aria-label={t('speakCount', lang)}>
-                <Mic className="w-9 h-9" />
-              </button>
-              <div className="text-xs font-bold text-slate-800">{voice.listening ? t('listening', lang) : t('tapMic', lang)}</div>
-              <div className="text-[11px] text-slate-500 text-center">{t('sayLike', lang)}</div>
-              {heard && <div id="r-heard" className={`text-xs rounded-lg px-3 py-1.5 ${heard.ok ? 'bg-emerald-50 text-emerald-900 border border-emerald-200' : 'bg-amber-50 text-amber-900 border border-amber-200'}`}>{heard.ok ? <>{t('heard', lang)}: “{heard.text}”</> : t('notUnderstood', lang)}</div>}
-              {voice.error && voice.error !== 'lang_fallback' && <div className="text-[11px] text-amber-800"><MicOff className="w-3.5 h-3.5 inline mr-1" />{voice.error.replace(/_/g, ' ')}</div>}
-            </div>
-          ) : null}
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-bold text-slate-700">{t('counted', lang)}</span>
-              <div className="flex items-center gap-1.5">
-                <button className={stepBtn} onClick={() => bump(l.id, 'counted', -1)} aria-label="minus"><Minus className="w-4 h-4" /></button>
-                <input id={`r-count-${l.id}`} inputMode="numeric" value={c.counted} onChange={(e) => set(l.id, 'counted', e.target.value)} placeholder="?" className={num} />
-                <button className={stepBtn} onClick={() => bump(l.id, 'counted', 1)} aria-label="plus"><Plus className="w-4 h-4" /></button>
-              </div>
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-bold text-slate-700">{t('damaged', lang)}</span>
-              <div className="flex items-center gap-1.5">
-                <button className={stepBtn} onClick={() => bump(l.id, 'damaged', -1)} aria-label="minus"><Minus className="w-4 h-4" /></button>
-                <input id={`r-dmg-${l.id}`} inputMode="numeric" value={c.damaged} onChange={(e) => set(l.id, 'damaged', e.target.value)} className={`${num} ${bad ? 'border-rose-500 text-rose-700' : ''}`} />
-                <button className={stepBtn} onClick={() => bump(l.id, 'damaged', 1)} aria-label="plus"><Plus className="w-4 h-4" /></button>
-              </div>
-            </div>
-          </div>
-          {bad && <div id="r-dmg-msg" className="text-xs font-bold text-rose-700">{t('dmgTooMany', lang)}</div>}
-          {!state.settings.blindCount ? (() => {
-            const n = Number(c.counted);
-            const counted = c.counted !== '' && Number.isFinite(n);
-            const miss = counted ? Math.max(0, l.qty - n) : null;
-            const extra = counted ? Math.max(0, n - l.qty) : 0;
-            return (
-              <div id={`r-missing-${l.id}`} className={`flex items-center justify-between gap-2 rounded-xl border-2 px-3 py-2 ${miss ? 'border-rose-300 bg-rose-50' : extra ? 'border-sky-300 bg-sky-50' : 'border-slate-200 bg-slate-50'}`}>
-                <span className="text-xs font-bold text-slate-700">{extra ? `➕ ${t('excess', lang)}` : `❌ ${t('short', lang)}`}<span className="block font-normal text-[11px] text-slate-500">{t('sentQty', lang)} {l.qty} − {t('counted', lang)} {counted ? n : '?'}</span></span>
-                <span className={`text-2xl font-bold font-mono ${miss ? 'text-rose-700' : extra ? 'text-sky-700' : 'text-slate-900'}`}>{miss === null ? '?' : extra || miss}</span>
-              </div>
-            );
-          })() : <div id="missing-hint" className="text-[11px] text-slate-500">{MISSING_HINT}</div>}
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <button onClick={() => go(step - 1)} disabled={step === 0} className="py-3 rounded-xl border border-slate-300 text-sm font-bold flex items-center justify-center disabled:opacity-30 cursor-pointer"><ChevronLeft className="w-4 h-4 mr-1" />{t('prev', lang)}</button>
-          <button id="btn-next-line" onClick={() => go(step + 1)} disabled={!lineValid(l.id)} className="py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center disabled:opacity-40 cursor-pointer">{step === n - 1 ? t('checkSubmit', lang) : t('next', lang)}<ChevronRight className="w-4 h-4 ml-1" /></button>
-        </div>
-        <div className="text-[10px] text-slate-400 text-center">{t('savedPhone', lang)}</div>
-      </PhoneFrame>
-    );
-  }
-
-  // ----- review and submit (still blind) -----
   return (
-    <PhoneFrame title={countTitle()} sub={`${t('checkSubmit', lang)} · ${loadName(s.id)}`} lang={lang} setLang={setLang}>
-      {head}
-      <div className="rounded-xl border border-slate-200 divide-y divide-slate-100">
-        {s.lines.map((l: any, i: number) => {
-          const c = get(l.id);
-          return (
-            <button key={l.id} onClick={() => go(i)} className="w-full px-3 py-2 flex items-center justify-between text-xs text-left cursor-pointer hover:bg-slate-50">
-              <span className="pr-2 text-slate-800">{item(l.item).name}</span>
-              <span className={`font-mono font-bold whitespace-nowrap ${lineValid(l.id) ? 'text-slate-900' : 'text-rose-700'}`}>{c.counted || '?'}{Number(c.damaged) ? ` (${c.damaged} ${t('damagedWord', lang)})` : ''}</span>
-            </button>
-          );
-        })}
-      </div>
-      <PhotoStrip photos={photos} onAdd={(r) => setPhotos([...photos, ...r])} label={t('addPhoto', lang)} lang={lang} kinds={['damage', 'unloading', 'delivery note', 'bill']} />
-      <div className="text-[10px] text-slate-400">{t('photosHere', lang)}</div>
-      <label className="block text-[11px] font-bold text-slate-700">{t('note', lang)}
-        <textarea id="r-note" value={note} onChange={(e) => setNote(e.target.value)} rows={2} className="mt-1 w-full p-2 rounded-lg border border-slate-300 text-sm" />
-      </label>
-      <label className="block text-[11px] font-bold text-slate-700">{t('yourName', lang)}
-        <input id="r-name" value={by} onChange={(e) => setBy(e.target.value)} className="mt-1 w-full p-2.5 rounded-lg border border-slate-300 text-sm" />
-      </label>
-      {!ready && <div id="r-missing" className="text-[11px] text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-2">{t('stillNeeded', lang)}: {[left ? `${left} ${t('linesLeft', lang)}` : '', !by.trim() ? t('yourName', lang) : ''].filter(Boolean).join(' · ')}</div>}
-      {!confirming ? (
-        <button id="btn-submit-count" disabled={!ready} onClick={() => setConfirming(true)} className="w-full min-h-[52px] rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-sm font-bold cursor-pointer shadow-md">
-          {t('submit', lang)}{left ? ` · ${left} ${t('linesLeft', lang)}` : ''}
-        </button>
-      ) : (
-        <div className="space-y-2 rounded-xl border border-amber-300 bg-amber-50 p-3">
-          <div className="text-xs font-bold text-amber-950">{t('confirmSubmit', lang)}</div>
-          <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => setConfirming(false)} className="py-3 rounded-xl border border-slate-300 bg-white text-xs font-bold cursor-pointer">{t('goBack', lang)}</button>
-            <button id="btn-confirm-submit" onClick={submit} className="py-3 rounded-xl bg-emerald-600 text-white text-xs font-bold cursor-pointer">{t('yesSubmit', lang)}</button>
+    <PhoneFrame title={staff ? 'LoadMatch · Store' : 'LoadMatch · Count'} sub={`${route(s).split(' → ')[1]} · ${loadName(s.id)}`} lang={lang} setLang={setLang}>
+      <div className="space-y-3">
+        {head}
+        {s.lines.map((l: any) => (
+          <div key={l.id} id={`rline-${l.id}`} className={`${tile} ${mode === 'ok' ? 'border-emerald-300' : 'border-slate-200'}`}>
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">{itemIco(l.item)}</span>
+              <span className="flex-1 min-w-0 text-sm font-bold text-slate-900 leading-tight">{shortN(l.item)}<span className="block text-[11px] font-normal text-slate-500">{unitWord(item(l.item).unit, lang)}</span></span>
+              {!blind && <span className="text-right"><span className="block text-[11px] text-slate-500">{w('sent')}</span><span className="text-2xl font-mono font-bold text-slate-900">{l.qty}</span></span>}
+              {mode === 'ok' && <span className="text-2xl">✅</span>}
+            </div>
+            {blind && <div className="flex items-center justify-between gap-2"><span className="text-sm font-bold text-slate-700">🔢 {w('counted')}</span><Stepper id={`r-count-${l.id}`} value={countedOf(l)} onChange={(v) => put(l.id, 'counted', v)} /></div>}
+            {(mode === 'wrong' || blind) && <>
+              {!blind && markRow(l, 'missing', '❌', 'rose', l.qty - m(l.id).extra)}
+              {markRow(l, 'damaged', '💔', 'amber', Math.max(0, countedOf(l)))}
+              {!blind && (extraOpen[l.id] || m(l.id).extra ? markRow(l, 'extra', '➕', 'sky', 999) : <button id={`r-more-${l.id}`} onClick={() => setExtraOpen({ ...extraOpen, [l.id]: true })} className="text-[12px] font-bold text-sky-800 underline cursor-pointer">{w('moreCame')}</button>)}
+            </>}
           </div>
-        </div>
-      )}
-      <div className="text-[10px] text-slate-400 text-center">{t('savedPhone', lang)}</div>
+        ))}
+
+        {!blind && !mode && <div className="grid grid-cols-2 gap-3">
+          <button id="btn-all-came" onClick={() => setMode('ok')} className="min-h-[72px] rounded-2xl bg-emerald-600 text-white text-base font-bold cursor-pointer flex flex-col items-center justify-center"><span className="text-2xl">✅</span>{w('allCame')}</button>
+          <button id="btn-something-wrong" onClick={() => setMode('wrong')} className="min-h-[72px] rounded-2xl bg-amber-500 text-white text-base font-bold cursor-pointer flex flex-col items-center justify-center"><span className="text-2xl">⚠️</span>{w('wrong')}</button>
+        </div>}
+
+        {(mode === 'wrong' || blind) && <div className="rounded-2xl border-2 border-slate-200 bg-slate-50 p-3 space-y-2">
+          <button id="btn-speak" disabled={busy === 'voice'} onClick={speak} className={`w-full min-h-[52px] rounded-2xl text-white text-base font-bold cursor-pointer ${busy === 'voice' ? 'bg-rose-600 animate-pulse' : 'bg-slate-900'}`}>🎤 {busy === 'voice' ? w('listening') : blind ? w('sayCount') : w('speak')}</button>
+          {heard && <div id="r-heard" className="text-xs rounded-lg px-3 py-1.5 bg-emerald-50 text-emerald-900 border border-emerald-200">🤖 {w('heard')}: {heard}</div>}
+          {!blind && <div className="text-[11px] text-slate-500 text-center">{w('orTap')}</div>}
+        </div>}
+
+        {mode === 'ok' && <button id="btn-photo-stack" disabled={busy === 'photo' || photos.includes('stack.jpg')} onClick={() => photo('stack.jpg')} className={`w-full min-h-[52px] rounded-2xl text-base font-bold cursor-pointer border-2 ${photos.includes('stack.jpg') ? 'border-emerald-300 bg-emerald-50 text-emerald-900' : 'border-slate-900 bg-white text-slate-900'}`}>{photos.includes('stack.jpg') ? `✅ ${w('photoOk')}` : busy === 'photo' ? '⏳' : `📷 ${w('stackPhoto')}`}</button>}
+        {mode === 'wrong' && s.lines.some((l: any) => m(l.id).damaged) && <button id="btn-photo-damage" disabled={busy === 'photo' || photos.includes('damage.jpg')} onClick={() => photo('damage.jpg')} className={`w-full min-h-[48px] rounded-2xl text-sm font-bold cursor-pointer border-2 ${photos.includes('damage.jpg') ? 'border-emerald-300 bg-emerald-50 text-emerald-900' : 'border-slate-400 bg-white text-slate-800'}`}>{photos.includes('damage.jpg') ? `✅ ${w('photoOk')}` : `📷 ${w('damagePhoto')}`}</button>}
+
+        {!staff && (mode || blind) && <label className="block text-[11px] font-bold text-slate-700">{w('yourName')}<input id="r-name" value={by} onChange={(e) => setBy(e.target.value)} className="mt-1 w-full p-2.5 rounded-lg border border-slate-300 text-sm" /></label>}
+        {mode === 'wrong' && !anyMark && <div id="r-missing" className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-2">{w('nothingMarked')}</div>}
+        {(mode || blind) && <button id="btn-submit-count" disabled={!ready} onClick={submit} className="w-full min-h-[56px] rounded-2xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-base font-bold cursor-pointer">📨 {w('sendOwner')}</button>}
+        {mode && <button id="btn-change-mode" onClick={() => { setMode(''); setMarks({}); setHeard(''); }} className="text-xs font-bold text-slate-500 underline cursor-pointer">← {t('goBack', lang)}</button>}
+      </div>
     </PhoneFrame>
   );
 }
@@ -314,48 +271,69 @@ export function resultText(state: any, s: any, lang: string) {
   return `${head}\n${t('resultDiff', lang)}\n${ds.map((d: any) => `• ${item(d.item).name}: ${d.qty} ${kind[d.kind]}`).join('\n')}`;
 }
 
-// After submitting: the count is locked; now the sent quantity is shown next to the count.
-function Done({ s, state, remote, lang, setLang, head }: { s: any; state: any; remote: boolean; lang: string; setLang: (l: string) => void; head: React.ReactNode }) {
+// After submitting: one line says what happened; the items are one tap away.
+function Done({ s, state, remote, lang, setLang, head, w }: { s: any; state: any; remote: boolean; lang: string; setLang: (l: string) => void; head: React.ReactNode; w: (k: string) => string }) {
   const { dispatch } = useStore();
-  // From another phone: the message to the sender carries a link that records this count on their phone.
-  // Always: the receiver may be on a different phone even when this phone has a load with the same number.
-  // With the shared database the count already reached everyone; the WhatsApp message is just a note.
+  const [items, setItems] = useState(false);
   const message = sharedMode ? resultText(state, s, lang) : `${resultText(state, s, lang)}\n\n${t('saveCountLink', lang)}:\n${appLink(countBackPath(s, s.receipt))}`;
   const matched = shipmentStatus(state, s) === 'MATCHED';
-  // the count is locked now, so the counter can see what is missing or damaged (the owner still decides)
-  const showLines = true;
   const tot = s.lines.reduce((a: any, l: any) => { const r = s.receipt.lines[l.id]; a.missing += Math.max(0, l.qty - r.counted); a.extra += Math.max(0, r.counted - l.qty); a.damaged += r.damaged || 0; return a; }, { missing: 0, extra: 0, damaged: 0 });
+  const what = [[tot.missing, w('missing')], [tot.damaged, w('damaged')], [tot.extra, w('extra')]].filter(([n]) => n).map(([n, x]) => `${n} ${String(x).toLowerCase()}`).join(', ');
   return (
-    <PhoneFrame title={countTitle()} sub={loadName(s.id)} lang={lang} setLang={setLang}>
-      {head}
-      <Note tone="go"><CheckCircle2 className="w-4 h-4 inline mr-1" />{t(remote ? 'savedSendNow' : 'submitted', lang)}</Note>
-      <Note tone={matched ? 'go' : 'warn'}>{matched ? t('resultMatched', lang) : t('resultDiff', lang)}</Note>
-      <div id="count-summary" className="grid grid-cols-3 gap-2 text-center">
-        <div className={`rounded-xl border-2 p-2 ${tot.missing ? 'border-rose-300 bg-rose-50' : 'border-slate-200'}`}><div className="text-2xl font-bold">{tot.missing}</div><div className="text-xs font-bold">❌ {t('short', lang)}</div></div>
-        <div className={`rounded-xl border-2 p-2 ${tot.damaged ? 'border-amber-300 bg-amber-50' : 'border-slate-200'}`}><div className="text-2xl font-bold">{tot.damaged}</div><div className="text-xs font-bold">⚠️ {t('damagedWord', lang)}</div></div>
-        <div className={`rounded-xl border-2 p-2 ${tot.extra ? 'border-sky-300 bg-sky-50' : 'border-slate-200'}`}><div className="text-2xl font-bold">{tot.extra}</div><div className="text-xs font-bold">➕ {t('excess', lang)}</div></div>
-      </div>
-      {showLines && <div className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">{t('compare', lang)}</div>}
-      {showLines && <div className="rounded-xl border border-slate-200 divide-y divide-slate-100">
-        {s.lines.map((l: any) => {
-          const r = s.receipt.lines[l.id];
-          const same = r.counted === l.qty && !r.damaged;
-          return (
-            <div key={l.id} className="px-3 py-2 text-xs">
-              <div className="text-slate-800">{item(l.item).name}</div>
-              <div className="flex items-center justify-between font-mono mt-0.5">
-                <span className="text-slate-500">{t('sentQty', lang)} {l.qty} → {t('counted', lang)} <b className="text-slate-900">{r.counted}</b>{r.damaged ? ` (${r.damaged} ${t('damagedWord', lang)})` : ''}</span>
-                <span className={`font-sans font-bold text-right ${same ? 'text-emerald-700' : 'text-amber-700'}`}>{same ? `✓ ${t('matchedLine', lang)}` : [r.counted < l.qty ? `${l.qty - r.counted} ${t('short', lang)}` : '', r.counted > l.qty ? `${r.counted - l.qty} ${t('excess', lang)}` : '', r.damaged ? `${r.damaged} ${t('damagedWord', lang)}` : ''].filter(Boolean).join(', ')}</span>
+    <PhoneFrame title="LoadMatch" sub={loadName(s.id)} lang={lang} setLang={setLang}>
+      <div className="space-y-3">
+        {head}
+        <div id="count-summary" className={`rounded-2xl border-2 p-4 text-center space-y-1 ${matched ? 'border-emerald-300 bg-emerald-50' : 'border-amber-300 bg-amber-50'}`}>
+          <div className="text-4xl">{matched ? '✅' : '⚠️'}</div>
+          <div className="text-base font-bold text-slate-900">{matched ? w('allOkDone') : `${w('sentToOwner')}: ${what}`}</div>
+        </div>
+        {!matched && s.flow !== 'outbound' && <Note tone="warn">{t('lrTip', lang)}</Note>}
+        {!matched && !remote && <PhotoStrip photos={(s.docs || []).filter((d: any) => d.by === 'Receiver')} onAdd={(r) => dispatch({ type: 'ATTACH_DOC', id: s.id, docs: r, actor: 'Receiver' })} label={t('addPhoto', lang)} lang={lang} kinds={['signed lorry receipt (bilty)', 'damage']} />}
+        {!sharedMode && !countedByUs(s) && <div id="r-send-back"><Note tone="warn">{t('sendBackNote', lang)}</Note></div>}
+        {!countedByUs(s) && <a id="btn-tell-sender" href={shareWhatsApp(message)} target="_blank" rel="noreferrer" className="w-full min-h-[48px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center"><MessageCircle className="w-5 h-5 mr-2" />{t(sharedMode ? 'tellSender' : 'sendCountToSender', lang)}</a>}
+        <button id="btn-see-items" onClick={() => setItems(!items)} className="text-sm font-bold text-slate-600 underline cursor-pointer">{items ? '▲' : '▼'} {w('seeItems')}</button>
+        {items && <div className="rounded-xl border border-slate-200 divide-y divide-slate-100 bg-white">
+          {s.lines.map((l: any) => {
+            const r = s.receipt.lines[l.id];
+            const same = r.counted === l.qty && !r.damaged;
+            return (
+              <div key={l.id} className="px-3 py-2 text-xs flex items-center justify-between gap-2">
+                <span className="text-slate-800">{itemIco(l.item)} {shortN(l.item)}<span className="block font-mono text-slate-500">{w('sent')} {l.qty} → {w('counted')} {r.counted}</span></span>
+                <span className={`font-bold text-right ${same ? 'text-emerald-700' : 'text-amber-700'}`}>{same ? '✓' : [r.counted < l.qty ? `${l.qty - r.counted} ${w('missing').toLowerCase()}` : '', r.counted > l.qty ? `${r.counted - l.qty} ${w('extra').toLowerCase()}` : '', r.damaged ? `${r.damaged} ${w('damaged').toLowerCase()}` : ''].filter(Boolean).join(', ')}</span>
               </div>
-            </div>
-          );
-        })}
-      </div>}
-      {!matched && s.flow !== 'outbound' && <Note tone="warn">{t('lrTip', lang)}</Note>}
-      {!sharedMode && !countedByUs(s) && <div id="r-send-back"><Note tone="warn">{t('sendBackNote', lang)}</Note></div>}
-      {!matched && !remote && <PhotoStrip photos={(s.docs || []).filter((d: any) => d.by === 'Receiver')} onAdd={(r) => dispatch({ type: 'ATTACH_DOC', id: s.id, docs: r, actor: 'Receiver' })} label={t('addPhoto', lang)} lang={lang} kinds={['signed lorry receipt (bilty)', 'damage']} />}
-      {!countedByUs(s) &&       <a id="btn-tell-sender" href={shareWhatsApp(message)} target="_blank" rel="noreferrer" className="w-full min-h-[48px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center justify-center"><MessageCircle className="w-5 h-5 mr-2" />{t(sharedMode ? 'tellSender' : 'sendCountToSender', lang)}</a>}
-      <Note><Lock className="w-4 h-4 inline mr-1" />{t('locked', lang)} {s.receipt.by}, {when(s.receipt.at)}</Note>
+            );
+          })}
+        </div>}
+        <div className="text-[11px] text-slate-500 flex items-center"><Lock className="w-3.5 h-3.5 mr-1" />{w('lockedBy')} {s.receipt.by}, {when(s.receipt.at)}</div>
+      </div>
+    </PhoneFrame>
+  );
+}
+
+// ---------- the owner asked a supplier what happened: #/a/<truck>/<token>, one tap to answer ----------
+export function SenderReply({ id, token }: { id: string; token: string }) {
+  const { state, dispatch } = useStore();
+  const [lang, setLangState] = useState(savedLang);
+  const setLang = (l: string) => { setLangState(l); saveLang(l); };
+  const s = shipmentOf(state, id);
+  const valid = s && s.ask && s.ask.token === token;
+  const ds = valid ? diffsOf(state, s.id).filter((d: any) => d.kind !== 'excess') : [];
+  return (
+    <PhoneFrame title="LoadMatch" sub={s ? loadName(s.id) : id} lang={lang} setLang={setLang}>
+      {!valid ? <Note tone="stop">{t('invalidLink', lang)}</Note> : (
+        <div className="space-y-3">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs space-y-1">
+            <div className="font-bold text-slate-900 text-sm">{route(s)} · {loadName(s.id)}</div>
+            <div className="text-slate-600">Bill {s.ref} · truck {s.truckNo}</div>
+          </div>
+          <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-3 space-y-1">
+            <div className="text-base font-bold text-amber-950">❓ The buyer counted less than your bill. What happened?</div>
+            {ds.map((d: any) => <div key={d.id} className="text-sm text-amber-950">{itemIco(d.item)} {shortN(d.item)}: {d.qty} {d.kind === 'short' ? 'missing' : 'damaged'}</div>)}
+          </div>
+          {s.ask.reply ? <div id="reply-done" className="rounded-xl border-2 border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-950">✅ Sent: {REPLIES[s.ask.reply.kind].label}. Thank you.</div>
+            : Object.keys(REPLIES).map((k) => <button key={k} id={`sreply-${k}`} onClick={() => dispatch({ type: 'SENDER_REPLY', id: s.id, token, kind: k, by: `${party(s.party)?.name}`, actor: party(s.party)?.name })} className="w-full min-h-[52px] rounded-xl border-2 border-slate-300 bg-white px-3 text-left text-sm font-bold text-slate-900 cursor-pointer flex items-center gap-2"><span className="text-xl">{REPLIES[k].icon}</span>{REPLIES[k].label}</button>)}
+        </div>
+      )}
     </PhoneFrame>
   );
 }

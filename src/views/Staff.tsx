@@ -1,14 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useStore, route, diffsOf, countedByUs, atGate, receiverPath, loadName } from '../store.tsx';
-import { UNITS, COMPANY } from '../data/seed.ts';
+import { useStore, route, diffsOf, countedByUs, atGate, receiverPath, loadName, item, party, REPLIES, senderIsUs } from '../store.tsx';
+import { UNITS, PARTIES } from '../data/seed.ts';
 import { getUnit, setUnit, setMeName, me } from '../lib/who.ts';
-import { PhoneFrame, savedLang, saveLang, newToken, shareWhatsApp, appLink } from './ui.tsx';
+import { PhoneFrame, savedLang, saveLang, newToken } from './ui.tsx';
 import { when } from '../lib/format.ts';
 import type { Go } from './ui.tsx';
 
-// Staff screen, made for people who read little: pictures, big buttons, one next step per truck, their language.
+// Staff screen, made for people who read little and do not type: pictures, big buttons, photos and voice,
+// one next step per truck, their language.
 const uname = (id: string) => UNITS[id]?.name.split(' (')[0] || id;
 const staffName = (state: any) => (state.staff || []).find((p: any) => p.unit === getUnit())?.name || 'Staff';
+export const itemIcon = (code: string) => (/^PLY/.test(code) ? '🟫' : /^BOX/.test(code) ? '📦' : /^LOG/.test(code) ? '🪵' : '📜');
+export const shortName = (code: string) => item(code)?.name.split(',')[0] || code;
 
 type L = 'en' | 'hi' | 'kn' | 'te';
 const W: Record<string, Record<L, string>> = {
@@ -17,49 +20,69 @@ const W: Record<string, Record<L, string>> = {
   updates: { en: 'Updates', hi: 'खबर', kn: 'ಸುದ್ದಿ', te: 'సమాచారం' },
   send: { en: 'Send', hi: 'भेजें', kn: 'ಕಳುಹಿಸಿ', te: 'పంపండి' },
   receive: { en: 'Receive', hi: 'माल आया', kn: 'ಸ್ವೀಕರಿಸಿ', te: 'స్వీకరించండి' },
-  myTrucks: { en: 'Trucks I send', hi: 'भेजने वाली गाड़ियाँ', kn: 'ಕಳುಹಿಸುವ ಲಾರಿಗಳು', te: 'పంపే లారీలు' },
-  startLoading: { en: 'Start loading', hi: 'लोडिंग शुरू', kn: 'ಲೋಡಿಂಗ್ ಶುರು', te: 'లోడింగ్ మొదలు' },
-  loadingDone: { en: 'Loading done', hi: 'लोडिंग पूरी', kn: 'ಲೋಡಿಂಗ್ ಮುಗಿಯಿತು', te: 'లోడింగ్ పూర్తి' },
+  myTrucks: { en: 'Trucks I sent', hi: 'भेजी गई गाड़ियाँ', kn: 'ಕಳುಹಿಸಿದ ಲಾರಿಗಳು', te: 'పంపిన లారీలు' },
   truckLeft: { en: 'Truck left', hi: 'गाड़ी निकल गई', kn: 'ಲಾರಿ ಹೊರಟಿತು', te: 'లారీ బయలుదేరింది' },
   arrived: { en: 'Truck arrived', hi: 'गाड़ी पहुँच गई', kn: 'ಲಾರಿ ಬಂತು', te: 'లారీ వచ్చింది' },
   count: { en: 'Count', hi: 'गिनें', kn: 'ಎಣಿಸಿ', te: 'లెక్కించండి' },
   onTheWay: { en: 'On the way', hi: 'रास्ते में', kn: 'ದಾರಿಯಲ್ಲಿದೆ', te: 'దారిలో ఉంది' },
   reached: { en: 'Reached', hi: 'पहुँच गई', kn: 'ತಲುಪಿತು', te: 'చేరింది' },
-  loading: { en: 'Loading', hi: 'लोड हो रहा है', kn: 'ಲೋಡ್ ಆಗುತ್ತಿದೆ', te: 'లోడ్ అవుతోంది' },
+  notLeft: { en: 'Not left yet', hi: 'अभी नहीं निकली', kn: 'ಇನ್ನೂ ಹೊರಟಿಲ್ಲ', te: 'ఇంకా బయలుదేరలేదు' },
   oldTrucks: { en: 'Old trucks', hi: 'पुरानी गाड़ियाँ', kn: 'ಹಳೆಯ ಲಾರಿಗಳು', te: 'పాత లారీలు' },
   problem: { en: 'Problem? Ask owner', hi: 'दिक्कत? मालिक से पूछें', kn: 'ಸಮಸ್ಯೆ? ಮಾಲೀಕರನ್ನು ಕೇಳಿ', te: 'సమస్యా? యజమానిని అడగండి' },
-  nothing: { en: 'Nothing to do now ✓', hi: 'अभी कुछ नहीं ✓', kn: 'ಈಗ ಏನೂ ಇಲ್ಲ ✓', te: 'ఇప్పుడు ఏమీ లేదు ✓' },
   noNews: { en: 'No news', hi: 'कोई खबर नहीं', kn: 'ಸುದ್ದಿ ಇಲ್ಲ', te: 'సమాచారం లేదు' },
-  ourUnit: { en: 'Our other unit', hi: 'हमारी दूसरी यूनिट', kn: 'ನಮ್ಮ ಇನ್ನೊಂದು ಘಟಕ', te: 'మా ఇంకో యూనిట్' },
-  customer: { en: 'Customer', hi: 'ग्राहक', kn: 'ಗ್ರಾಹಕ', te: 'కస్టమర్' },
-  supplierGate: { en: 'Supplier truck at the gate', hi: 'सप्लायर की गाड़ी गेट पर', kn: 'ಸರಬರಾಜುದಾರರ ಲಾರಿ ಗೇಟ್‌ನಲ್ಲಿ', te: 'సరఫరాదారు లారీ గేటు వద్ద' },
-  fromOur: { en: 'Every truck coming to you (our unit or a supplier) is below. Tap Truck arrived, then Count.', hi: 'आपके पास आने वाली हर गाड़ी नीचे है। “गाड़ी पहुँच गई” दबाएँ, फिर गिनें।', kn: 'ನಿಮಗೆ ಬರುವ ಪ್ರತಿ ಲಾರಿ ಕೆಳಗಿದೆ. “ಲಾರಿ ಬಂತು” ಒತ್ತಿ, ನಂತರ ಎಣಿಸಿ.', te: 'మీకు వచ్చే ప్రతి లారీ కింద ఉంది. “లారీ వచ్చింది” నొక్కి, తర్వాత లెక్కించండి.' },
   checking: { en: 'does not match. Owner is checking it', hi: 'मेल नहीं खाता, मालिक जाँच रहे हैं', kn: 'ಹೊಂದುತ್ತಿಲ್ಲ, ಮಾಲೀಕರು ಪರಿಶೀಲಿಸುತ್ತಿದ್ದಾರೆ', te: 'సరిపోలలేదు, యజమాని పరిశీలిస్తున్నారు' },
-  restComing: { en: 'does not match. The rest will come in the next load', hi: 'मेल नहीं खाता, बाकी अगली गाड़ी में आएगा', kn: 'ಹೊಂದುತ್ತಿಲ್ಲ, ಉಳಿದದ್ದು ಮುಂದಿನ ಲೋಡ್‌ನಲ್ಲಿ ಬರುತ್ತದೆ', te: 'సరిపోలలేదు, మిగతాది తదుపరి లోడ్‌లో వస్తుంది' },
+  restComing: { en: 'does not match. The rest will come in the next truck', hi: 'मेल नहीं खाता, बाकी अगली गाड़ी में आएगा', kn: 'ಹೊಂದುತ್ತಿಲ್ಲ, ಉಳಿದದ್ದು ಮುಂದಿನ ಲಾರಿಯಲ್ಲಿ ಬರುತ್ತದೆ', te: 'సరిపోలలేదు, మిగతాది తదుపరి లారీలో వస్తుంది' },
   decided: { en: 'does not match. Owner has decided', hi: 'मेल नहीं खाता, मालिक ने फैसला कर दिया', kn: 'ಹೊಂದುತ್ತಿಲ್ಲ, ಮಾಲೀಕರು ನಿರ್ಧರಿಸಿದ್ದಾರೆ', te: 'సరిపోలలేదు, యజమాని నిర్ణయించారు' },
-  ownerTells: { en: 'owner will tell them', hi: 'मालिक उन्हें बताएंगे', kn: 'ಮಾಲೀಕರು ಅವರಿಗೆ ತಿಳಿಸುತ್ತಾರೆ', te: 'యజమాని వారికి చెబుతారు' },
   ownerSends: { en: 'The owner sends the count link to the customer.', hi: 'मालिक ग्राहक को गिनती का लिंक भेजेंगे।', kn: 'ಮಾಲೀಕರು ಗ್ರಾಹಕರಿಗೆ ಎಣಿಕೆ ಲಿಂಕ್ ಕಳುಹಿಸುತ್ತಾರೆ.', te: 'యజమాని కస్టమర్‌కు లెక్క లింక్ పంపుతారు.' },
-  waLink: { en: 'Send count link on WhatsApp', hi: 'WhatsApp पर गिनती लिंक भेजें', kn: 'WhatsApp‌ನಲ್ಲಿ ಎಣಿಕೆ ಲಿಂಕ್ ಕಳುಹಿಸಿ', te: 'WhatsAppలో లెక్క లింక్ పంపండి' },
   yes: { en: 'Owner said YES', hi: 'मालिक ने हाँ कहा', kn: 'ಮಾಲೀಕರು ಹೌದು ಎಂದರು', te: 'యజమాని సరే అన్నారు' },
   no: { en: 'Owner said NO', hi: 'मालिक ने ना कहा', kn: 'ಮಾಲೀಕರು ಬೇಡ ಎಂದರು', te: 'యజమాని వద్దు అన్నారు' },
   waiting: { en: 'Waiting for owner', hi: 'मालिक के जवाब का इंतज़ार', kn: 'ಮಾಲೀಕರ ಉತ್ತರಕ್ಕೆ ಕಾಯುತ್ತಿದೆ', te: 'యజమాని సమాధానం కోసం' },
   okCount: { en: 'counted, all OK', hi: 'गिनती ठीक', kn: 'ಎಣಿಕೆ ಸರಿ', te: 'లెక్క సరిగ్గా ఉంది' },
-  diff: { en: 'does not match. Waiting for the owner', hi: 'मेल नहीं खाता, मालिक के फैसले का इंतज़ार', kn: 'ಹೊಂದುತ್ತಿಲ್ಲ, ಮಾಲೀಕರ ನಿರ್ಧಾರಕ್ಕೆ ಕಾಯುತ್ತಿದೆ', te: 'సరిపోలలేదు, యజమాని నిర్ణయం కోసం' },
+  diff: { en: 'does not match. Owner will decide', hi: 'मेल नहीं खाता, मालिक फैसला करेंगे', kn: 'ಹೊಂದುತ್ತಿಲ್ಲ, ಮಾಲೀಕರು ನಿರ್ಧರಿಸುತ್ತಾರೆ', te: 'సరిపోలలేదు, యజమాని నిర్ణయిస్తారు' },
   backAccident: { en: 'Coming back after accident', hi: 'दुर्घटना के बाद वापस', kn: 'ಅಪಘಾತದ ನಂತರ ವಾಪಸ್', te: 'ప్రమాదం తర్వాత తిరిగి' },
   expected: { en: 'Expected', hi: 'आने वाली', kn: 'ಬರಬೇಕಿದೆ', te: 'రావాల్సింది' },
   notInList: { en: 'A truck came that is not in the list? Tell owner', hi: 'सूची में नहीं है ऐसी गाड़ी आई? मालिक को बताएं', kn: 'ಪಟ್ಟಿಯಲ್ಲಿಲ್ಲದ ಲಾರಿ ಬಂತೇ? ಮಾಲೀಕರಿಗೆ ತಿಳಿಸಿ', te: 'జాబితాలో లేని లారీ వచ్చిందా? యజమానికి చెప్పండి' },
   comingToday: { en: 'Coming to you', hi: 'आपके पास आ रही हैं', kn: 'ನಿಮಗೆ ಬರುತ್ತಿವೆ', te: 'మీకు వస్తున్నవి' },
-  tapWhenHere: { en: 'Truck is here? Tap it to count.', hi: 'गाड़ी आ गई? दबाएँ और गिनें।', kn: 'ಲಾರಿ ಬಂತೇ? ಒತ್ತಿ ಎಣಿಸಿ.', te: 'లారీ వచ్చిందా? నొక్కి లెక్కించండి.' },
   noneComing: { en: 'No truck coming now', hi: 'अभी कोई गाड़ी नहीं आ रही', kn: 'ಈಗ ಯಾವ ಲಾರಿಯೂ ಬರುತ್ತಿಲ್ಲ', te: 'ఇప్పుడు ఏ లారీ రావడం లేదు' },
-  cancelled: { en: 'Cancelled', hi: 'रद्द', kn: 'ರದ್ದು', te: 'రద్దు' },
+  whereTo: { en: 'Where is it going?', hi: 'कहाँ जा रही है?', kn: 'ಎಲ್ಲಿಗೆ ಹೋಗುತ್ತಿದೆ?', te: 'ఎక్కడికి వెళ్తోంది?' },
+  photoChallan: { en: 'Photo of the challan or bill', hi: 'चालान या बिल की फोटो', kn: 'ಚಲನ್ ಅಥವಾ ಬಿಲ್ ಫೋಟೋ', te: 'చలాన్ లేదా బిల్ ఫోటో' },
+  photoPlate: { en: 'Photo of the number plate', hi: 'नंबर प्लेट की फोटो', kn: 'ನಂಬರ್ ಪ್ಲೇಟ್ ಫೋಟೋ', te: 'నంబర్ ప్లేట్ ఫోటో' },
+  reading: { en: 'Reading the photo…', hi: 'फोटो पढ़ रहे हैं…', kn: 'ಫೋಟೋ ಓದುತ್ತಿದೆ…', te: 'ఫోటో చదువుతోంది…' },
+  checkNumbers: { en: 'Read from the photo. Check the numbers; fix with − +', hi: 'फोटो से पढ़ा। संख्या देखें; − + से ठीक करें', kn: 'ಫೋಟೋದಿಂದ ಓದಿದೆ. ಸಂಖ್ಯೆ ನೋಡಿ; − + ಇಂದ ಸರಿಪಡಿಸಿ', te: 'ఫోటో నుండి చదివింది. సంఖ్యలు చూడండి; − + తో సరిచేయండి' },
+  driverKnown: { en: 'Driver from the last trip with this truck', hi: 'इस गाड़ी के पिछले चक्कर का ड्राइवर', kn: 'ಈ ಲಾರಿಯ ಹಿಂದಿನ ಪ್ರಯಾಣದ ಚಾಲಕ', te: 'ఈ లారీ గత ట్రిప్ డ్రైవర్' },
+  sentOk: { en: 'left. The owner is told.', hi: 'निकल गई। मालिक को खबर हो गई।', kn: 'ಹೊರಟಿತು. ಮಾಲೀಕರಿಗೆ ತಿಳಿಸಲಾಗಿದೆ.', te: 'బయలుదేరింది. యజమానికి తెలిసింది.' },
+  ownerAsks: { en: 'Owner asks: what happened?', hi: 'मालिक पूछ रहे हैं: क्या हुआ?', kn: 'ಮಾಲೀಕರು ಕೇಳುತ್ತಿದ್ದಾರೆ: ಏನಾಯಿತು?', te: 'యజమాని అడుగుతున్నారు: ఏమైంది?' },
+  youReplied: { en: 'You replied', hi: 'आपने जवाब दिया', kn: 'ನೀವು ಉತ್ತರಿಸಿದಿರಿ', te: 'మీరు సమాధానం ఇచ్చారు' },
+  send_next: { en: 'Left here. Will send in the next truck', hi: 'यहीं रह गया। अगली गाड़ी में भेजेंगे', kn: 'ಇಲ್ಲೇ ಉಳಿದಿದೆ. ಮುಂದಿನ ಲಾರಿಯಲ್ಲಿ ಕಳುಹಿಸುತ್ತೇವೆ', te: 'ఇక్కడే ఉండిపోయింది. తదుపరి లారీలో పంపుతాం' },
+  sent_full: { en: 'We loaded it all (loading photo)', hi: 'हमने पूरा लोड किया (लोडिंग फोटो)', kn: 'ನಾವು ಎಲ್ಲಾ ಲೋಡ್ ಮಾಡಿದೆವು (ಫೋಟೋ)', te: 'మేము అంతా లోడ్ చేశాం (ఫోటో)' },
+  transporter: { en: 'Lost or broken on the road', hi: 'रास्ते में खोया या टूटा', kn: 'ದಾರಿಯಲ್ಲಿ ಕಳೆದುಹೋಯಿತು ಅಥವಾ ಮುರಿಯಿತು', te: 'దారిలో పోయింది లేదా పగిలింది' },
+  missing: { en: 'missing', hi: 'कम', kn: 'ಕಡಿಮೆ', te: 'తక్కువ' },
+  damaged: { en: 'damaged', hi: 'खराब', kn: 'ಹಾಳು', te: 'పాడైనవి' },
+  extra: { en: 'extra', hi: 'ज़्यादा', kn: 'ಹೆಚ್ಚು', te: 'ఎక్కువ' },
 };
 const fromX = (x: string, l: L) => ({ en: `From ${x}`, hi: `${x} से`, kn: `${x}ಇಂದ`, te: `${x} నుండి` }[l]);
 const toX = (x: string, l: L) => ({ en: `To ${x}`, hi: `${x} को`, kn: `${x}ಗೆ`, te: `${x}కు` }[l]);
-const comingX = (x: string, l: L) => ({ en: `Truck coming from ${x}`, hi: `${x} से गाड़ी आ रही है`, kn: `${x}ಇಂದ ಲಾರಿ ಬರುತ್ತಿದೆ`, te: `${x} నుండి లారీ వస్తోంది` }[l]);
+const foundX = (x: string, what: string, load: string, l: L) => ({ en: `${x} found ${what} in ${load}`, hi: `${x} में ${load} में ${what} मिला`, kn: `${x}ನಲ್ಲಿ ${load}ನಲ್ಲಿ ${what}`, te: `${x}లో ${load}లో ${what}` }[l]);
 const dayText = (ms: number) => { const d = new Date(ms).toDateString(), t = new Date(), y = new Date(Date.now() + 86400000); return d === t.toDateString() ? 'today' : d === y.toDateString() ? 'tomorrow' : new Date(ms).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }); };
 const reachedX = (x: string, l: L) => ({ en: `reached ${x}`, hi: `${x} पहुँची`, kn: `${x} ತಲುಪಿತು`, te: `${x} చేరింది` }[l]);
 
 const big = 'w-full min-h-[56px] rounded-2xl text-base font-bold flex items-center justify-center cursor-pointer';
+export const Plate = ({ no }: { no: string }) => <span className="inline-block whitespace-nowrap px-2 py-0.5 rounded-md border-2 border-slate-800 bg-amber-50 font-mono font-bold text-sm text-slate-900">{no}</span>;
+const TONE: Record<string, string> = { slate: 'text-slate-900', rose: 'text-rose-700', amber: 'text-amber-700', sky: 'text-sky-700' };
+// shared −/+ stepper (no typing)
+export function Stepper({ id, value, onChange, min = 0, max = 9999, tone = 'slate' }: { id: string; value: number; onChange: (n: number) => void; min?: number; max?: number; tone?: string }) {
+  const b = 'w-11 h-11 rounded-xl border-2 border-slate-300 bg-white text-xl font-bold text-slate-700 cursor-pointer active:bg-slate-100 disabled:opacity-30';
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <button id={`${id}-minus`} aria-label="minus" disabled={value <= min} onClick={() => onChange(Math.max(min, value - 1))} className={b}>−</button>
+      <span id={id} className={`w-12 text-center text-xl font-mono font-bold ${value ? TONE[tone] || 'text-slate-900' : 'text-slate-400'}`}>{value}</span>
+      <button id={`${id}-plus`} aria-label="plus" disabled={value >= max} onClick={() => onChange(Math.min(max, value + 1))} className={b}>+</button>
+    </span>
+  );
+}
+
+// What each kind of difference is called for the staff, e.g. "6 missing, 2 damaged"
+const whatText = (ds: any[], w: (k: string) => string) => [['short', 'missing'], ['damaged', 'damaged'], ['excess', 'extra']].map(([k, word]) => { const n = ds.filter((d: any) => d.kind === k).reduce((a: number, d: any) => a + d.qty, 0); return n ? `${n} ${w(word)}` : ''; }).filter(Boolean).join(', ');
 
 export default function Staff({ go, initialId = null }: { go: Go; initialId?: string | null }) {
   const { state, dispatch } = useStore();
@@ -71,20 +94,21 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
   const [open, setOpen] = useState<'' | 'send' | 'receive'>(initialId ? 'send' : '');
   const [showOld, setShowOld] = useState(false);
   const [allNews, setAllNews] = useState(false);
+  const [justSent, setJustSent] = useState<string | null>(null);
   const pickUnit = (u: string) => { setUnit(u); setU(u); };
   setMeName(staffName(state));
 
   const live = state.shipments.filter((s: any) => !s.cancelledAt && !s.receipt);
-  // trucks this unit loads and sends
-  // newest first, so a truck just saved is at the top
-  const sending = live.filter((s: any) => s.fromUnit === unit && !s.returning && !atGate(s.flow)).sort((a: any, b: any) => (b.id === initialId ? 1 : 0) - (a.id === initialId ? 1 : 0) || b.createdAt - a.createdAt);
-  // trucks coming to this unit (our units' trucks, supplier trucks not yet counted, goods coming back after an accident)
-  const receiving = live.filter((s: any) => (s.returning ? s.fromUnit === unit : s.toUnit === unit && countedByUs(s) && (s.flow !== 'transfer' || (s.sentAt && s.linkSentAt))));
+  // trucks this unit sends, newest first
+  const sending = live.filter((s: any) => s.fromUnit === unit && !s.returning && !atGate(s.flow)).sort((a: any, b: any) => (b.id === justSent ? 1 : 0) - (a.id === justSent ? 1 : 0) || b.createdAt - a.createdAt);
+  // trucks coming to this unit: our other unit's trucks show as soon as they leave; supplier trucks the owner expects; goods coming back after an accident
+  const receiving = live.filter((s: any) => (s.returning ? s.fromUnit === unit : s.toUnit === unit && countedByUs(s) && (s.flow !== 'transfer' || s.sentAt)));
   const old = state.shipments.filter((s: any) => (open === 'send' ? s.fromUnit === unit : open === 'receive' ? s.toUnit === unit : s.fromUnit === unit || s.toUnit === unit) && (s.receipt || s.cancelledAt))
     .sort((a: any, b: any) => (b.receipt?.at || b.cancelledAt) - (a.receipt?.at || a.cancelledAt)).slice(0, 10);
+  // the owner asked this unit what happened to a truck it sent
+  const asks = state.shipments.filter((s: any) => s.ask && !s.ask.reply && senderIsUs(s) && s.fromUnit === unit);
 
   // Demo: there is always a truck coming to you, so the receive path can be tried again and again.
-  // When nothing is coming to this unit, a new one is added: Mysuru gets a supplier delivery, Bengaluru a truck from Mysuru.
   const topped = useRef<Record<string, boolean>>({});
   useEffect(() => {
     if (receiving.length || topped.current[unit]) return;
@@ -100,7 +124,6 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
       dispatch({ type: 'LOADING', id, point: 'Dock 1', phase: 'start', actor: 'Ramesh (staff)' });
       dispatch({ type: 'LOADING', id, phase: 'end', actor: 'Ramesh (staff)' });
       dispatch({ type: 'SEND_TO_RECEIVER', id, token: newToken(), actor: 'Ramesh (staff)' });
-      dispatch({ type: 'LINK_SENT', id, actor: 'Owner' });
     }
   }, [unit, receiving.length]);
 
@@ -110,21 +133,28 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
     dispatch({ type: 'SEND_TO_RECEIVER', id: s.id, token, actor: me() });
     window.location.hash = `#/r/${s.id}/${token}`;
   };
+  const leave = (s: any) => {
+    if (!s.loading) dispatch({ type: 'LOADING', id: s.id, point: 'Dock 1', phase: 'start', actor: me() });
+    if (!s.loading?.endAt) dispatch({ type: 'LOADING', id: s.id, phase: 'end', actor: me() });
+    dispatch({ type: 'SEND_TO_RECEIVER', id: s.id, token: newToken(), actor: me() });
+  };
 
   // Updates: short lines with a picture, newest first
-  const news: { at: number; icon: string; text: string; tone: string; pin?: boolean; side?: string }[] = [];
+  const news: { at: number; icon: string; text: string; tone: string; side?: string }[] = [];
   for (const s of state.shipments) {
-    const [from, to] = route(s).split(' → ');
+    const [, to] = route(s).split(' → ');
     if (s.cancelledAt) continue;
-    if (s.toUnit === unit && s.flow === 'transfer' && s.sentAt && s.linkSentAt && !s.arrivedAt && !s.receipt) news.push({ at: s.sentAt, pin: true, icon: '🚚', text: `${comingX(from, l)} · ${loadName(s.id)}`, tone: 'bg-sky-50 border-sky-200' });
-    if (s.toUnit === unit && s.expectedOn && !s.arrivedAt && !s.receipt) news.push({ at: s.expectedOn, pin: true, icon: '🚛', text: `${comingX(from, l)} · ${w('expected')} ${dayText(s.expectedOn)}`, tone: 'bg-sky-50 border-sky-200' });
-    if (s.returning && s.fromUnit === unit && !s.receipt) news.push({ at: s.accident?.at || s.sentAt, pin: true, icon: '⚠️', text: `${w('backAccident')} · ${loadName(s.id)}`, tone: 'bg-rose-50 border-rose-200' });
     if (s.fromUnit === unit && s.arrivedAt && !s.receipt && !s.returning) news.push({ side: 'send', at: s.arrivedAt, icon: '📍', text: `${loadName(s.id)} ${reachedX(to, l)}`, tone: 'bg-sky-50 border-sky-200' });
+    if (s.fromUnit === unit && s.ask?.reply) news.push({ side: 'send', at: s.ask.reply.at, icon: REPLIES[s.ask.reply.kind].icon, text: `${w('youReplied')} · ${loadName(s.id)}: ${w(s.ask.reply.kind)}`, tone: 'bg-slate-50 border-slate-200' });
     if (s.fromUnit === unit && s.receipt && Date.now() - s.receipt.at < 48 * 3600000) {
-      const bad = diffsOf(state, s.id).length > 0;
       const dd = diffsOf(state, s.id);
+      const bad = dd.length > 0;
       const state2 = !bad ? '' : dd.some((d: any) => d.status === 'open') ? w('diff') : dd.some((d: any) => d.status === 'investigating') ? w('checking') : dd.some((d: any) => d.status === 'waiting') ? w('restComing') : w('decided');
       news.push({ side: 'send', at: Math.max(s.receipt.at, ...dd.map((d: any) => d.decision?.at || 0)), icon: bad ? (dd.some((d: any) => d.status === 'open') ? '⚠️' : '🔎') : '✅', text: `${loadName(s.id)} ${bad ? state2 : w('okCount')}`, tone: bad ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200' });
+    }
+    if (s.toUnit === unit && s.receipt && Date.now() - s.receipt.at < 48 * 3600000) {
+      const bad = diffsOf(state, s.id).length > 0;
+      news.push({ side: 'receive', at: s.receipt.at, icon: bad ? '⚠️' : '✅', text: `${loadName(s.id)} ${bad ? w('diff') : w('okCount')}`, tone: bad ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200' });
     }
   }
   for (const r of state.requests || []) {
@@ -135,92 +165,77 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
     if (r.status === 'pending') news.push({ side, at: r.at, icon: '⏳', text: `${w('waiting')} · ${what}`, tone: 'bg-amber-50 border-amber-200' });
     else news.push({ side, at: r.decidedAt, icon: r.status === 'approved' ? '👍' : '👎', text: `${w(r.status === 'approved' ? 'yes' : 'no')} · ${what}${r.decidedNote ? ` · “${r.decidedNote}”` : ''}`, tone: r.status === 'approved' ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200' });
   }
-  // trucks coming to you stay on top until they arrive; then newest first
-  // trucks coming to you are in their own list above, so updates hold the rest, newest first
-  const updates = news.filter((n) => !n.pin && (!open || !n.side || n.side === open)).sort((a, b) => b.at - a.at);
+  const updates = news.filter((n) => !open || !n.side || n.side === open).sort((a, b) => b.at - a.at);
 
-  // one big button: the next step for this truck
-  const step = (s: any): { icon: string; status: string; btn?: string; btnCls?: string; act?: () => void } => {
-    if (receiving.includes(s)) {
-      if (!s.arrivedAt && (!atGate(s.flow) || s.expectedOn)) return { icon: s.expectedOn ? '🚛' : '🚚', status: s.expectedOn ? `${w('expected')} ${dayText(s.expectedOn)}` : w('onTheWay'), btn: `📍 ${w('arrived')} → 🔢 ${w('count')}`, btnCls: 'bg-sky-600 text-white', act: () => { dispatch({ type: 'ARRIVED', id: s.id, by: me(), actor: me() }); count(s); } };
-      return { icon: '📍', status: w('reached'), btn: `🔢 ${w('count')}`, btnCls: 'bg-emerald-600 text-white', act: () => count(s) };
-    }
-    if (!s.loading) return { icon: '📦', status: w('loading'), btn: `📦 ${w('startLoading')}`, btnCls: 'bg-violet-600 text-white', act: () => dispatch({ type: 'LOADING', id: s.id, point: 'Dock 1', phase: 'start', actor: me() }) };
-    if (!s.loading.endAt) return { icon: '📦', status: w('loading'), btn: `✅ ${w('loadingDone')}`, btnCls: 'bg-violet-600 text-white', act: () => dispatch({ type: 'LOADING', id: s.id, phase: 'end', actor: me() }) };
-    if (!s.sentAt) return { icon: '📦', status: w('loadingDone'), btn: `🚚 ${w('truckLeft')}`, btnCls: 'bg-emerald-600 text-white', act: () => dispatch({ type: 'SEND_TO_RECEIVER', id: s.id, token: newToken(), actor: me() }) };
-    return { icon: s.arrivedAt ? '📍' : '🚚', status: s.arrivedAt ? w('reached') : s.linkSentAt ? w('onTheWay') : `${w('onTheWay')} · ${w('ownerTells')}` };
-  };
-
-  const Card = ({ s }: { s: any }) => {
-    const st = step(s);
-    const [from, to] = route(s).split(' → ');
-    const incoming = receiving.includes(s);
-    return (
-      <div id={`staff-${s.id}`} className={`rounded-2xl border-2 p-3 space-y-2 ${s.id === initialId && !s.sentAt ? 'bg-violet-50 border-violet-500 ring-2 ring-violet-300' : `bg-white ${incoming ? 'border-sky-200' : 'border-violet-200'}`}`}>
-        <div className="flex items-center gap-3">
-          <span className="text-3xl leading-none">{st.icon}</span>
-          <div className="min-w-0 flex-1">
-            <div className="text-base font-bold text-slate-900 truncate">{s.returning ? w('backAccident') : incoming ? fromX(from, l) : toX(to, l)}</div>
-            {s.truckNo && s.truckNo !== 'NOT KNOWN' && <div className="inline-block whitespace-nowrap mt-0.5 px-2 py-0.5 rounded-md border-2 border-slate-800 bg-amber-50 font-mono font-bold text-sm text-slate-900">{s.truckNo}</div>}
-            <div className="text-xs text-slate-600">{st.status} · {loadName(s.id)}</div>
-          </div>
-        </div>
-        {st.btn && <button id={`step-${s.id}`} onClick={st.act} className={`${big} ${st.btnCls}`}>{st.btn}</button>}
-        {!st.btn && s.flow === 'outbound' && <div id={`owner-link-${s.id}`} className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">💬 {w('ownerSends')}</div>}
-        <button id={`open-${s.id}`} onClick={() => go('dispatch', { id: s.id })} className="text-[12px] font-semibold text-slate-500 underline cursor-pointer">{w('problem')}</button>
-      </div>
-    );
-  };
-
-  const mine = sending;
   return (
     <PhoneFrame title="LoadMatch" sub={`${staffName(state)} · ${uname(unit)}`} lang={lang} setLang={setLang}>
       <div className="space-y-4">
-        {open && <button id={open === 'send' ? 'btn-send-stock' : 'btn-receive-stock'} onClick={() => setOpen('')} className="-mt-1 inline-flex items-center rounded-lg border-2 border-slate-300 bg-white px-3 py-1.5 text-sm font-bold text-slate-700 cursor-pointer">← {w('back')}</button>}
+        {open && <button id={open === 'send' ? 'btn-send-stock' : 'btn-receive-stock'} onClick={() => { setOpen(''); setJustSent(null); }} className="-mt-1 inline-flex items-center rounded-lg border-2 border-slate-300 bg-white px-3 py-1.5 text-sm font-bold text-slate-700 cursor-pointer">← {w('back')}</button>}
         <div className="flex items-center gap-2 text-xs">
           <span className="text-slate-500">{w('iAmAt')}:</span>
           {Object.keys(UNITS).map((u) => <button key={u} id={`unit-${u}`} onClick={() => pickUnit(u)} className={`px-3 py-1.5 rounded-full border font-bold cursor-pointer ${u === unit ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-300'}`}>{uname(u)}</button>)}
         </div>
 
+        {/* the owner asked this unit what happened: one tap to answer */}
+        {open !== 'receive' && asks.map((s: any) => (
+          <div key={s.id} id={`ask-${s.id}`} className="rounded-2xl border-2 border-amber-400 bg-amber-50 p-3 space-y-2">
+            <div className="text-base font-bold text-amber-950">❓ {w('ownerAsks')}</div>
+            <div className="text-sm text-amber-950">{foundX(route(s).split(' → ')[1], whatText(diffsOf(state, s.id).filter((d: any) => d.status === 'open' || d.status === 'investigating'), w), loadName(s.id), l)}</div>
+            <div className="text-xs text-slate-600">{[...new Set(diffsOf(state, s.id).filter((d: any) => d.status === 'open' || d.status === 'investigating').map((d: any) => d.item))].map((it: any) => `${itemIcon(it)} ${shortName(it)}`).join(' · ')}</div>
+            {Object.keys(REPLIES).map((k) => <button key={k} id={`reply-${s.id}-${k}`} onClick={() => dispatch({ type: 'SENDER_REPLY', id: s.id, kind: k, by: staffName(state), actor: me() })} className="w-full min-h-[48px] rounded-xl border-2 border-amber-300 bg-white px-3 text-left text-sm font-bold text-slate-900 cursor-pointer flex items-center gap-2"><span className="text-xl">{REPLIES[k].icon}</span>{w(k)}</button>)}
+          </div>
+        ))}
+
         {!open ? (
           <div className="grid grid-cols-2 gap-3">
-            <button id="btn-send-stock" onClick={() => setOpen('send')} className="min-h-[84px] rounded-2xl text-lg font-bold cursor-pointer flex flex-col items-center justify-center border-2 bg-violet-50 text-violet-900 border-violet-200"><span className="text-3xl">📤</span>{w('send')}</button>
-            <button id="btn-receive-stock" onClick={() => setOpen('receive')} className="min-h-[84px] rounded-2xl text-lg font-bold cursor-pointer flex flex-col items-center justify-center border-2 bg-sky-50 text-sky-900 border-sky-200"><span className="text-3xl">📥</span>{w('receive')}</button>
+            <button id="btn-send-stock" onClick={() => setOpen('send')} className="min-h-[96px] rounded-2xl text-lg font-bold cursor-pointer flex flex-col items-center justify-center border-2 bg-violet-50 text-violet-900 border-violet-200"><span className="text-3xl">📤</span>{w('send')}</button>
+            <button id="btn-receive-stock" onClick={() => setOpen('receive')} className="relative min-h-[96px] rounded-2xl text-lg font-bold cursor-pointer flex flex-col items-center justify-center border-2 bg-sky-50 text-sky-900 border-sky-200"><span className="text-3xl">📥</span>{w('receive')}
+              {receiving.length > 0 && <span id="receive-badge" className="absolute top-2 right-2 min-w-6 h-6 px-1.5 rounded-full bg-sky-600 text-white text-sm flex items-center justify-center">{receiving.length}</span>}
+            </button>
           </div>
         ) : (
-          // only the chosen side is on screen; Back (top left) returns to both
           <div className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-white ${open === 'send' ? 'bg-violet-700' : 'bg-sky-700'}`}>
             <span className="text-2xl">{open === 'send' ? '📤' : '📥'}</span>
             <span className="text-lg font-bold">{w(open)}</span>
           </div>
         )}
-        {open === 'send' && (
-          <div className="grid grid-cols-2 gap-3">
-            <button id="send-unit" onClick={() => go('dispatch', { id: 'new:transfer' })} className={`${big} flex-col py-3 bg-white border-2 border-violet-300 text-violet-900`}><span className="text-2xl">🏭</span>{w('ourUnit')}</button>
-            <button id="send-customer" onClick={() => go('dispatch', { id: 'new:outbound' })} className={`${big} flex-col py-3 bg-white border-2 border-violet-300 text-violet-900`}><span className="text-2xl">🏪</span>{w('customer')}</button>
-          </div>
-        )}
-        {open === 'receive' && (
-          <div className="space-y-2">
-            <div className="text-xs text-slate-600">👆 {w('tapWhenHere')} (🚚 {w('comingToday')})</div>
-            <AskAdd what="delivery" label={w('notInList')} />
-          </div>
-        )}
 
-        <div className="space-y-2">
-          {open !== 'send' && <div id="coming" className="rounded-2xl border-2 border-sky-300 bg-sky-50 p-3 space-y-2">
+        {open === 'send' && <>
+          {justSent && <div id="sent-ok" className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-3 text-base font-bold text-emerald-900">✅ {loadName(justSent)} {w('sentOk')}</div>}
+          <SendTruck key={justSent || 'new'} unit={unit} w={w} onSent={(id) => setJustSent(id)} />
+          {sending.length > 0 && <div className="text-sm font-bold text-slate-900 pt-1">📤 {w('myTrucks')}</div>}
+          {sending.map((s: any) => {
+            const [, to] = route(s).split(' → ');
+            return (
+              <div key={s.id} id={`staff-${s.id}`} className={`rounded-2xl border-2 p-3 space-y-2 ${s.id === justSent ? 'border-emerald-400 bg-emerald-50/40' : 'border-violet-200 bg-white'}`}>
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl leading-none">{!s.sentAt ? '📦' : s.arrivedAt ? '📍' : '🚚'}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-base font-bold text-slate-900 truncate">{toX(to, l)}</div>
+                    {s.truckNo && <Plate no={s.truckNo} />}
+                    <div className="text-xs text-slate-600">{!s.sentAt ? w('notLeft') : s.arrivedAt ? w('reached') : w('onTheWay')} · {loadName(s.id)}</div>
+                  </div>
+                </div>
+                {!s.sentAt && <button id={`step-${s.id}`} onClick={() => leave(s)} className={`${big} bg-emerald-600 text-white`}>🚚 {w('truckLeft')}</button>}
+                {s.sentAt && s.flow === 'outbound' && !s.linkSentAt && <div id={`owner-link-${s.id}`} className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">💬 {w('ownerSends')}</div>}
+                <button id={`open-${s.id}`} onClick={() => go('dispatch', { id: s.id })} className="text-[12px] font-semibold text-slate-500 underline cursor-pointer">{w('problem')}</button>
+              </div>
+            );
+          })}
+        </>}
+
+        {open !== 'send' && <div id="coming" className="rounded-2xl border-2 border-sky-300 bg-sky-50 p-3 space-y-2">
           <div className="text-base font-bold text-sky-950">🚚 {w('comingToday')} · {receiving.length}</div>
           {!receiving.length && <div className="text-sm text-sky-900">{w('noneComing')}</div>}
-          {receiving.length > 0 && <div className="text-xs text-sky-900">👆 {w('tapWhenHere')}</div>}
           {receiving.map((s: any) => {
             const [from] = route(s).split(' → ');
             return (
-              <button key={s.id} id={`coming-${s.id}`} onClick={() => { if (!s.arrivedAt) dispatch({ type: 'ARRIVED', id: s.id, by: me(), actor: me() }); count(s); }} className="w-full text-left rounded-xl bg-white border-2 border-sky-200 hover:border-sky-500 p-3 space-y-2 cursor-pointer block">
+              <button key={s.id} id={`coming-${s.id}`} onClick={() => { if (!s.arrivedAt && s.sentAt) dispatch({ type: 'ARRIVED', id: s.id, by: me(), actor: me() }); count(s); }} className="w-full text-left rounded-xl bg-white border-2 border-sky-200 hover:border-sky-500 p-3 space-y-2 cursor-pointer block">
                 <span className="flex items-center gap-3">
                   <span className="text-3xl leading-none">{s.returning ? '⚠️' : s.flow === 'inbound' ? '🚛' : '🚚'}</span>
                   <span className="flex-1 min-w-0">
                     <span className="block text-base font-bold text-slate-900">{s.returning ? w('backAccident') : fromX(from, l)}</span>
-                    {s.truckNo && s.truckNo !== 'NOT KNOWN' && <span className="inline-block whitespace-nowrap my-0.5 px-2 py-0.5 rounded-md border-2 border-slate-800 bg-amber-50 font-mono font-bold text-sm text-slate-900">{s.truckNo}</span>}
+                    {s.truckNo && s.truckNo !== 'NOT KNOWN' && <Plate no={s.truckNo} />}
                     <span className="block text-xs text-slate-600">{s.arrivedAt ? `📍 ${w('reached')}` : s.expectedOn ? `${w('expected')} ${dayText(s.expectedOn)}` : `${w('onTheWay')} · ${when(s.sentAt)}`} · {loadName(s.id)}</span>
                   </span>
                 </span>
@@ -228,6 +243,7 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
               </button>
             );
           })}
+          {open === 'receive' && <AskAdd what="delivery" label={w('notInList')} />}
         </div>}
 
         <div id="updates" className="space-y-1.5">
@@ -235,11 +251,6 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
           {!updates.length && <div className="text-xs text-slate-500">{w('noNews')}</div>}
           {(allNews ? updates.slice(0, 10) : updates.slice(0, 3)).map((n, i) => <div key={i} className={`rounded-xl border px-3 py-2 text-sm flex items-start gap-2 ${n.tone}`}><span className="text-lg leading-none">{n.icon}</span><span className="flex-1">{n.text}<span className="block text-[11px] text-slate-500">{when(n.at)}</span></span></div>)}
           {updates.length > 3 && <button id="btn-news-all" onClick={() => setAllNews(!allNews)} className="text-xs font-bold text-slate-500 underline cursor-pointer">{allNews ? '−' : `+${Math.min(updates.length, 10) - 3}`}</button>}
-        </div>
-
-        {open !== 'receive' && <div className="text-sm font-bold text-slate-900">📤 {w('myTrucks')}</div>}
-          {!mine.length && open !== 'receive' && <div id="nothing-pending" className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{w('nothing')}</div>}
-          {open !== 'receive' && sending.map((s: any) => <Card key={s.id} s={s} />)}
         </div>
 
         <button id="btn-old" onClick={() => setShowOld(!showOld)} className="text-sm font-bold text-slate-600 underline cursor-pointer">🗂 {w('oldTrucks')} ({old.length})</button>
@@ -253,13 +264,83 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
   );
 }
 
-export function AskAdd({ what, partyKind, label }: { what: 'item' | 'party' | 'delivery'; partyKind?: string; label?: string }) {
+// Send a truck without typing: where to (tap), photo of the challan (items read from it), photo of the plate
+// (truck number read, driver remembered), then Truck left. Prototype: the photo reading is simulated with demo data.
+const PLATES = ['KA 09 B 6138', 'KA 40 A 2541', 'KA 19 D 7724', 'KA 05 M 8812'];
+function SendTruck({ unit, w, onSent }: { unit: string; w: (k: string) => string; onSent: (id: string) => void }) {
   const { state, dispatch } = useStore();
+  const others = Object.keys(UNITS).filter((u) => u !== unit);
+  const customers = Object.values(PARTIES).filter((p) => p.kind === 'customer');
+  const [to, setTo] = useState(others[0]);
+  const flow = UNITS[to] ? 'transfer' : 'outbound';
+  const [reading, setReading] = useState<'' | 'challan' | 'plate'>('');
+  const [lines, setLines] = useState<{ item: string; qty: number }[] | null>(null);
+  const [ref, setRef] = useState('');
+  const [plate, setPlate] = useState('');
+  const timer = useRef<any>(null);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const n = state.counters.trk + 1;
+  const readChallan = () => {
+    setReading('challan');
+    timer.current = setTimeout(() => {
+      setLines(flow === 'transfer' ? [{ item: 'PLY-12', qty: 80 }, { item: 'PLY-18', qty: 45 }] : [{ item: 'BOX-NL', qty: 150 }, { item: 'BOX-RB', qty: 60 }]);
+      setRef(`${flow === 'transfer' ? 'DC' : 'INV'}-${700 + n}`);
+      setReading('');
+    }, 1100);
+  };
+  const readPlate = () => { setReading('plate'); timer.current = setTimeout(() => { setPlate(PLATES[n % PLATES.length]); setReading(''); }, 900); };
+  const last = state.shipments.filter((s: any) => s.truckNo === plate && s.driver).sort((a: any, b: any) => b.createdAt - a.createdAt)[0];
+  const driver = last ? { name: last.driver, phone: last.driverPhone } : { name: 'Manju', phone: '9845012345' };
+  const pick = (x: string) => { setTo(x); setLines(null); setRef(''); };
+  const ready = lines && lines.every((x) => x.qty > 0) && plate && !reading;
+  const leave = () => {
+    const id = `TRK-${1000 + n}`;
+    const who = me();
+    dispatch({ type: 'CREATE_SHIPMENT', id, flow, fromUnit: unit, ...(flow === 'transfer' ? { toUnit: to } : { party: to }), truckNo: plate, ref, driver: driver.name, driverPhone: driver.phone, lines, actor: who });
+    dispatch({ type: 'LOADING', id, point: 'Dock 1', phase: 'start', actor: who });
+    dispatch({ type: 'LOADING', id, phase: 'end', actor: who });
+    dispatch({ type: 'SEND_TO_RECEIVER', id, token: newToken(), actor: who });
+    onSent(id);
+  };
+  const chip = (x: string, icon: string, label: string) => <button key={x} id={`to-${x}`} onClick={() => pick(x)} className={`rounded-xl border-2 px-3 py-2 text-sm font-bold cursor-pointer flex items-center gap-1.5 ${to === x ? 'bg-violet-700 text-white border-violet-700' : 'bg-white text-slate-800 border-slate-300'}`}><span className="text-lg">{icon}</span>{label}</button>;
+  const stepCls = (done: boolean) => `rounded-2xl border-2 p-3 space-y-2 ${done ? 'border-emerald-300 bg-emerald-50/40' : 'border-slate-200 bg-white'}`;
+  return (
+    <div id="send-truck" className="space-y-3">
+      <div className={stepCls(true)}>
+        <div className="text-sm font-bold text-slate-900">1 · {w('whereTo')}</div>
+        <div className="flex flex-wrap gap-2">{others.map((u) => chip(u, '🏭', uname(u)))}{customers.map((p) => chip(p.id, '🏪', p.name))}</div>
+      </div>
+      <div className={stepCls(Boolean(lines))}>
+        <div className="text-sm font-bold text-slate-900">2 · {w('photoChallan')}</div>
+        {!lines && <button id="btn-photo-challan" disabled={reading === 'challan'} onClick={readChallan} className={`${big} bg-slate-900 text-white`}>{reading === 'challan' ? `⏳ ${w('reading')}` : '📷'}</button>}
+        {lines && <>
+          <div id="challan-read" className="text-xs text-emerald-900">🤖 {w('checkNumbers')} · {ref}</div>
+          {lines.map((x, i) => (
+            <div key={x.item} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-2">
+              <span className="text-2xl">{itemIcon(x.item)}</span>
+              <span className="flex-1 min-w-0 text-sm font-bold text-slate-900 leading-tight">{shortName(x.item)}<span className="block text-[11px] font-normal text-slate-500">{item(x.item).unit}</span></span>
+              <Stepper id={`send-qty-${x.item}`} value={x.qty} onChange={(q) => setLines(lines.map((y, j) => (j === i ? { ...y, qty: q } : y)))} />
+            </div>
+          ))}
+        </>}
+      </div>
+      <div className={stepCls(Boolean(plate))}>
+        <div className="text-sm font-bold text-slate-900">3 · {w('photoPlate')}</div>
+        {!plate && <button id="btn-photo-plate" disabled={reading === 'plate'} onClick={readPlate} className={`${big} bg-slate-900 text-white`}>{reading === 'plate' ? `⏳ ${w('reading')}` : '📷'}</button>}
+        {plate && <div id="plate-read" className="space-y-1"><Plate no={plate} /><div className="text-xs text-slate-600">🧑‍✈️ {driver.name} · 📞 {driver.phone} <span className="text-slate-400">({w('driverKnown')})</span></div></div>}
+      </div>
+      <button id="btn-truck-left" disabled={!ready} onClick={leave} className={`${big} bg-emerald-600 text-white disabled:opacity-40`}>🚚 {w('truckLeft')}</button>
+    </div>
+  );
+}
+
+export function AskAdd({ what, partyKind, label }: { what: 'item' | 'party' | 'delivery'; partyKind?: string; label?: string }) {
+  const { dispatch } = useStore();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(what === 'item' ? 'Rosewood veneer 4 mm' : what === 'delivery' ? 'Sri Lakshmi Timbers' : partyKind === 'supplier' ? 'Kaveri Timber Depot' : 'Hosur Crates');
   const [sent, setSent] = useState('');
-  if (sent) return <div className="text-[11px] text-emerald-800">Asked the owner to add “{sent}”. It appears here once approved.</div>;
-  if (!open) return <button id={`ask-add-${what}`} onClick={() => setOpen(true)} className="text-[11px] font-bold text-sky-800 underline cursor-pointer text-left">{label || (what === 'item' ? 'Item not in the list? Ask owner to add it' : partyKind === 'supplier' ? 'New supplier at the gate? Ask owner to add them' : `New ${partyKind || 'party'}? Ask owner to add them`)}</button>;
+  if (sent) return <div className="text-[11px] text-emerald-800">Asked the owner about “{sent}”. The answer shows in Updates.</div>;
+  if (!open) return <button id={`ask-add-${what}`} onClick={() => setOpen(true)} className="text-[12px] font-bold text-sky-800 underline cursor-pointer text-left">{label || (what === 'item' ? 'Item not in the list? Ask owner to add it' : partyKind === 'supplier' ? 'New supplier at the gate? Ask owner to add them' : `New ${partyKind || 'party'}? Ask owner to add them`)}</button>;
   return (
     <div className="flex gap-2">
       <input id={`ask-add-name-${what}`} value={name} onChange={(e) => setName(e.target.value)} placeholder={what === 'item' ? 'Item name and size' : what === 'delivery' ? 'Whose truck? e.g. Coastal Veneers' : 'Party name'} className="flex-1 p-2 rounded-lg border border-slate-300 text-xs" />
@@ -267,4 +348,3 @@ export function AskAdd({ what, partyKind, label }: { what: 'item' | 'party' | 'd
     </div>
   );
 }
-

@@ -3,35 +3,38 @@ import { X, BookOpen } from 'lucide-react';
 
 const SOPS: [string, string[]][] = [
   ['Three people use LoadMatch', [
-    'Staff: one person at each unit. Sends stock and receives stock.',
-    'Owner: sees everything, decides every difference, answers staff requests, and sets up the lists.',
-    'Accountant: does the paperwork for the owner\'s decisions (debit notes, credit notes, bills) from a to-do list.',
-    'Customers and suppliers need no app: the owner sends them a count link from the company WhatsApp.',
+    'Staff: one person at each unit. Sends and receives trucks. Never types: taps, photos and voice.',
+    'Owner: one card per truck that needs a decision, with one suggested next step.',
+    'Accountant: a to-do list of debit notes, credit notes and bills from the owner\'s decisions.',
+    'Customers and suppliers need no app: they get a WhatsApp link. Their owner can save the truck to their own company.',
   ]],
-  ['1 · Staff: every truck has one big button', [
-    'Sending: 📦 Start loading → ✅ Loading done → 🚚 Truck left.',
-    'Receiving: 📍 Truck arrived (the store person taps it, not the driver) → 🔢 Count → Submit.',
-    'To send: tap 📤 Send, then 🏭 Our other unit or 🏪 Customer. Choose items, numbers and the truck number. That is all.',
-    'Supplier deliveries: the owner adds them when the order is placed. They show as 🚛 Truck coming from the supplier. Tap 📍 Truck arrived, then 🔢 Count. A truck not in the list? Tap 📥 Receive → Tell owner.',
-    'While counting, the sent number is hidden. Missing pieces are worked out by the app after you submit.',
+  ['1 · Staff: send a truck', [
+    'Tap 📤 Send → choose where (🏭 our unit or 🏪 customer) → 📷 photo of the challan (items and numbers are read from it; fix with − +) → 📷 photo of the number plate (truck no. read, driver remembered) → 🚚 Truck left.',
+    'Our other unit sees the truck at once under “Coming to you”. For a customer, the owner sends the count link.',
   ]],
-  ['2 · Staff: updates', [
-    '🔔 Updates shows the latest three: truck coming, truck reached, counted OK or not matching, and the owner\'s YES or NO.',
-    'Problem with a truck (new truck, came back, accident)? Tap “Problem? Ask owner” on its card.',
-    'Old trucks are under 🗂 Old trucks.',
+  ['2 · Staff: receive a truck', [
+    'Tap the truck under 🚚 Coming to you when it is at the gate (📍 Truck arrived → 🔢 Count).',
+    '✅ All came → 📷 photo of the unloaded stack → Send to owner.',
+    '⚠️ Something is wrong → 🎤 say it (“two bundles torn”) or tap − + for ❌ missing, 💔 damaged, ➕ extra → 📷 photo of the damage → Send to owner.',
+    'The result is one line. The driver writes the shortage on the lorry receipt and signs.',
   ]],
-  ['3 · Owner', [
-    'Your day: today\'s trucks and money at risk.',
-    'Staff are asking you: say Yes or No, with a note. Staff see your answer.',
-    'Needs your decision: only what did not match, with its value and loading time. Choose: take the loss, ask for it to be sent or replaced, adjust in the next bill, or check first.',
-    '🚛 + Expected from supplier: add each order you place (supplier, items, unit, day). The store sees it coming and counts it.',
-    'Setup: add units (with GST no.), staff, items (one by one or pasted from Excel) and customers or suppliers. Staff only pick from these lists.',
-    'Latest from staff (top): every count and request, newest first. When a truck leaves for a customer, tap “Send count link to customer”.',
-    'More (one button): trucks on the road, promises and recent trucks.',
+  ['3 · Staff: answer the owner', [
+    'When the owner asks “what happened?” about a truck you sent, tap one answer: left here (next truck), we loaded it all, or lost on the road.',
+    '🔔 Updates shows the latest three. Problem with a truck (new truck, came back, accident)? Tap “Problem? Ask owner” on its card.',
   ]],
-  ['4 · Accountant', [
+  ['4 · Owner: one card per truck', [
+    'Difference found → ❓ Ask the sender (our unit answers in the app; a supplier answers from a WhatsApp link).',
+    'Their answer comes back on the card with ONE suggested step, e.g. “Sending unit sends it in the next truck, by Sat”. Tap it. Other options are one tap away.',
+    '🤖 The assistant reminds a sender who has not replied, watches the next trucks for promised goods, and reminds them when a promise is late.',
+    'Extra goods and accidents get a suggestion straight away. Anything that costs money goes to the accountant.',
+    'Staff requests: Yes or No, with a note. Things with nothing to do are under “Also today”.',
+  ]],
+  ['5 · Accountant', [
     'To do: each debit note, credit note or bill the owner\'s decisions need, with party and amount. Tick “Done in Tally”.',
     'The report to print and one Tally file with all stock entries.',
+  ]],
+  ['Prototype note', [
+    'Reading the challan, the number plate and voice is simulated with demo data. In a real build: a photo-reading model, plate OCR and speech-to-text in Kannada, Hindi and Telugu, always confirmed by the staff member.',
   ]],
 ];
 

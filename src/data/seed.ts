@@ -115,7 +115,7 @@ export function makeSeed(anchor: number) {
   ev.push({ type: 'CREATE_SHIPMENT', id: 'TRK-1014', flow: 'inbound', toUnit: 'MYS', party: 'lakshmi', truckNo: 'KA 45 C 7720', ref: 'SB-0951', at: at(-26), actor: 'Gate (Mysuru)', lines: [{ item: 'LOG-RW', qty: 100 }] });
   ev.push({ type: 'SEND_TO_RECEIVER', id: 'TRK-1014', token: 'demo14k', at: at(-26), actor: 'Gate (Mysuru)' });
   ev.push({ type: 'SUBMIT_RECEIPT', id: 'TRK-1014', token: 'demo14k', by: 'Gate (Mysuru)', at: at(-25, -30), actor: 'Receiver', lines: { L1: { counted: 90, damaged: 0 } } });
-  ev.push({ type: 'DECIDE', diffId: 'DIF-0003', action: 'replace', dueAt: at(48), note: 'Supplier will send 10 bundles with the next load.', at: at(-24), actor: 'Owner' });
+  ev.push({ type: 'DECIDE', diffId: 'DIF-0003', action: 'replace', dueAt: at(-3), note: 'Supplier will send 10 bundles with the next load.', at: at(-24), actor: 'Owner' });
 
   // TRK-1015: customer dispatch this morning, customer reports 3 extra boxes
   ev.push({ type: 'CREATE_SHIPMENT', id: 'TRK-1015', flow: 'outbound', fromUnit: 'BLR', party: 'sunrise', truckNo: 'KA 05 M 8812', ref: 'INV-2519', at: at(-6), actor: 'Dispatch staff', lines: [{ item: 'BOX-RB', qty: 300 }] });
@@ -124,12 +124,20 @@ export function makeSeed(anchor: number) {
   ev.push({ type: 'SEND_TO_RECEIVER', id: 'TRK-1015', token: 'demo15k', at: at(-5), actor: 'Dispatch staff' });
   ev.push({ type: 'SUBMIT_RECEIPT', id: 'TRK-1015', token: 'demo15k', by: 'Sunrise stores', at: at(-2), actor: 'Receiver', lines: { L1: { counted: 303, damaged: 0 } } });
 
+  // TRK-1022: yesterday's transfer came 6 sheets short; the owner asked Mysuru and they replied "left here, next truck"
+  ev.push({ type: 'CREATE_SHIPMENT', id: 'TRK-1022', flow: 'transfer', fromUnit: 'MYS', toUnit: 'BLR', truckNo: 'KA 09 B 5512', ref: 'DC-0417', driver: 'Prakash', driverPhone: '9886054321', at: at(-20), actor: 'Ramesh (staff)', lines: [{ item: 'PLY-18', qty: 60 }, { item: 'PLY-12', qty: 40 }] });
+  ev.push({ type: 'LOADING', id: 'TRK-1022', point: 'Dock 1', phase: 'start', at: at(-20, 10), actor: 'Ramesh (staff)' });
+  ev.push({ type: 'LOADING', id: 'TRK-1022', point: 'Dock 1', phase: 'end', at: at(-19, -10), actor: 'Ramesh (staff)' });
+  ev.push({ type: 'SEND_TO_RECEIVER', id: 'TRK-1022', token: 'demo22k', at: at(-19), actor: 'Ramesh (staff)' });
+  ev.push({ type: 'SUBMIT_RECEIPT', id: 'TRK-1022', token: 'demo22k', by: 'Ravi', at: at(-14), actor: 'Receiver', lines: { L1: { counted: 54, damaged: 0 }, L2: { counted: 40, damaged: 0 } }, photos: ['stack.jpg'] });
+  ev.push({ type: 'ASK_SENDER', id: 'TRK-1022', token: 'ask22k', at: at(-13), actor: 'Owner' });
+  ev.push({ type: 'SENDER_REPLY', id: 'TRK-1022', kind: 'send_next', by: 'Ramesh', at: at(-2), actor: 'Ramesh (staff)' });
+
   // TRK-1016: transfer that left 3 hours ago, still on the road
   ev.push({ type: 'CREATE_SHIPMENT', id: 'TRK-1016', parentId: 'TRK-1014', flow: 'transfer', fromUnit: 'MYS', toUnit: 'BLR', truckNo: 'KA 09 B 4471', ref: 'DC-0419', driver: 'Prakash', driverPhone: '9886054321', at: at(-4), actor: 'Dispatch staff', lines: [{ item: 'PLY-12', qty: 80 }, { item: 'PLY-18', qty: 45 }] });
   ev.push({ type: 'LOADING', id: 'TRK-1016', point: 'Dock 1', phase: 'start', at: at(-3, -50), actor: 'Dispatch staff' });
   ev.push({ type: 'LOADING', id: 'TRK-1016', point: 'Dock 1', phase: 'end', at: at(-3, -10), actor: 'Dispatch staff' });
   ev.push({ type: 'SEND_TO_RECEIVER', id: 'TRK-1016', token: 'demo16k', at: at(-3), actor: 'Dispatch staff' });
-  ev.push({ type: 'LINK_SENT', id: 'TRK-1016', at: at(-3) + 60000, actor: 'Owner' }); // owner told Bengaluru it is coming
   // Ravi at Bengaluru asked the owner to add an item that is not in the list yet
   ev.push({ type: 'ASK_ADD', what: 'item', name: 'Teak veneer 6 mm', by: 'Ravi (staff)', at: at(-1), actor: 'Ravi (staff)' });
 

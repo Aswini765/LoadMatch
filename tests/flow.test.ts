@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   OPTIONS, jobworkBalance, jobworkDueAt, jobworkOpen, childrenOf, parentOf, JOBWORK_DAYS,
   reducer, buildInitialState, shipmentOf, packLoad, unpackLoad, packCount, unpackCount, optionsFor, diffsOf, diffOf, shipmentStatus, receiptOverdue, diffOverdue, truckSummary, evidenceText, importOrder,
+  suggestFor, cameLater, senderIsUs,
 } from '../src/core.ts';
 import { voucherXml } from '../src/lib/tally.ts';
 import { taxLines } from '../src/lib/tax.ts';
@@ -38,7 +39,7 @@ test('seed: one truck to decide, one promise waiting, one in transit, one loadin
   assert.ok(s.shipments.filter((x: any) => status(s, x.id) === 'MATCHED').length >= 12);
   // last month's entries already went to the accountant; only this week's trucks are waiting
   const pending = s.drafts.filter((d: any) => d.status === 'pending');
-  assert.deepEqual([...new Set(pending.map((d: any) => d.shipmentId))].sort(), ['TRK-1013', 'TRK-1014', 'TRK-1016', 'TRK-1021']);
+  assert.deepEqual([...new Set(pending.map((d: any) => d.shipmentId))].sort(), ['TRK-1013', 'TRK-1014', 'TRK-1016', 'TRK-1021', 'TRK-1022']);
   assert.equal(s.drafts.filter((d: any) => d.status === 'sent').length, 15);
   // the job work example: 50 of 200 still with the job worker, due within the year
   assert.equal(jobworkBalance(s, shipmentOf(s, 'TRK-1018'))[0].pending, 50);
@@ -150,8 +151,8 @@ test('supplier delivery: receipt note at counted good units; replacement promise
   assert.equal(rn.lines[0].qty, 90, 'book what arrived, not what was billed');
   const d = diffsOf(s, 'TRK-1014')[0];
   assert.equal(d.status, 'waiting');
-  assert.equal(diffOverdue(d, s.anchor), false);
-  assert.equal(diffOverdue(d, s.anchor + 3 * 86400000), true, 'flagged once the promised date passes');
+  assert.equal(diffOverdue(d, d.decision.dueAt - 1000), false);
+  assert.equal(diffOverdue(d, s.anchor), true, 'demo: the promise is already late, so the assistant has reminded');
   s = run(s, { type: 'SETTLE', diffId: d.id, note: '10 bundles came with TRK-1020' });
   assert.equal(status(s, 'TRK-1014'), 'SETTLED');
 });
@@ -543,6 +544,40 @@ test('owner choices: check first keeps it with the owner; next load waits; not k
   assert.equal(run(s, { type: 'PROMISE_BROKEN', diffId: d.id, actor: 'Ramesh (staff)' }), s);
   s = run(s, { type: 'PROMISE_BROKEN', diffId: d.id, actor: 'Owner' });
   assert.equal(diffOf(s, d.id).status, 'open');
+});
+
+test('ask the sender: owner asks, sender answers once, the answer picks the suggested decision', () => {
+  let s = buildInitialState();
+  const t = shipmentOf(s, 'TRK-1013');
+  const d = diffsOf(s, 'TRK-1013')[0];
+  assert.equal(suggestFor(t, d), null, 'missing goods: no suggestion before the sender answers');
+  assert.equal(run(s, { type: 'ASK_SENDER', id: 'TRK-1013', actor: 'Ravi (staff)' }), s, 'only the owner asks');
+  assert.equal(run(s, { type: 'SENDER_REPLY', id: 'TRK-1013', kind: 'send_next', by: 'Ramesh' }), s, 'no reply before a question');
+  s = run(s, { type: 'ASK_SENDER', id: 'TRK-1013', token: 'ask13', actor: 'Owner' });
+  assert.ok(shipmentOf(s, 'TRK-1013').ask);
+  assert.equal(run(s, { type: 'SENDER_REPLY', id: 'TRK-1013', kind: 'nonsense', by: 'Ramesh' }), s);
+  assert.equal(run(s, { type: 'SENDER_REPLY', id: 'TRK-1013', kind: 'send_next', token: 'wrong', by: 'x' }), s, 'link reply needs the right token');
+  s = run(s, { type: 'SENDER_REPLY', id: 'TRK-1013', kind: 'send_next', by: 'Ramesh' });
+  assert.equal(suggestFor(shipmentOf(s, 'TRK-1013'), d), 'unit_sends_rest');
+  assert.equal(run(s, { type: 'SENDER_REPLY', id: 'TRK-1013', kind: 'transporter', by: 'Ramesh' }), s, 'answers once');
+  // seeded: TRK-1022 already answered "left here"
+  const t22 = shipmentOf(s, 'TRK-1022');
+  assert.equal(suggestFor(t22, diffsOf(s, 'TRK-1022')[0]), 'unit_sends_rest');
+  // a supplier saying "transporter" means they pay; extra goods need no question
+  assert.equal(suggestFor({ ...shipmentOf(s, 'TRK-1014'), ask: { reply: { kind: 'transporter' } } }, { kind: 'short' }), 'debit_note');
+  assert.equal(suggestFor(shipmentOf(s, 'TRK-1015'), diffsOf(s, 'TRK-1015')[0]), 'bill_extra');
+  assert.equal(senderIsUs(shipmentOf(s, 'TRK-1014')), false);
+  assert.equal(senderIsUs(t22), true);
+});
+
+test('the assistant notices when a later truck brought the promised goods', () => {
+  let s = buildInitialState();
+  const d = diffsOf(s, 'TRK-1022')[0];
+  s = run(s, { type: 'DECIDE', diffId: d.id, action: 'unit_sends_rest', dueAt: Date.now() + 86400000, actor: 'Owner' });
+  assert.equal(cameLater(s, diffOf(s, d.id)), null);
+  let id: any; [s, id] = sentTransfer(s, [{ item: 'PLY-18', qty: 6 }]);
+  s = run(s, { type: 'SUBMIT_RECEIPT', id, token: 'tok123', by: 'Ravi', lines: { L1: { counted: 6, damaged: 0 } } });
+  assert.equal(cameLater(s, diffOf(s, d.id))?.id, id);
 });
 
 console.log(`\n${passed} tests passed`);
