@@ -116,6 +116,8 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
   const [showOld, setShowOld] = useState(false);
   const [allNews, setAllNews] = useState(false);
   const [justSent, setJustSent] = useState<string | null>(null);
+  const [formTruck, setFormTruck] = useState('');
+  const [formKey, setFormKey] = useState(0);
   const [replyNext, setReplyNext] = useState('');
   const [replyDue, setReplyDue] = useState<number | null>(null);
   const [allComing, setAllComing] = useState(false);
@@ -233,9 +235,9 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
         )}
 
         {open === 'send' && <>
-          {justSent && <div id="sent-ok" className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-3 text-base font-bold text-emerald-900">{(() => { const j = state.shipments.find((x: any) => x.id === justSent); return j?.sentAt ? `✅ ${loadName(justSent)} ${w('sentOk')}` : `📦 ${loadName(justSent)}: ${w('loadingStarted')}`; })()}</div>}
+          {justSent && !formTruck && <div id="sent-ok" className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-3 text-base font-bold text-emerald-900">✅ {loadName(justSent)} {w('sentOk')}</div>}
           {['loading'].map((part) => {
-            const list = sending.filter((s: any) => (part === 'loading' ? !s.sentAt : s.sentAt)).slice(0, 3);
+            const list = sending.filter((s: any) => s.id !== formTruck && (part === 'loading' ? !s.sentAt : s.sentAt)).slice(0, 3);
             if (!list.length) return null;
             return <div key={part} id={part === 'loading' ? 'loading-now' : 'trucks-sent'} className="space-y-3">
           <div className="text-sm font-bold text-slate-900 pt-1">{part === 'loading' ? `📦 ${w('loadingNow')}` : `📤 ${w('myTrucks')}`}</div>
@@ -262,9 +264,9 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
           })}
             </div>;
           })}
-          <SendTruck key={justSent || 'new'} unit={unit} w={w} onSent={(id) => setJustSent(id)} />
+          <SendTruck key={formKey} unit={unit} w={w} onSent={(id, step) => { setJustSent(id); setFormTruck(step === 'left' ? '' : id); if (step === 'left') setFormKey((k) => k + 1); }} />
           {['sent'].map((part) => {
-            const list = sending.filter((s: any) => (part === 'loading' ? !s.sentAt : s.sentAt)).slice(0, 3);
+            const list = sending.filter((s: any) => s.id !== formTruck && (part === 'loading' ? !s.sentAt : s.sentAt)).slice(0, 3);
             if (!list.length) return null;
             return <div key={part} id={part === 'loading' ? 'loading-now' : 'trucks-sent'} className="space-y-3">
           <div className="text-sm font-bold text-slate-900 pt-1">{part === 'loading' ? `📦 ${w('loadingNow')}` : `📤 ${w('myTrucks')}`}</div>
@@ -339,7 +341,7 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
 // Goods we owe the receiver (missing last time) are offered as one tap. Prototype: photo and voice reading are simulated.
 const PLATES = ['KA 09 B 6138', 'KA 40 A 2541', 'KA 19 D 7724', 'KA 05 M 8812'];
 const NEW_DRIVERS = [{ name: 'Suresh K', phone: '9900112233' }, { name: 'Imran Pasha', phone: '9741556677' }, { name: 'Venkatesh', phone: '9448023456' }];
-function SendTruck({ unit, w, onSent }: { unit: string; w: (k: string) => string; onSent: (id: string) => void }) {
+function SendTruck({ unit, w, onSent }: { unit: string; w: (k: string) => string; onSent: (id: string, step: string) => void }) {
   const { state, dispatch } = useStore();
   const others = Object.keys(UNITS).filter((u) => u !== unit);
   const customers = Object.values(PARTIES).filter((p) => p.kind === 'customer');
@@ -352,6 +354,7 @@ function SendTruck({ unit, w, onSent }: { unit: string; w: (k: string) => string
   const [driver, setDriver] = useState<{ name: string; phone: string } | null>(null);
   const [newDriver, setNewDriver] = useState<{ name: string; phone: string } | null>(null);
   const [owedOn, setOwedOn] = useState<Record<string, boolean>>({});
+  const [cur, setCur] = useState<{ id: string; phase: 'loading' | 'loaded' } | null>(null);
   const timer = useRef<any>(null);
   useEffect(() => () => clearTimeout(timer.current), []);
   const n = state.counters.trk + 1;
@@ -387,8 +390,11 @@ function SendTruck({ unit, w, onSent }: { unit: string; w: (k: string) => string
     const goDriver = driver || lastDriver || { name: 'Manju', phone: '9845012345' };
     dispatch({ type: 'CREATE_SHIPMENT', id, flow, fromUnit: unit, ...(flow === 'transfer' ? { toUnit: to } : { party: to }), truckNo: goPlate, ref: goRef, driver: goDriver.name, driverPhone: goDriver.phone, lines: goLines, fulfils: useOwed.map((d: any) => d.id), docs: [{ id: newToken(), name: `${goRef}.jpg`, kind: 'challan photo' }], actor: who });
     dispatch({ type: 'LOADING', id, point: 'Dock 1', phase: 'start', actor: who });
-    onSent(id);
+    setCur({ id, phase: 'loading' });
+    onSent(id, 'loading');
   };
+  const loadedNow = () => { dispatch({ type: 'LOADING', id: cur!.id, phase: 'end', actor: me() }); setCur({ id: cur!.id, phase: 'loaded' }); onSent(cur!.id, 'loaded'); };
+  const leftNow = () => { dispatch({ type: 'SEND_TO_RECEIVER', id: cur!.id, token: newToken(), actor: me() }); onSent(cur!.id, 'left'); };
   const chip = (x: string, icon: string, label: string) => <button key={x} id={`to-${x}`} onClick={() => pick(x)} className={`rounded-xl border-2 px-3 py-2 text-sm font-bold cursor-pointer flex items-center gap-1.5 ${to === x ? 'bg-violet-700 text-white border-violet-700' : 'bg-white text-slate-800 border-slate-300'}`}><span className="text-lg">{icon}</span>{label}</button>;
   const stepCls = (done: boolean) => `rounded-2xl border-2 p-3 space-y-2 ${done ? 'border-emerald-300 bg-emerald-50/40' : 'border-slate-200 bg-white'}`;
   const small = 'min-h-[44px] rounded-xl border-2 text-sm font-bold cursor-pointer px-3';
@@ -441,7 +447,10 @@ function SendTruck({ unit, w, onSent }: { unit: string; w: (k: string) => string
         </div>}
         {driver && <div id="driver-read" className="text-xs text-slate-700">🧑‍✈️ <b>{driver.name}</b> · 📞 {driver.phone} {driver !== lastDriver && <span className="text-emerald-800">({w('newSaved')})</span>} <button id="btn-change-driver" onClick={() => { setDriver(null); setNewDriver({ name: '', phone: '' }); }} className="underline text-slate-500 cursor-pointer ml-1">{w('change')}</button></div>}
       </div>
-      <button id="btn-start-loading" disabled={Boolean(reading)} onClick={leave} className={`${big} bg-violet-700 text-white disabled:opacity-40`}>📦 {w('startLoading')}</button>
+      {cur && <div className="flex items-center gap-1 text-[11px] font-bold text-slate-500">{[['📦', w('startLoading'), true], ['✅', w('loadingDone'), cur.phase === 'loaded'], ['🚚', w('truckLeft'), false]].map(([i, t, d]: any, k) => <span key={k} className={`flex-1 text-center rounded-md py-1 ${d ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100'}`}>{d ? '✓' : i} {t}</span>)}</div>}
+      {!cur ? <button id="btn-start-loading" disabled={Boolean(reading)} onClick={leave} className={`${big} bg-violet-700 text-white disabled:opacity-40`}>📦 {w('startLoading')}</button>
+        : cur.phase === 'loading' ? <button id="btn-loading-done" onClick={loadedNow} className={`${big} bg-emerald-600 text-white`}>✅ {w('loadingDone')}</button>
+        : <button id="btn-truck-left" onClick={leftNow} className={`${big} bg-emerald-600 text-white`}>🚚 {w('truckLeft')}</button>}
     </div>
   );
 }

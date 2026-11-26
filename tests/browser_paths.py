@@ -28,10 +28,8 @@ with sync_playwright() as pw:
         else:
             if has('#btn-other-driver'): c('#btn-other-driver')
             snap('#btn-photo-licence'); W(1000); c('#btn-driver-phone'); W(1400)
-        c('#btn-start-loading'); W(400)
-        T=p.eval_on_selector('#sent-ok','e=>e.innerText').split('Load ')[1].split(':')[0].split(' ')[0]
-        c('#step-TRK-'+T); c('#step-TRK-'+T)
-        return T
+        c('#btn-start-loading'); c('#btn-loading-done'); c('#btn-truck-left'); W(300)
+        return p.eval_on_selector('#sent-ok','e=>e.innerText').split('Load ')[1].split(' ')[0]
     def open_count(T, u): home(); who('staff'); unit(u); c('#btn-receive-stock'); c('#btn-coming-all') if has('#btn-coming-all') else None; c('#coming-TRK-'+T); W(700)
     def all_came(): c('#btn-all-came'); snap('#btn-photo-stack'); c('#btn-submit-count'); W(500)
     def summary(): return re.sub(r'\s+',' ',txt('#count-summary'))
@@ -50,16 +48,12 @@ with sync_playwright() as pw:
     if has('#btn-other-driver'): c('#btn-other-driver')
     snap('#btn-photo-licence'); W(1000); c('#btn-driver-phone'); W(1400)
     ok('H1.4 New driver: name from licence, phone by voice', has('#driver-read') and 'saved for next time' in txt('#driver-read'), txt('#driver-read'))
-    shot('03-send-filled'); c('#btn-start-loading'); W(400)
-    T=p.eval_on_selector('#sent-ok','e=>e.innerText').split('Load ')[1].split(':')[0]
-    ok('H1.5a Start loading → card shows Loading done next', 'loading started' in txt('#sent-ok') and has('#step-TRK-'+T) and 'Loading done' in txt('#step-TRK-'+T), txt('#staff-TRK-'+T)[:120])
-    ok('H1.5x Being loaded: under "Loading now", not under "Trucks I sent"', has('#loading-now #staff-TRK-'+T) and not has('#trucks-sent #staff-TRK-'+T))
-    c('#step-TRK-'+T); shot('03b-loaded'); ok('H1.5b Loading done is one tap (no photo) → Truck left button', 'Truck left' in txt('#step-TRK-'+T) and not has('#camera'))
-    home(); who('owner'); c('#btn-info'); 
-    ok('H1.5c Owner sees "being loaded"? (not yet left: nothing shown is fine)', True)
-    home(); who('staff'); unit('MYS'); c('#btn-send-stock'); c('#step-TRK-'+T)
-    ok('H1.5y After Truck left it moves to "Trucks I sent"', has('#trucks-sent #staff-TRK-'+T))
-    ok('H1.5 Truck left: card shows On the way', 'On the way' in txt('#staff-TRK-'+T), txt('#staff-TRK-'+T)[:80])
+    shot('03-send-filled'); c('#btn-start-loading')
+    ok('H1.5a Start loading → the same button is now a green Loading done, at once', has('#btn-loading-done') and not has('#btn-start-loading'))
+    c('#btn-loading-done'); ok('H1.5b Loading done → the same button is Truck left', has('#btn-truck-left'))
+    c('#btn-truck-left'); W(300)
+    T=p.eval_on_selector('#sent-ok','e=>e.innerText').split('Load ')[1].split(' ')[0]
+    ok('H1.5 Truck left → owner told, form ready for the next truck, truck under Trucks I sent', 'owner is told' in txt('#sent-ok') and has('#btn-start-loading') and has('#trucks-sent #staff-TRK-'+T))
     owner(); c('#btn-info'); inf=p.query_selector(f'[id^=info-TRK-{T}-]')
     ok('H1.7 Owner: the sent truck can be opened', inf is not None)
     if inf: inf.click(); W(400); shot('03c-owner-sheet')
