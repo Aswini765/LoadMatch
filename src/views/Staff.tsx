@@ -57,6 +57,11 @@ const W: Record<string, Record<L, string>> = {
   send_next: { en: 'Left here. Will send in the next truck', hi: 'यहीं रह गया। अगली गाड़ी में भेजेंगे', kn: 'ಇಲ್ಲೇ ಉಳಿದಿದೆ. ಮುಂದಿನ ಲಾರಿಯಲ್ಲಿ ಕಳುಹಿಸುತ್ತೇವೆ', te: 'ఇక్కడే ఉండిపోయింది. తదుపరి లారీలో పంపుతాం' },
   sent_full: { en: 'We loaded it all (loading photo)', hi: 'हमने पूरा लोड किया (लोडिंग फोटो)', kn: 'ನಾವು ಎಲ್ಲಾ ಲೋಡ್ ಮಾಡಿದೆವು (ಫೋಟೋ)', te: 'మేము అంతా లోడ్ చేశాం (ఫోటో)' },
   transporter: { en: 'Lost or broken on the road', hi: 'रास्ते में खोया या टूटा', kn: 'ದಾರಿಯಲ್ಲಿ ಕಳೆದುಹೋಯಿತು ಅಥವಾ ಮುರಿಯಿತು', te: 'దారిలో పోయింది లేదా పగిలింది' },
+  startLoading: { en: 'Start loading', hi: 'लोडिंग शुरू', kn: 'ಲೋಡಿಂಗ್ ಪ್ರಾರಂಭಿಸಿ', te: 'లోడింగ్ ప్రారంభించండి' },
+  loadingDone: { en: 'Loading done', hi: 'लोडिंग पूरी', kn: 'ಲೋಡಿಂಗ್ ಮುಗಿದಿದೆ', te: 'లోడింగ్ పూర్తైంది' },
+  loadingNow: { en: 'Loading now', hi: 'लोड हो रहा है', kn: 'ಲೋಡ್ ಆಗುತ್ತಿದೆ', te: 'లోడ్ అవుతోంది' },
+  loadingDonePhoto: { en: 'Loading done: photo of the loaded truck', hi: 'लोडिंग पूरी: भरी गाड़ी की फोटो', kn: 'ಲೋಡಿಂಗ್ ಮುಗಿದಿದೆ: ಲೋಡ್ ಆದ ಲಾರಿಯ ಫೋಟೋ', te: 'లోడింగ్ పూర్తి: లోడ్ అయిన లారీ ఫోటో' },
+  loadingStarted: { en: 'loading started. Tap the next step on the card below.', hi: 'लोडिंग शुरू। नीचे कार्ड पर अगला कदम दबाएँ।', kn: 'ಲೋಡಿಂಗ್ ಪ್ರಾರಂಭವಾಯಿತು. ಕೆಳಗಿನ ಕಾರ್ಡ್‌ನಲ್ಲಿ ಮುಂದಿನ ಹಂತ ಒತ್ತಿ.', te: 'లోడింగ్ ప్రారంభమైంది. కింది కార్డ్‌లో తదుపరి దశ నొక్కండి.' },
   owedAdd: { en: 'Add what we owe', hi: 'बकाया माल जोड़ें', kn: 'ಬಾಕಿ ಸರಕು ಸೇರಿಸಿ', te: 'బాకీ సరుకు చేర్చండి' },
   owedWhy: { en: 'missing last time', hi: 'पिछली बार कम था', kn: 'ಹಿಂದಿನ ಬಾರಿ ಕಡಿಮೆ', te: 'గతసారి తక్కువ' },
   owedIncl: { en: 'incl. owed', hi: 'बकाया सहित', kn: 'ಬಾಕಿ ಸೇರಿ', te: 'బాకీ కలిపి' },
@@ -158,11 +163,9 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
     dispatch({ type: 'SEND_TO_RECEIVER', id: s.id, token, actor: me() });
     window.location.hash = `#/r/${s.id}/${token}`;
   };
-  const leave = (s: any) => {
-    if (!s.loading) dispatch({ type: 'LOADING', id: s.id, point: 'Dock 1', phase: 'start', actor: me() });
-    if (!s.loading?.endAt) dispatch({ type: 'LOADING', id: s.id, phase: 'end', actor: me() });
-    dispatch({ type: 'SEND_TO_RECEIVER', id: s.id, token: newToken(), actor: me() });
-  };
+  const startLoading = (s: any) => dispatch({ type: 'LOADING', id: s.id, point: 'Dock 1', phase: 'start', actor: me() });
+  const loaded = (s: any) => { dispatch({ type: 'ATTACH_DOC', id: s.id, docs: [{ id: newToken(), name: `${s.id}-loaded.jpg`, kind: 'loaded truck photo' }], actor: me() }); dispatch({ type: 'LOADING', id: s.id, phase: 'end', actor: me() }); };
+  const leave = (s: any) => dispatch({ type: 'SEND_TO_RECEIVER', id: s.id, token: newToken(), actor: me() });
 
   // Updates: short lines with a picture, newest first
   const news: { at: number; icon: string; text: string; tone: string; side?: string }[] = [];
@@ -230,7 +233,7 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
         )}
 
         {open === 'send' && <>
-          {justSent && <div id="sent-ok" className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-3 text-base font-bold text-emerald-900">✅ {loadName(justSent)} {w('sentOk')}</div>}
+          {justSent && <div id="sent-ok" className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-3 text-base font-bold text-emerald-900">{(() => { const j = state.shipments.find((x: any) => x.id === justSent); return j?.sentAt ? `✅ ${loadName(justSent)} ${w('sentOk')}` : `📦 ${loadName(justSent)}: ${w('loadingStarted')}`; })()}</div>}
           <SendTruck key={justSent || 'new'} unit={unit} w={w} onSent={(id) => setJustSent(id)} />
           {sending.length > 0 && <div className="text-sm font-bold text-slate-900 pt-1">📤 {w('myTrucks')}</div>}
           {sending.slice(0, 3).map((s: any) => {
@@ -238,14 +241,17 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
             return (
               <div key={s.id} id={`staff-${s.id}`} className={`rounded-2xl border-2 p-3 space-y-2 ${s.id === justSent ? 'border-emerald-400 bg-emerald-50/40' : 'border-violet-200 bg-white'}`}>
                 <div className="flex items-center gap-3">
-                  <span className="text-3xl leading-none">{!s.sentAt ? '📦' : s.arrivedAt ? '📍' : '🚚'}</span>
+                  <span className="text-3xl leading-none">{!s.sentAt ? (s.loading?.endAt ? '✅' : '📦') : s.arrivedAt ? '📍' : '🚚'}</span>
                   <div className="min-w-0 flex-1">
                     <div className="text-base font-bold text-slate-900 truncate">{toX(to, l)}</div>
                     {s.truckNo && <Plate no={s.truckNo} />}
-                    <div className="text-xs text-slate-600">{!s.sentAt ? w('notLeft') : s.arrivedAt ? w('reached') : w('onTheWay')} · {loadName(s.id)}</div>
+                    <div className="text-xs text-slate-600">{!s.sentAt ? (s.loading?.endAt ? w('loadingDone') : s.loading ? w('loadingNow') : w('notLeft')) : s.arrivedAt ? w('reached') : w('onTheWay')} · {loadName(s.id)}</div>
                   </div>
                 </div>
-                {!s.sentAt && <button id={`step-${s.id}`} onClick={() => leave(s)} className={`${big} bg-emerald-600 text-white`}>🚚 {w('truckLeft')}</button>}
+                {!s.sentAt && <div className="flex items-center gap-1 text-[11px] font-bold text-slate-500">{[['📦', w('startLoading'), Boolean(s.loading)], ['✅', w('loadingDone'), Boolean(s.loading?.endAt)], ['🚚', w('truckLeft'), false]].map(([i, t, d]: any, k) => <span key={k} className={`flex-1 text-center rounded-md py-1 ${d ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100'}`}>{d ? '✓' : i} {t}</span>)}</div>}
+                {!s.sentAt && !s.loading && <button id={`step-${s.id}`} onClick={() => startLoading(s)} className={`${big} bg-violet-700 text-white`}>📦 {w('startLoading')}</button>}
+                {!s.sentAt && s.loading && !s.loading.endAt && <CameraButton id={`step-${s.id}`} kind="loading" label={w('loadingDonePhoto')} done={false} onShot={() => loaded(s)} text={s.ref} />}
+                {!s.sentAt && s.loading?.endAt && <button id={`step-${s.id}`} onClick={() => leave(s)} className={`${big} bg-emerald-600 text-white`}>🚚 {w('truckLeft')}</button>}
                 {s.sentAt && s.flow === 'outbound' && !s.linkSentAt && <div id={`owner-link-${s.id}`} className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">💬 {w('ownerSends')}</div>}
                 <button id={`open-${s.id}`} onClick={() => go('dispatch', { id: s.id })} className="text-[12px] font-semibold text-slate-500 underline cursor-pointer">{w('problem')}</button>
               </div>
@@ -338,10 +344,8 @@ function SendTruck({ unit, w, onSent }: { unit: string; w: (k: string) => string
   const leave = () => {
     const id = `TRK-${1000 + n}`;
     const who = me();
-    dispatch({ type: 'CREATE_SHIPMENT', id, flow, fromUnit: unit, ...(flow === 'transfer' ? { toUnit: to } : { party: to }), truckNo: plate, ref, driver: driver!.name, driverPhone: driver!.phone, lines: allLines, fulfils: useOwed.map((d: any) => d.id), actor: who });
+    dispatch({ type: 'CREATE_SHIPMENT', id, flow, fromUnit: unit, ...(flow === 'transfer' ? { toUnit: to } : { party: to }), truckNo: plate, ref, driver: driver!.name, driverPhone: driver!.phone, lines: allLines, fulfils: useOwed.map((d: any) => d.id), docs: [{ id: newToken(), name: `${ref}.jpg`, kind: 'challan photo' }], actor: who });
     dispatch({ type: 'LOADING', id, point: 'Dock 1', phase: 'start', actor: who });
-    dispatch({ type: 'LOADING', id, phase: 'end', actor: who });
-    dispatch({ type: 'SEND_TO_RECEIVER', id, token: newToken(), actor: who });
     onSent(id);
   };
   const chip = (x: string, icon: string, label: string) => <button key={x} id={`to-${x}`} onClick={() => pick(x)} className={`rounded-xl border-2 px-3 py-2 text-sm font-bold cursor-pointer flex items-center gap-1.5 ${to === x ? 'bg-violet-700 text-white border-violet-700' : 'bg-white text-slate-800 border-slate-300'}`}><span className="text-lg">{icon}</span>{label}</button>;
@@ -396,7 +400,7 @@ function SendTruck({ unit, w, onSent }: { unit: string; w: (k: string) => string
         </div>}
         {driver && <div id="driver-read" className="text-xs text-slate-700">🧑‍✈️ <b>{driver.name}</b> · 📞 {driver.phone} {driver !== lastDriver && <span className="text-emerald-800">({w('newSaved')})</span>} <button id="btn-change-driver" onClick={() => { setDriver(null); setNewDriver({ name: '', phone: '' }); }} className="underline text-slate-500 cursor-pointer ml-1">{w('change')}</button></div>}
       </div>
-      <button id="btn-truck-left" disabled={!ready} onClick={leave} className={`${big} bg-emerald-600 text-white disabled:opacity-40`}>🚚 {w('truckLeft')}</button>
+      <button id="btn-start-loading" disabled={!ready} onClick={leave} className={`${big} bg-violet-700 text-white disabled:opacity-40`}>📦 {w('startLoading')}</button>
     </div>
   );
 }

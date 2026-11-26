@@ -8,7 +8,8 @@ export function Sample({ kind, big = false, text = '' }: { kind: Shot; big?: boo
   const sz = big ? 'w-64 h-44' : 'w-16 h-11';
   const f = big ? 'text-[11px]' : 'text-[4px]';
   if (kind === 'plate') return <div className={`${sz} rounded bg-slate-600 flex items-center justify-center`}><div className={`bg-amber-300 border-2 border-black rounded px-1 font-mono font-bold text-black ${big ? 'text-2xl px-3 py-1' : 'text-[6px]'}`}>{text || 'KA 09 B 6138'}</div></div>;
-  if (kind === 'challan' || kind === 'loading') return (
+  if (kind === 'loading') return <div className={`${sz} rounded bg-sky-200 flex items-end justify-center pb-1 ${big ? 'text-7xl' : 'text-xl'}`}>🚛</div>;
+  if (kind === 'challan') return (
     <div className={`${sz} rounded bg-white p-1.5 ${f} text-slate-700 leading-tight overflow-hidden border border-slate-300`}>
       <div className="font-bold text-center">DELIVERY CHALLAN</div>
       <div>No. {text || 'DC-742'} · Kaveri Wood Products</div>

@@ -146,7 +146,7 @@ export default function Receive({ id, token, payload }: { id: string; token: str
   const staff = Boolean(getWho()) || Boolean(asStore);
   // our staff: their own name; an outside receiver: the last name used on this phone
   const [by, setBy] = useState(() => (asStore ? `${party(s?.party)?.name.split(' ')[0] || 'Customer'} stores` : staff ? me().replace(' (staff)', '') : (() => { try { return localStorage.getItem('loadmatch-name') || (s?.party ? `${party(s.party)?.name.split(' ')[0]} stores` : 'Store person'); } catch { return 'Store person'; } })()));
-  const [arrivedHere, setArrivedHere] = useState(false);
+  const [arrivedHere, setArrivedHere] = useState(() => { try { const n = sessionStorage.getItem('lm-arrive-now') === id; sessionStorage.removeItem('lm-arrive-now'); return n; } catch { return false; } });
   const [savedCo, setSavedCo] = useState(false);
   const [mode, setMode] = useState<'' | 'ok' | 'wrong'>('');
   const [marks, setMarks] = useState<Marks>({});
@@ -326,27 +326,45 @@ export function PartnerStore({ partyId }: { partyId: string }) {
   const { state } = useStore();
   const [lang, setLangState] = useState(savedLang);
   const setLang = (l: string) => { setLangState(l); saveLang(l); };
+  const [open, setOpen] = useState<'' | 'send' | 'receive'>('receive');
   const p = party(partyId);
   const list = savedTrucks(partyId);
-  const done = (x: any) => Boolean(shipmentOf(state, x.id)?.receipt) || (() => { try { const [, , , tok] = x.hash.split('/'); return Boolean(localStorage.getItem(remoteKey(x.id, tok))); } catch { return false; } })();
-  const coming = list.filter((x: any) => !done(x));
-  const old = list.filter(done).slice(0, 3);
-  const open = (x: any) => { try { sessionStorage.setItem('lm-as-store', partyId); } catch { /* ignore */ } window.location.hash = x.hash; };
+  const doneOf = (x: any) => shipmentOf(state, x.id)?.receipt || (() => { try { const tok = x.hash.split('/')[3]; return JSON.parse(localStorage.getItem(remoteKey(x.id, tok)) || 'null'); } catch { return null; } })();
+  const coming = list.filter((x: any) => !doneOf(x));
+  const counted = list.filter((x: any) => doneOf(x));
+  const go = (x: any, arrive: boolean) => { try { sessionStorage.setItem('lm-as-store', partyId); if (arrive) sessionStorage.setItem('lm-arrive-now', x.id); } catch { /* ignore */ } window.location.hash = x.hash; };
+  const short = p?.name.split(' ')[0] || 'Store';
   return (
-    <PhoneFrame title={`${p?.name || 'Customer'} · Store`} sub="LoadMatch" lang={lang} setLang={setLang}>
-      <div className="space-y-3">
-        <div className="text-[11px] text-slate-500">Demo: this is the customer's own LoadMatch. Trucks their owner saved from a WhatsApp link show here.</div>
-        <div id="co-coming" className="rounded-2xl border-2 border-sky-300 bg-sky-50 p-3 space-y-2">
+    <PhoneFrame title="LoadMatch" sub={`${short} stores · ${p?.name}`} lang={lang} setLang={setLang}>
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 text-xs"><span className="text-slate-500">I am at:</span><span className="px-3 py-1.5 rounded-full border font-bold bg-slate-900 text-white border-slate-900">{p?.name} store</span></div>
+        <div className="grid grid-cols-2 gap-3">
+          <button id="co-send" onClick={() => setOpen('send')} className={`min-h-[96px] rounded-2xl text-lg font-bold cursor-pointer flex flex-col items-center justify-center border-2 ${open === 'send' ? 'bg-violet-700 text-white border-violet-700' : 'bg-violet-50 text-violet-900 border-violet-200'}`}><span className="text-3xl">📤</span>Send</button>
+          <button id="co-receive" onClick={() => setOpen('receive')} className={`relative min-h-[96px] rounded-2xl text-lg font-bold cursor-pointer flex flex-col items-center justify-center border-2 ${open === 'receive' ? 'bg-sky-700 text-white border-sky-700' : 'bg-sky-50 text-sky-900 border-sky-200'}`}><span className="text-3xl">📥</span>Receive
+            {coming.length > 0 && <span className="absolute top-2 right-2 min-w-6 h-6 px-1.5 rounded-full bg-amber-500 text-white text-sm flex items-center justify-center">{coming.length}</span>}</button>
+        </div>
+        {open === 'send' && <div id="co-send-note" className="rounded-2xl border-2 border-violet-200 bg-violet-50 p-3 text-sm text-violet-950">📤 {p?.name} sends its own trucks here the same way: photo of the challan, photo of the plate, driver, Start loading → Loading done → Truck left. (Not filled in this demo.)</div>}
+        {open === 'receive' && <div id="co-coming" className="rounded-2xl border-2 border-sky-300 bg-sky-50 p-3 space-y-2">
           <div className="text-base font-bold text-sky-950">🚚 Coming to you · {coming.length}</div>
           {!coming.length && <div className="text-sm text-sky-900">No truck coming now</div>}
           {coming.slice(0, 3).map((x: any) => (
-            <button key={x.id} id={`co-${x.id}`} onClick={() => open(x)} className="w-full text-left rounded-xl bg-white border-2 border-sky-200 p-3 space-y-2 cursor-pointer block">
-              <span className="flex items-center gap-3"><span className="text-3xl">🚚</span><span className="flex-1"><span className="block text-base font-bold text-slate-900">From {x.from}</span><span className="inline-block px-2 py-0.5 rounded-md border-2 border-slate-800 bg-amber-50 font-mono font-bold text-sm">{x.plate}</span><span className="block text-xs text-slate-600">{loadName(x.id)}</span></span></span>
+            <button key={x.id} id={`co-${x.id}`} onClick={() => go(x, true)} className="w-full text-left rounded-xl bg-white border-2 border-sky-200 hover:border-sky-500 p-3 space-y-2 cursor-pointer block">
+              <span className="flex items-center gap-3">
+                <span className="text-3xl leading-none">🚚</span>
+                <span className="flex-1 min-w-0"><span className="block text-base font-bold text-slate-900">From {x.from}</span><span className="inline-block px-2 py-0.5 rounded-md border-2 border-slate-800 bg-amber-50 font-mono font-bold text-sm text-slate-900">{x.plate}</span><span className="block text-xs text-slate-600">On the way · {loadName(x.id)}</span></span>
+              </span>
               <span className="w-full min-h-[48px] rounded-xl bg-emerald-600 text-white text-base font-bold flex items-center justify-center">📍 Truck arrived → 🔢 Count</span>
             </button>
           ))}
+        </div>}
+        <div id="co-updates" className="space-y-1.5">
+          <div className="text-sm font-bold text-slate-900">🔔 Updates</div>
+          {!list.length && <div className="text-xs text-slate-500">No news</div>}
+          {list.slice(0, 3).map((x: any) => { const r = doneOf(x); const bad = r && Object.values(r.lines || {}).some((v: any, i) => v.damaged || v.counted !== (shipmentOf(state, x.id)?.lines[i]?.qty ?? v.counted)); return (
+            <button key={x.id} id={`co-up-${x.id}`} onClick={() => go(x, false)} className={`w-full text-left rounded-xl border px-3 py-2 text-sm flex items-start gap-2 cursor-pointer ${!r ? 'bg-sky-50 border-sky-200' : bad ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'}`}><span className="text-lg leading-none">{!r ? '🚚' : bad ? '⚠️' : '✅'}</span><span className="flex-1">{loadName(x.id)} {!r ? `coming from ${x.from}` : bad ? 'counted: does not match. Your owner is told' : 'counted, all OK'}<span className="block text-[11px] text-slate-500">{when(r?.at || x.at)}</span></span></button>); })}
         </div>
-        {old.length > 0 && <div className="space-y-1.5"><div className="text-sm font-bold text-slate-900">🗂 Counted</div>{old.map((x: any) => <button key={x.id} id={`co-old-${x.id}`} onClick={() => open(x)} className="w-full text-left rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm cursor-pointer">✅ From {x.from} · {loadName(x.id)}</button>)}</div>}
+        {counted.length > 0 && <div className="text-[11px] text-slate-500">🗂 Counted trucks: {counted.length}</div>}
+        <div className="text-[11px] text-slate-400">Demo: this is {p?.name}'s own LoadMatch. Trucks their owner saved from a WhatsApp link show here.</div>
       </div>
     </PhoneFrame>
   );

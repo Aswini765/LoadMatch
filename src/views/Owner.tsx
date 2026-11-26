@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { MessageCircle, Film, Share2, CheckCircle2, Clock, AlertTriangle, Truck, ChevronDown, ChevronRight, ShieldCheck, Link2, HelpCircle, Printer, FileCode, Send, Undo2 } from 'lucide-react';
 import { OwnerAnswered, KIND_TEXT, FIELD } from './Requests.tsx';
-import { useStore, item, party, route, atGate, jobworkOpen, jobworkBalance, jobworkDueAt, shipmentOf, diffsOf, lineOf, shipmentStatus, receiptOverdue, diffOverdue, receiverPath, evidencePath, evidenceText, truckSummary, importOrder, ACTIONS, OPTIONS, optionsFor, countedByUs, KIND_LABEL, FLOW_LABEL, DRAFT_LABEL, DRAFT_PLAIN, loadName, REPLIES, senderName, senderIsUs, suggestFor, cameLater } from '../store.tsx';
+import { useStore, item, party, route, atGate, jobworkOpen, jobworkBalance, jobworkDueAt, shipmentOf, diffsOf, diffOf, lineOf, shipmentStatus, receiptOverdue, diffOverdue, receiverPath, evidencePath, evidenceText, truckSummary, importOrder, ACTIONS, OPTIONS, optionsFor, countedByUs, KIND_LABEL, FLOW_LABEL, DRAFT_LABEL, DRAFT_PLAIN, loadName, REPLIES, senderName, senderIsUs, suggestFor, cameLater } from '../store.tsx';
 import { reportHtml, printReport, packSummary, entryAmount, entryLines } from '../lib/report.ts';
 import { batchXml, download } from '../lib/tally.ts';
 import { tallyDate } from '../lib/format.ts';
@@ -9,7 +9,8 @@ import { Chain } from './Dispatch.tsx';
 import { PageHeader, Panel, StatusBadge, Note, PhotoStrip, shareWhatsApp, appLink, newToken, type Go } from './ui.tsx';
 import { inr, inr0, inrL, when, duration, dateTime, time } from '../lib/format.ts';
 import { COMPANY } from '../data/seed.ts';
-import { DateChips, dayFrom, dayLabel } from './sim.tsx';
+import { DateChips, dayFrom, dayLabel, Sample } from './sim.tsx';
+import type { Shot } from './sim.tsx';
 
 const KIND_CLS: Record<string, string> = {
   short: 'bg-amber-50 text-amber-800 border-amber-200',
@@ -106,6 +107,7 @@ function Inbox({ go, initialId }: { go: Go; initialId?: string | null }) {
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [showInfo, setShowInfo] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [sheet, setSheet] = useState('');
   const rows: any[] = [];
   const info: any[] = [];
   for (const s of state.shipments) {
@@ -113,19 +115,19 @@ function Inbox({ go, initialId }: { go: Go; initialId?: string | null }) {
     const ds = diffsOf(state, s.id);
     const openDs = ds.filter((d: any) => d.status === 'open' || d.status === 'investigating');
     if (s.receipt && openDs.length) rows.push({ kind: 'truck', at: s.ask?.reply?.at || s.receipt.at, s, openDs });
-    else if (s.receipt && now - s.receipt.at < 24 * 3600000 && !ds.length) info.push({ at: s.receipt.at, icon: '✅', title: `${loadName(s.id)} · all matched`, sub: `${route(s)} · counted by ${s.receipt.by}` });
+    else if (s.receipt && now - s.receipt.at < 24 * 3600000 && !ds.length) info.push({ id: s.id, at: s.receipt.at, icon: '✅', title: `${loadName(s.id)} · all matched`, sub: `${route(s)} · counted by ${s.receipt.by}` });
     for (const d of ds) {
       if (d.status === 'waiting') rows.push({ kind: 'promise', at: diffOverdue(d, now) ? d.decision.dueAt : d.decision.at, s, d });
       else if (d.status === 'settled' && d.settledAt && now - d.settledAt < 24 * 3600000) {
         const toAcc = state.drafts.some((x: any) => x.diffId === d.id);
-        info.push({ at: d.settledAt, icon: '✅', title: `${loadName(s.id)} · ${qtyText([d])}: decided`, sub: `${d.decision ? ACTIONS[d.decision.action].label : 'Done'}${toAcc ? ' · sent to the accountant' : ''}` });
+        info.push({ id: s.id, at: d.settledAt, icon: '✅', title: `${loadName(s.id)} · ${qtyText([d])}: decided`, sub: `${d.decision ? ACTIONS[d.decision.action].label : 'Done'}${toAcc ? ' · sent to the accountant' : ''}` });
       }
     }
     // our other unit sees a truck as soon as it leaves; the owner is only told
-    if (s.flow === 'transfer' && s.sentAt && !s.receipt && !s.returning) info.push({ at: s.arrivedAt || s.sentAt, icon: s.arrivedAt ? '📍' : '🚚', title: s.arrivedAt ? `${loadName(s.id)} reached ${route(s).split(' → ')[1]}` : `${loadName(s.id)} left ${route(s).split(' → ')[0]} for ${route(s).split(' → ')[1]}`, sub: s.arrivedAt ? `Being counted · truck ${s.truckNo}` : `${route(s).split(' → ')[1]} sees it in the app · truck ${s.truckNo}` });
+    if (s.flow === 'transfer' && s.sentAt && !s.receipt && !s.returning) info.push({ id: s.id, at: s.arrivedAt || s.sentAt, icon: s.arrivedAt ? '📍' : '🚚', title: s.arrivedAt ? `${loadName(s.id)} reached ${route(s).split(' → ')[1]}` : `${loadName(s.id)} left ${route(s).split(' → ')[0]} for ${route(s).split(' → ')[1]}`, sub: s.arrivedAt ? `Being counted · truck ${s.truckNo}` : `${route(s).split(' → ')[1]} sees it in the app · truck ${s.truckNo}` });
     // a customer is outside the app: the owner sends them the count link
     if (s.flow === 'outbound' && s.sentAt && !s.receipt && !s.linkSentAt) rows.push({ kind: 'link', at: s.sentAt, s });
-    if (s.flow === 'outbound' && s.sentAt && !s.receipt && s.linkSentAt) info.push({ at: s.linkSentAt, icon: '💬', title: `${loadName(s.id)} · link sent to ${party(s.party).name}`, sub: `Waiting for their count · truck ${s.truckNo}` });
+    if (s.flow === 'outbound' && s.sentAt && !s.receipt && s.linkSentAt) info.push({ id: s.id, at: s.linkSentAt, icon: '💬', title: `${loadName(s.id)} · link sent to ${party(s.party).name}`, sub: `Waiting for their count · truck ${s.truckNo}` });
   }
   for (const r of state.requests || []) if (r.status === 'pending') rows.push({ kind: 'req', at: r.at, r });
   rows.sort((a, b) => b.at - a.at);
@@ -144,7 +146,7 @@ function Inbox({ go, initialId }: { go: Go; initialId?: string | null }) {
         if (x.kind === 'link') return (
           <div key={x.s.id} id={`row-link-${x.s.id}`} className="bg-white border border-slate-200 border-l-4 border-l-violet-500 rounded-xl p-3 flex items-center gap-3">
             <span className="text-2xl">🚚</span>
-            <div className="flex-1 min-w-0"><div className="text-sm font-bold text-slate-900">{loadName(x.s.id)} left for {party(x.s.party).name}</div><div className="text-xs text-slate-500">They are not in the app: send them the count link · {when(x.at, now)}</div></div>
+            <div className="flex-1 min-w-0 cursor-pointer" id={`open-${x.s.id}`} onClick={() => setSheet(x.s.id)}><div className="text-sm font-bold text-slate-900 underline decoration-dotted">{loadName(x.s.id)} left for {party(x.s.party).name} ›</div><div className="text-xs text-slate-500">They are not in the app: send them the count link · {when(x.at, now)}</div></div>
             <a id={`send-link-${x.s.id}`} href={shareWhatsApp(`${COMPANY.name}: ${loadName(x.s.id)} is on the way (truck ${x.s.truckNo}). When it reaches you, open this link, tap Truck arrived and count:\n${appLink(receiverPath(x.s, state.settings))}`)} target="_blank" rel="noreferrer" onClick={() => dispatch({ type: 'LINK_SENT', id: x.s.id, actor: 'Owner' })} className={`${btn} bg-emerald-600 text-white`}>💬 Send to receiver</a>
           </div>
         );
@@ -171,7 +173,53 @@ function Inbox({ go, initialId }: { go: Go; initialId?: string | null }) {
       {rows.length > 3 && <button id="btn-show-all" onClick={() => setShowAll(!showAll)} className="w-full min-h-[40px] rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-700 cursor-pointer">{showAll ? '▲ Show only 3' : `▼ Show ${rows.length - 3} more`}</button>}
       {!rows.length && <Note tone="go">Nothing needs you right now.</Note>}
       {info.length > 0 && <button id="btn-info" onClick={() => setShowInfo(!showInfo)} className="w-full text-left text-xs font-bold text-slate-500 py-1 cursor-pointer">{showInfo ? '▲' : '▼'} Also today, nothing to do · {info.length}</button>}
-      {showInfo && <div id="info-list" className="space-y-1">{info.map((x, i) => <div key={i} className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs flex items-center gap-2"><span className="text-base">{x.icon}</span><span className="flex-1 min-w-0"><b className="text-slate-800">{x.title}</b><span className="block text-slate-500 truncate">{x.sub} · {when(x.at, now)}</span></span></div>)}</div>}
+      {showInfo && <div id="info-list" className="space-y-1">{info.map((x, i) => <button key={i} id={`info-${x.id}-${i}`} onClick={() => setSheet(x.id)} className="w-full text-left bg-white border border-slate-200 hover:border-slate-400 rounded-lg px-3 py-2 text-xs flex items-center gap-2 cursor-pointer"><span className="text-base">{x.icon}</span><span className="flex-1 min-w-0"><b className="text-slate-800">{x.title}</b><span className="block text-slate-500 truncate">{x.sub} · {when(x.at, now)}</span></span><span className="text-slate-400 font-bold">›</span></button>)}</div>}
+      {sheet && <TruckSheet id={sheet} onClose={() => setSheet('')} />}
+    </div>
+  );
+}
+
+
+// Everything about one truck, to read: route, truck and driver, steps with times, items sent and counted, photos.
+const DOC_SHOT: Record<string, Shot> = { 'challan photo': 'challan', 'loaded truck photo': 'loading', 'stack.jpg': 'stack', 'damage.jpg': 'damage' };
+export function TruckSheet({ id, onClose }: { id: string; onClose: () => void }) {
+  const { state } = useStore();
+  const s = state.shipments.find((x: any) => x.id === id);
+  if (!s) return null;
+  const ds = diffsOf(state, s.id);
+  const steps: [string, number | null | undefined, string][] = [
+    ['📝', s.createdAt, `Made by ${String(s.createdBy || '').replace(' (staff)', '')}`],
+    ['📦', s.loading?.startAt, 'Loading started'],
+    ['✅', s.loading?.endAt, 'Loading done'],
+    ['🚚', s.sentAt, atGate(s.flow) ? 'Expected' : 'Truck left'],
+    ['💬', s.linkSentAt, 'Link sent to the customer'],
+    ['📍', s.arrivedAt, `Arrived${s.arrivedBy ? ` (${String(s.arrivedBy).replace(' (staff)', '')})` : ''}`],
+    ['🔢', s.receipt?.at, s.receipt ? `Counted by ${s.receipt.by}${ds.length ? `: ${qtyText(ds)}` : ': all matched'}` : ''],
+  ];
+  const photos = [...(s.docs || []).map((d: any) => ({ shot: DOC_SHOT[d.kind] || 'challan', label: d.kind })), ...((s.receipt?.photos || []).map((p: string) => ({ shot: DOC_SHOT[p] || 'stack', label: p === 'stack.jpg' ? 'unloaded stack' : p === 'damage.jpg' ? 'damage' : p })))];
+  return (
+    <div id="truck-sheet" className="fixed inset-0 z-50 bg-slate-900/40 flex items-end sm:items-center justify-center" onClick={onClose}>
+      <div className="bg-white w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl p-4 space-y-3" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-2">
+          <div><div className="text-lg font-bold text-slate-950">{loadName(s.id)}</div><div className="text-sm text-slate-600">{route(s)}</div></div>
+          <button id="btn-sheet-close" onClick={onClose} className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-bold cursor-pointer">Close</button>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-700">
+          <span className="inline-block px-2 py-0.5 rounded-md border-2 border-slate-800 bg-amber-50 font-mono font-bold text-slate-900">{s.truckNo}</span>
+          {s.driver && <span>🧑‍✈️ {s.driver}</span>}{s.driverPhone && <a href={`tel:${s.driverPhone}`} className="font-bold text-emerald-800">📞 {s.driverPhone}</a>}
+          <span>🧾 {s.ref}</span>
+        </div>
+        <div className="space-y-1">{steps.filter(([, t]) => t).map(([i, t, x], k) => <div key={k} className="flex items-center gap-2 text-xs"><span className="w-5 text-center">{i}</span><span className="flex-1 text-slate-800">{x}</span><span className="text-slate-500">{when(t as number)}</span></div>)}</div>
+        <div className="rounded-xl border border-slate-200 divide-y divide-slate-100">
+          {s.lines.map((l: any) => { const r = s.receipt?.lines[l.id]; const bad = r && (r.counted !== l.qty || r.damaged); return (
+            <div key={l.id} className="px-3 py-2 text-xs flex items-center justify-between gap-2">
+              <span className="text-slate-800">{ico(l.item)} <b>{shortItem(l.item)}</b><span className="block text-slate-500">{item(l.item).unit}</span></span>
+              <span className={`text-right font-mono ${bad ? 'text-amber-700 font-bold' : 'text-slate-700'}`}>Sent {l.qty}{r ? ` · counted ${r.counted}${r.damaged ? ` (${r.damaged} damaged)` : ''}` : ''}</span>
+            </div>); })}
+        </div>
+        {photos.length > 0 && <div className="flex flex-wrap gap-3">{photos.map((ph, k) => <div key={k} className="text-[10px] text-slate-600 text-center space-y-1"><Sample kind={ph.shot} text={ph.shot === 'challan' ? s.ref : s.truckNo} /><div>{ph.label}</div></div>)}</div>}
+        {(s.fulfils || []).length > 0 && <div className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">📦 Also carries goods owed from {(s.fulfils || []).map((d: string) => loadName(diffOf(state, d)?.shipmentId || '')).join(', ')}.</div>}
+      </div>
     </div>
   );
 }
@@ -195,6 +243,7 @@ function TruckCard({ s, ds, startOpen }: { s: any; ds: any[]; startOpen?: boolea
   const now = Date.now();
   const [more, setMore] = useState(Boolean(startOpen));
   const [pick, setPick] = useState<{ kind: string; action: string } | null>(null);
+  const [sheet, setSheet] = useState(false);
   const [due, setDue] = useState<number | null>(null);
   const value = ds.reduce((a: number, d: any) => a + d.value, 0);
   const sender = senderName(s);
@@ -222,11 +271,12 @@ function TruckCard({ s, ds, startOpen }: { s: any; ds: any[]; startOpen?: boolea
   const b = 'w-full min-h-[44px] rounded-xl text-sm font-bold cursor-pointer flex items-center justify-center px-3';
   return (
     <div id={`own-truck-${s.id}`} className={`bg-white border border-slate-200 border-l-4 ${checking ? 'border-l-violet-500' : 'border-l-amber-500'} rounded-xl overflow-hidden`}>
+      {sheet && <TruckSheet id={s.id} onClose={() => setSheet(false)} />}
       <div className="p-3 space-y-2.5">
         <div className="flex items-start gap-3">
           <span className="text-2xl leading-none">{checking ? '🔍' : '⚠️'}</span>
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-bold text-slate-900">{loadName(s.id)} · {qtyText(ds)} <span className="text-rose-700">· {inrL(value)}</span></div>
+            <button id={`open-${s.id}`} onClick={() => setSheet(true)} className="text-left text-sm font-bold text-slate-900 cursor-pointer underline decoration-dotted">{loadName(s.id)} · {qtyText(ds)} <span className="text-rose-700">· {inrL(value)}</span> ›</button>
             <div className="text-xs text-slate-500">{route(s)} · counted by {s.receipt.by} · {when(s.receipt.at, now)}</div>
             <div className="text-xs text-slate-700 mt-1">{[...new Set(ds.map((d: any) => d.item))].map((it: any) => `${ico(it)} ${shortItem(it)}: ${qtyText(ds.filter((d: any) => d.item === it))}`).join(' · ')}</div>
           </div>
@@ -282,12 +332,14 @@ function PromiseCard({ d, s }: { d: any; s: any }) {
   const delivers = ['unit_sends_rest', 'replace', 'send_rest', 'send_replacement'].includes(d.decision.action);
   const btn = 'px-3 py-2 rounded-lg text-xs font-bold cursor-pointer';
   const icon = d.came ? '📦' : carrying ? '🚚' : late ? '⏰' : '⏳';
+  const [sheet, setSheet] = useState('');
   return (
     <div id={`promise-${d.id}`} className={`bg-white border border-slate-200 border-l-4 ${d.came ? 'border-l-emerald-500' : late ? 'border-l-rose-500' : 'border-l-slate-400'} rounded-xl p-3 space-y-2`}>
       <div className="flex items-start gap-3">
         <span className="text-2xl leading-none">{icon}</span>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-bold text-slate-900">{loadName(s.id)} · {d.qty} {shortItem(d.item)} {KIND_LABEL[d.kind].toLowerCase()} · {plain(d.decision.action).replace(/^\S+ /, '').toLowerCase()}</div>
+          {sheet && <TruckSheet id={sheet} onClose={() => setSheet('')} />}
+          <div id={`open-${s.id}`} onClick={() => setSheet(d.came?.load || carrying?.id || s.id)} className="text-sm font-bold text-slate-900 cursor-pointer underline decoration-dotted">{loadName(s.id)} · {d.qty} {shortItem(d.item)} {KIND_LABEL[d.kind].toLowerCase()} · {plain(d.decision.action).replace(/^\S+ /, '').toLowerCase()}</div>
           <div className="text-xs text-slate-500">{late && !d.came ? `Late: was due ${dayLabel(d.decision.dueAt)}` : `Due ${dayLabel(d.decision.dueAt)}`} · {route(s)}</div>
         </div>
       </div>
@@ -534,6 +586,7 @@ export function AccountantPanel({ mode = 'owner' }: { mode?: 'owner' | 'accounta
   const ready = state.drafts.filter((d: any) => d.status === 'pending').sort(importOrder);
   const packs = [...(state.packs || [])].reverse();
   const [showAll, setShowAll] = useState(false);
+  const [sheet, setSheet] = useState('');
   const [undoing, setUndoing] = useState<string | null>(null);
   const now = Date.now();
   const stamp = tallyDate(now);

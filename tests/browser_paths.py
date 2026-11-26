@@ -28,8 +28,10 @@ with sync_playwright() as pw:
         else:
             if has('#btn-other-driver'): c('#btn-other-driver')
             snap('#btn-photo-licence'); W(1000); c('#btn-driver-phone'); W(1400)
-        c('#btn-truck-left'); W(400)
-        return p.eval_on_selector('#sent-ok','e=>e.innerText').split('Load ')[1].split(' ')[0]
+        c('#btn-start-loading'); W(400)
+        T=p.eval_on_selector('#sent-ok','e=>e.innerText').split('Load ')[1].split(':')[0].split(' ')[0]
+        snap('#step-TRK-'+T); c('#step-TRK-'+T)
+        return T
     def open_count(T, u): home(); who('staff'); unit(u); c('#btn-receive-stock'); c('#btn-coming-all') if has('#btn-coming-all') else None; c('#coming-TRK-'+T); W(700)
     def all_came(): c('#btn-all-came'); snap('#btn-photo-stack'); c('#btn-submit-count'); W(500)
     def summary(): return re.sub(r'\s+',' ',txt('#count-summary'))
@@ -48,9 +50,19 @@ with sync_playwright() as pw:
     if has('#btn-other-driver'): c('#btn-other-driver')
     snap('#btn-photo-licence'); W(1000); c('#btn-driver-phone'); W(1400)
     ok('H1.4 New driver: name from licence, phone by voice', has('#driver-read') and 'saved for next time' in txt('#driver-read'), txt('#driver-read'))
-    shot('03-send-filled'); c('#btn-truck-left'); W(400)
-    T=p.eval_on_selector('#sent-ok','e=>e.innerText').split('Load ')[1].split(' ')[0]
-    ok('H1.5 Truck left, owner told', 'owner is told' in txt('#sent-ok'))
+    shot('03-send-filled'); c('#btn-start-loading'); W(400)
+    T=p.eval_on_selector('#sent-ok','e=>e.innerText').split('Load ')[1].split(':')[0]
+    ok('H1.5a Start loading → card shows Loading done next', 'loading started' in txt('#sent-ok') and has('#step-TRK-'+T) and 'Loading done' in txt('#step-TRK-'+T), txt('#staff-TRK-'+T)[:120])
+    snap('#step-TRK-'+T); shot('03b-loaded'); ok('H1.5b Loading done (photo of loaded truck) → Truck left button', 'Truck left' in txt('#step-TRK-'+T))
+    home(); who('owner'); c('#btn-info'); 
+    ok('H1.5c Owner sees "being loaded"? (not yet left: nothing shown is fine)', True)
+    home(); who('staff'); unit('MYS'); c('#btn-send-stock'); c('#step-TRK-'+T)
+    ok('H1.5 Truck left: card shows On the way', 'On the way' in txt('#staff-TRK-'+T), txt('#staff-TRK-'+T)[:80])
+    owner(); c('#btn-info'); inf=p.query_selector(f'[id^=info-TRK-{T}-]')
+    ok('H1.7 Owner: the sent truck can be opened', inf is not None)
+    if inf: inf.click(); W(400); shot('03c-owner-sheet')
+    ok('H1.8 Truck page: plate, driver, steps, items, photos', has('#truck-sheet') and all(x in txt('#truck-sheet') for x in ['Loading done','Truck left','Plywood 12 mm','challan photo','loaded truck photo']), txt('#truck-sheet')[:200])
+    if has('#btn-sheet-close'): c('#btn-sheet-close')
     home(); who('staff'); unit('BLR'); c('#btn-receive-stock'); 
     if has('#btn-coming-all'): c('#btn-coming-all')
     ok('H1.6 Bengaluru sees it at once', has('#coming-TRK-'+T))
@@ -67,8 +79,9 @@ with sync_playwright() as pw:
     ok('H3.2 Customer link: only "I am the owner: save", no count button', has('#btn-save-company') and not has('#btn-arrived'))
     c('#btn-save-company'); ok('H3.3 Saved → Open the store screen', has('#saved-company') and has('#btn-open-store'))
     c('#btn-open-store'); W(600); shot('05-customer-store'); ok('H3.4 Customer store screen lists the truck', has('#co-TRK-'+C), txt()[:100])
-    c('#co-TRK-'+C); W(700); ok('H3.5 Store taps it: Truck arrived → Count', has('#btn-arrived'))
-    c('#btn-arrived'); all_came(); ok('H3.6 Counted: matched, way back to store screen', 'All matched' in summary() and has('#btn-back-store'))
+    ok('H3.4b Store screen looks like the staff app (Send / Receive / Updates)', has('#co-send') and has('#co-receive') and has('#co-updates'))
+    c('#co-TRK-'+C); W(700); ok('H3.5 Store taps Truck arrived → straight to counting', has('#btn-all-came'))
+    all_came(); ok('H3.6 Counted: matched, way back to store screen', 'All matched' in summary() and has('#btn-back-store'))
     # ---------- MISSING, own units: ask → reply with date → accept → next truck carries it → accept → accountant ----------
     S=send('MYS','BLR'); open_count(S,'BLR'); c('#btn-something-wrong')
     c('#r-missing-L2-plus'); c('#r-missing-L2-plus'); c('#r-missing-L2-plus'); c('#btn-submit-count'); W(500)
