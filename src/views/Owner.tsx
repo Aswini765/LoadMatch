@@ -360,9 +360,10 @@ function PromiseCard({ d, s }: { d: any; s: any }) {
   const now = Date.now();
   const late = diffOverdue(d, now);
   const carrying = state.shipments.find((x: any) => !x.cancelledAt && (x.fulfils || []).includes(d.id) && !x.receipt);
-  const guess = !d.came && !carrying ? cameLater(state, d) : null;
-  const sender = s.flow === 'outbound' ? route(s).split(' → ')[0] : senderName(s);
   const delivers = ['unit_sends_rest', 'replace', 'send_rest', 'send_replacement'].includes(d.decision.action);
+  // only a promise of goods can arrive on a later truck (a transporter claim or a note cannot)
+  const guess = delivers && !d.came && !carrying ? cameLater(state, d) : null;
+  const sender = s.flow === 'outbound' ? route(s).split(' → ')[0] : senderName(s);
   const btn = 'px-3 py-2 rounded-lg text-xs font-bold cursor-pointer';
   const icon = d.came ? '📦' : carrying ? '🚚' : late ? '⏰' : '⏳';
   const [sheet, setSheet] = useState('');
