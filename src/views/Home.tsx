@@ -42,7 +42,6 @@ export default function Home({ go, who, pick, co }: { go: Go; who?: string; pick
             className="text-left bg-white border border-slate-200 hover:border-slate-400 rounded-xl p-4 shadow-2xs space-y-2 cursor-pointer transition-colors">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2"><Icon className="w-5 h-5 text-emerald-700" /><span className="font-bold text-slate-900">{title}</span></div>
-              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${n ? 'bg-amber-100 text-amber-900' : 'bg-slate-100 text-slate-500'}`}>{n} {nLabel}</span>
             </div>
             <div className="text-[11px] font-semibold text-slate-500">{who}</div>
             <div className="text-xs text-slate-700 leading-relaxed">{what}</div>
