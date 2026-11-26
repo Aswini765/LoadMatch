@@ -30,6 +30,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<any>(() => (sync.sharedMode ? buildInitialState() : initialLocal()));
   const lastId = useRef(0);
   const seeded = useRef(false);
+  // Shared mode: what the database has confirmed, plus this phone's taps still uploading, so every tap shows at once.
+  const server = useRef<any>(null);
+  if (sync.sharedMode && !server.current) server.current = buildInitialState();
+  const view = () => sync.outbox().reduce((acc: any, a: any) => reducer(acc, a), server.current);
   const [status, setStatus] = useState({ online: typeof navigator === 'undefined' ? true : navigator.onLine, pending: sync.outbox().length, lastSyncAt: null as number | null, error: null as string | null });
 
   const pull = useCallback(async () => {
@@ -40,8 +44,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (!evs.length && lastId.current === 0 && !seeded.current) { seeded.current = true; if (await sync.send({ type: 'RESET', at: Date.now(), actor: 'LoadMatch' })) return pull(); }
       if (evs.length) {
         lastId.current = evs.at(-1)!.id;
-        setState((s: any) => evs.reduce((acc, e) => reducer(acc, e.action), s));
+        server.current = evs.reduce((acc: any, e: any) => reducer(acc, e.action), server.current);
       }
+      setState(view());
       setStatus((x) => ({ ...x, pending: sync.outbox().length, lastSyncAt: Date.now(), error: null }));
     } catch (e: any) {
       setStatus((x) => ({ ...x, pending: sync.outbox().length, error: e?.message || 'Could not reach the shared database' }));
@@ -63,7 +68,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const stamped = { ...action, at: action.at || Date.now() };
     if (sync.sharedMode) {
       setStatus((x) => ({ ...x, pending: x.pending + 1 }));
-      sync.send(stamped).then(() => pull());
+      const sending = sync.send(stamped); // queued on this phone first
+      setState(view()); // show the tap now; the database confirms it a moment later
+      sending.then(() => pull());
     } else {
       if (stamped.type === 'RESET') sync.localClear(); // a reset starts a fresh log on this device
       sync.localAppend(stamped);
