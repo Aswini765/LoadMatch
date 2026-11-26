@@ -117,7 +117,8 @@ function Inbox({ go, initialId }: { go: Go; initialId?: string | null }) {
     // a customer on LoadMatch decides about their own count: we answer their question, then follow their decision
     if (s.coSaved && s.receipt && openDs.length) {
       if (s.coAsk && !s.coAsk.reply) rows.push({ kind: 'coask', at: s.coAsk.at, s, openDs });
-      else info.push({ id: s.id, at: s.coAsk?.reply?.at || s.receipt.at, icon: '⏳', title: `${loadName(s.id)} · ${qtyText(openDs)} · ${party(s.party).name} is deciding`, sub: s.coAsk?.reply ? `You answered: ${REPLIES[s.coAsk.reply.kind].label}` : `Counted by ${s.receipt.by}; they will ask you here` });
+      else if (s.coAsk?.reply) info.push({ id: s.id, at: s.coAsk.reply.at, icon: '⏳', title: `${loadName(s.id)} · ${qtyText(openDs)} · ${party(s.party).name} is deciding`, sub: `You answered: ${REPLIES[s.coAsk.reply.kind].label}` });
+      else info.push({ id: s.id, at: s.receipt.at, icon: '🔢', title: `${loadName(s.id)} · counted by ${party(s.party).name}`, sub: 'Their owner decides whether to send you the result' });
     } else if (s.receipt && openDs.length) rows.push({ kind: 'truck', at: s.ask?.reply?.at || s.receipt.at, s, openDs });
     else if (s.receipt && now - s.receipt.at < 24 * 3600000 && !ds.length) info.push({ id: s.id, at: s.receipt.at, icon: '✅', title: `${loadName(s.id)} · all matched`, sub: `${route(s)} · counted by ${s.receipt.by}` });
     for (const d of ds) {

@@ -310,6 +310,7 @@ function Done({ s, state, remote, lang, setLang, head, w }: { s: any; state: any
             );
           })}
         </div>}
+        {(() => { try { return sessionStorage.getItem('lm-as-store'); } catch { return null; } })() && <div id="co-owner-told" className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-950">🔔 Your owner is told now{matched ? '' : ' and decides whether to send it to the sender'}. <a id="btn-see-owner" href={`#/co/${sessionStorage.getItem('lm-as-store')}/owner`} className="font-bold underline">Demo: see it as the owner →</a></div>}
         {(() => { try { return sessionStorage.getItem('lm-as-store'); } catch { return null; } })() && <a id="btn-back-store" href={`#/co/${sessionStorage.getItem('lm-as-store')}/staff`} className="block text-sm font-bold text-emerald-800 underline">← {w('backStore')}</a>}
         <div className="text-[11px] text-slate-500 flex items-center"><Lock className="w-3.5 h-3.5 mr-1" />{w('lockedBy')} {s.receipt.by}, {when(s.receipt.at)}</div>
       </div>
@@ -361,6 +362,7 @@ function PartnerOwner({ partyId }: { partyId: string }) {
   const [more, setMore] = useState('');
   const [due, setDue] = useState<number | null>(null);
   const [pick, setPick] = useState('');
+  const [keep, setKeep] = useState('');
   const now = Date.now();
   const rows = coTrucks(state, partyId);
   const need = rows.filter((r: any) => r.needsOwner || (r.s.receipt && r.open.length && !r.s.coDecision));
@@ -393,8 +395,16 @@ function PartnerOwner({ partyId }: { partyId: string }) {
             </> : <>
               {s.coAsk && !reply && <div id={`co-asked-${s.id}`} className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-700">⏳ Asked {COMPANY.name} {when(s.coAsk.at, now)}.<span className="block">🤖 Assistant reminds them if there is no reply in 2 hours.</span></div>}
               {reply && <div id={`co-reply-${s.id}`} className="rounded-lg bg-sky-50 border border-sky-200 px-3 py-2 text-xs text-sky-950">💬 <b>{COMPANY.name}</b>, {when(reply.at, now)}: “{REPLIES[reply.kind].label}{reply.dueAt ? `, by ${dayLabel(reply.dueAt)}` : ''}”</div>}
-              {!s.coAsk && <button id={`co-ask-${s.id}`} onClick={() => dispatch({ type: 'CO_ASK', id: s.id, actor: me })} className={`${b} bg-slate-900 text-white`}>❓ Ask {COMPANY.name}</button>}
-              {!s.coAsk && <div className="text-[11px] text-slate-500 -mt-1">Their owner sees the question in LoadMatch and answers with one tap.</div>}
+              {!s.coAsk && <div id={`co-what-${s.id}`} className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-950 space-y-0.5">
+                <div className="font-bold">📋 Your store counted it: {coWhat(open)}</div>
+                {[...new Set(open.map((d: any) => d.item))].map((it: any) => <div key={it}>• {item(it)?.name.split(',')[0]}: {coWhat(open.filter((d: any) => d.item === it))}</div>)}
+                <div className="text-amber-800">Send it to {COMPANY.name}? They answer what happened, then you decide.</div>
+              </div>}
+              {!s.coAsk && <div className="grid grid-cols-2 gap-2">
+                <button id={`co-ask-${s.id}`} onClick={() => dispatch({ type: 'CO_ASK', id: s.id, actor: me })} className={`${b} bg-emerald-600 text-white`}>📨 Send to {COMPANY.name.split(' ')[0]}</button>
+                <button id={`co-keep-${s.id}`} onClick={() => setKeep(keep === s.id ? '' : s.id)} className={`${b} border-2 border-slate-300 bg-white text-slate-800`}>Don't send · we take it</button>
+              </div>}
+              {!s.coAsk && keep === s.id && <div className="rounded-lg border-2 border-rose-200 bg-rose-50 p-2 space-y-2 text-xs text-rose-950"><div>You take the {coWhat(open)} ({lakh(value)}) yourselves. {COMPANY.name} is not told.</div><button id={`co-keep-ok-${s.id}`} onClick={() => decide(s.id, 'accept')} className={`${b} bg-rose-600 text-white`}>Yes, don't send</button></div>}
               {reply && sug && <button id={`co-apply-${s.id}`} onClick={() => decide(s.id, sug, reply.dueAt || undefined)} className={`${b} bg-emerald-600 text-white`}>✓ {CO_ACTIONS[sug]}{sug === 'next_truck' && reply.dueAt ? ` · by ${dayLabel(reply.dueAt)}` : ''}</button>}
               {reply && !sug && <div className="text-xs text-slate-600">🤖 They say they loaded it all. Compare their loading photo with your stack photo, then choose below.</div>}
               {reply && <button id={`co-more-${s.id}`} onClick={() => { setMore(more === s.id ? '' : s.id); setPick(''); setDue(null); }} className="text-xs font-bold text-slate-500 underline cursor-pointer">{more === s.id ? '▲ Close' : '▼ Other options'}</button>}
