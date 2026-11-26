@@ -322,6 +322,16 @@ export function suggestFor(s: any, d: any): string | null {
   const a = d.cause === 'accident' ? 'claim' : m ? (m._ || (r ? m[r] : null)) : null;
   return a && opts.includes(a) && a !== 'investigate' ? a : null;
 }
+// what a customer's owner can decide about our truck
+export const CO_ACTIONS: Record<string, string> = {
+  next_truck: 'They send it in the next truck',
+  pay_less: 'We pay less (debit note to them)',
+  accept: 'We take the loss',
+};
+export function coSuggest(s: any): string | null {
+  const r = s.coAsk?.reply?.kind;
+  return r === 'send_next' ? 'next_truck' : r === 'transporter' ? 'pay_less' : null;
+}
 // the agent's check: a later truck on the same route brought the promised item
 export function cameLater(state: any, d: any) {
   const s = shipmentOf(state, d.shipmentId);
@@ -672,6 +682,44 @@ export function reducer(state: any, action: any): any {
       if (action.kind === 'send_next' && !(Number(action.dueAt) > at)) return state;
       const dueAt = action.kind === 'send_next' ? Number(action.dueAt) : null;
       return putShipment(state, audit({ ...s, ask: { ...s.ask, reply: { kind: action.kind, at, by, dueAt, note: action.note || '' } } }, at, by, 'SENDER_REPLIED', `${by}: ${REPLIES[action.kind].label}.`));
+    }
+
+    // ---------- a customer who uses LoadMatch too: their owner saves our truck, asks us, decides; we follow ----------
+    case 'CO_SAVE': {
+      const s = shipmentOf(state, action.id);
+      if (!s || s.flow !== 'outbound' || s.coSaved) return state;
+      return putShipment(state, audit({ ...s, coSaved: { at } }, at, actor, 'CO_SAVED', `${PARTIES[s.party]?.name} saved this truck to their LoadMatch.`));
+    }
+    case 'CO_ASK': {
+      const s = shipmentOf(state, action.id);
+      if (!s || !s.coSaved || !s.receipt || s.coAsk || !diffsOf(state, s.id).some((d: any) => d.status === 'open' || d.status === 'investigating')) return state;
+      return putShipment(state, audit({ ...s, coAsk: { at } }, at, actor, 'CO_ASKED', `${PARTIES[s.party]?.name} asked what happened.`));
+    }
+    case 'CO_REPLY': {
+      const s = shipmentOf(state, action.id);
+      if (!s || !s.coAsk || s.coAsk.reply || !REPLIES[action.kind] || actor !== 'Owner') return state;
+      if (action.kind === 'send_next' && !(Number(action.dueAt) > at)) return state;
+      return putShipment(state, audit({ ...s, coAsk: { ...s.coAsk, reply: { kind: action.kind, at, by: COMPANY.name, dueAt: action.kind === 'send_next' ? Number(action.dueAt) : null } } }, at, actor, 'CO_REPLIED', `Answered ${PARTIES[s.party]?.name}: ${REPLIES[action.kind].label}.`));
+    }
+    case 'CO_DECIDE': {
+      // their decision is also ours: next truck → we send the rest; they pay less → our credit note; they take the loss → closed
+      const s = shipmentOf(state, action.id);
+      if (!s || !s.coSaved || s.coDecision || !CO_ACTIONS[action.action]) return state;
+      const due = Number(action.dueAt) || at + 2 * 86400000;
+      if (action.action === 'next_truck' && !(due > at)) return state;
+      let next = putShipment(state, audit({ ...s, coDecision: { action: action.action, dueAt: action.action === 'next_truck' ? due : null, at, doneAt: null } }, at, actor, 'CO_DECIDED', `${PARTIES[s.party]?.name}: ${CO_ACTIONS[action.action]}.`));
+      for (const d of diffsOf(state, s.id).filter((x: any) => x.status === 'open' || x.status === 'investigating')) {
+        const ours = action.action === 'next_truck' ? (d.kind === 'damaged' ? 'send_replacement' : d.kind === 'short' ? 'send_rest' : 'bill_extra')
+          : action.action === 'pay_less' ? (d.kind === 'excess' ? 'bill_extra' : 'credit_note') : null;
+        if (ours && optionsFor(s, d).includes(ours)) next = reducer(next, { type: 'DECIDE', diffId: d.id, action: ours, dueAt: ACTIONS[ours].due ? due : undefined, confirm: true, note: `${PARTIES[s.party]?.name} decided: ${CO_ACTIONS[action.action]}`, at, actor: 'Owner' });
+        else if (!ours) next = putDiff(next, { ...diffOf(next, d.id), status: 'settled', settledAt: at, history: [...d.history, { at, by: PARTIES[s.party]?.name, text: 'The customer took the loss.' }] });
+      }
+      return next;
+    }
+    case 'CO_DONE': {
+      const s = shipmentOf(state, action.id);
+      if (!s || !s.coDecision || s.coDecision.doneAt) return state;
+      return putShipment(state, { ...s, coDecision: { ...s.coDecision, doneAt: at } });
     }
 
     // A promise was not kept (the rest did not come): back to the owner to choose again

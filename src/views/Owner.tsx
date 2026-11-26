@@ -114,7 +114,11 @@ function Inbox({ go, initialId }: { go: Go; initialId?: string | null }) {
     if (s.cancelledAt) continue;
     const ds = diffsOf(state, s.id);
     const openDs = ds.filter((d: any) => d.status === 'open' || d.status === 'investigating');
-    if (s.receipt && openDs.length) rows.push({ kind: 'truck', at: s.ask?.reply?.at || s.receipt.at, s, openDs });
+    // a customer on LoadMatch decides about their own count: we answer their question, then follow their decision
+    if (s.coSaved && s.receipt && openDs.length) {
+      if (s.coAsk && !s.coAsk.reply) rows.push({ kind: 'coask', at: s.coAsk.at, s, openDs });
+      else info.push({ id: s.id, at: s.coAsk?.reply?.at || s.receipt.at, icon: '⏳', title: `${loadName(s.id)} · ${qtyText(openDs)} · ${party(s.party).name} is deciding`, sub: s.coAsk?.reply ? `You answered: ${REPLIES[s.coAsk.reply.kind].label}` : `Counted by ${s.receipt.by}; they will ask you here` });
+    } else if (s.receipt && openDs.length) rows.push({ kind: 'truck', at: s.ask?.reply?.at || s.receipt.at, s, openDs });
     else if (s.receipt && now - s.receipt.at < 24 * 3600000 && !ds.length) info.push({ id: s.id, at: s.receipt.at, icon: '✅', title: `${loadName(s.id)} · all matched`, sub: `${route(s)} · counted by ${s.receipt.by}` });
     for (const d of ds) {
       if (d.status === 'waiting') rows.push({ kind: 'promise', at: diffOverdue(d, now) ? d.decision.dueAt : d.decision.at, s, d });
@@ -143,6 +147,7 @@ function Inbox({ go, initialId }: { go: Go; initialId?: string | null }) {
       {shown.map((x) => {
         if (x.kind === 'truck') return <TruckCard key={x.s.id} s={x.s} ds={x.openDs} startOpen={Boolean(initialId && (initialId === x.s.id || x.openDs.some((d: any) => d.id === initialId)))} />;
         if (x.kind === 'promise') return <PromiseCard key={x.d.id} d={x.d} s={x.s} />;
+        if (x.kind === 'coask') return <CoAskCard key={x.s.id} s={x.s} ds={x.openDs} />;
         if (x.kind === 'link') return (
           <div key={x.s.id} id={`row-link-${x.s.id}`} className="bg-white border border-slate-200 border-l-4 border-l-violet-500 rounded-xl p-3 flex items-center gap-3">
             <span className="text-2xl">🚚</span>
@@ -220,6 +225,34 @@ export function TruckSheet({ id, onClose }: { id: string; onClose: () => void })
         {photos.length > 0 && <div className="flex flex-wrap gap-3">{photos.map((ph, k) => <div key={k} className="text-[10px] text-slate-600 text-center space-y-1"><Sample kind={ph.shot} text={ph.shot === 'challan' ? s.ref : s.truckNo} /><div>{ph.label}</div></div>)}</div>}
         {(s.fulfils || []).length > 0 && <div className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">📦 Also carries goods owed from {(s.fulfils || []).map((d: string) => loadName(diffOf(state, d)?.shipmentId || '')).join(', ')}.</div>}
       </div>
+    </div>
+  );
+}
+
+// A customer who uses LoadMatch asks us what happened. Our answer goes to their owner, who decides; we follow it.
+function CoAskCard({ s, ds }: { s: any; ds: any[] }) {
+  const { dispatch } = useStore();
+  const [next, setNext] = useState(false);
+  const [due, setDue] = useState<number | null>(null);
+  const [sheet, setSheet] = useState(false);
+  const who = party(s.party).name;
+  const answer = (kind: string, dueAt?: number) => dispatch({ type: 'CO_REPLY', id: s.id, kind, dueAt, actor: 'Owner' });
+  const b = 'w-full min-h-[44px] rounded-xl text-sm font-bold cursor-pointer px-3';
+  return (
+    <div id={`coask-${s.id}`} className="bg-white border border-slate-200 border-l-4 border-l-sky-500 rounded-xl p-3 space-y-2.5">
+      {sheet && <TruckSheet id={s.id} onClose={() => setSheet(false)} />}
+      <div className="flex items-start gap-3">
+        <span className="text-2xl leading-none">❓</span>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-bold text-slate-900">{who} asks: what happened?</div>
+          <button id={`open-${s.id}`} onClick={() => setSheet(true)} className="text-left text-xs text-slate-700 underline decoration-dotted cursor-pointer">{loadName(s.id)} · {qtyText(ds)} · {inrL(ds.reduce((a: number, d: any) => a + d.value, 0))} · {route(s)} ›</button>
+          <div className="text-xs text-slate-500">Counted by {s.receipt.by} · asked {when(s.coAsk.at)}. Their owner decides after your answer; we follow it.</div>
+        </div>
+      </div>
+      {!next ? Object.keys(REPLIES).map((k) => <button key={k} id={`coreply-${s.id}-${k}`} onClick={() => (k === 'send_next' ? setNext(true) : answer(k))} className={`${b} text-left border-2 border-slate-200 bg-white text-slate-900 flex items-center gap-2`}><span className="text-lg">{REPLIES[k].icon}</span>{REPLIES[k].label}</button>)
+        : <div className="space-y-2"><div className="text-xs font-bold text-slate-700">📦 When will you send it?</div><DateChips id={`codue-${s.id}`} value={due} onPick={setDue} />
+            <button id={`coreply-send-${s.id}`} disabled={!due} onClick={() => answer('send_next', due!)} className={`${b} bg-emerald-600 text-white disabled:opacity-40`}>📨 Send answer to {who}</button>
+            <button onClick={() => setNext(false)} className="text-xs font-bold text-slate-500 underline cursor-pointer">← Back</button></div>}
     </div>
   );
 }

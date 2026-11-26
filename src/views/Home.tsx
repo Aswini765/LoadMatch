@@ -3,9 +3,12 @@ import { Truck, PackageCheck, Scale, Calculator, FileCode, ArrowRight, BarChart3
 import { useStore, shipmentStatus, receiptOverdue, countedByUs, atGate } from '../store.tsx';
 import { COMPANY } from '../data/seed.ts';
 import type { Go } from './ui.tsx';
+import { PARTIES } from '../data/seed.ts';
+import { coCounts } from './Receive.tsx';
 
-export default function Home({ go, who, pick }: { go: Go; who?: string; pick?: (w: string) => void }) {
+export default function Home({ go, who, pick, co }: { go: Go; who?: string; pick?: (w: string) => void; co?: string }) {
   const { state } = useStore();
+  const cc = co ? coCounts(state, co) : null;
   const now = Date.now();
   const st = state.shipments.map((s: any) => shipmentStatus(state, s));
   const loading = st.filter((x: string) => x === 'LOADING').length;
@@ -15,11 +18,11 @@ export default function Home({ go, who, pick }: { go: Go; who?: string; pick?: (
   const drafts = state.drafts.filter((d: any) => d.status === 'pending').length;
   const firstLink = state.shipments.find((s: any) => s.sentAt && !s.receipt && !s.cancelledAt && !atGate(s.flow));
 
-  const toCount = state.shipments.filter((s: any) => !s.receipt && !s.cancelledAt && countedByUs(s) && (s.flow !== 'transfer' || s.sentAt)).length;
+  const toCount = cc ? cc.staff : state.shipments.filter((s: any) => !s.receipt && !s.cancelledAt && countedByUs(s) && (s.flow !== 'transfer' || s.sentAt)).length;
   const roles = [
     { id: 'staff', icon: Truck, title: 'Staff', who: 'One person at each unit', what: 'Never types. Sends a truck with two photos (challan and number plate). Counts what arrives with “All came” or “Something is wrong” (tap or speak). Answers the owner’s question with one tap.', n: toCount + loading, nLabel: late ? `to load or count · ${late} late` : 'to load or count' },
-    { id: 'owner', icon: Scale, title: 'Owner', who: 'Sees everything, decides', what: 'One card per truck with a difference: ask the sender, read their answer, tap the one suggested step. An assistant chases replies and late promises.', n: decide, nLabel: 'to decide' },
-    { id: 'accountant', icon: Calculator, title: 'Accountant', who: 'Does the paperwork', what: 'Gets a to-do list from the owner\'s decisions: debit note to a supplier, credit note or bill for a customer. Ticks each one when done in Tally. Also gets the report and one Tally file.', n: state.drafts.filter((d: any) => d.status === 'pending' && d.diffId).length, nLabel: 'to do' },
+    { id: 'owner', icon: Scale, title: 'Owner', who: 'Sees everything, decides', what: 'One card per truck with a difference: ask the sender, read their answer, tap the one suggested step. An assistant chases replies and late promises.', n: cc ? cc.owner : decide, nLabel: 'to decide' },
+    { id: 'accountant', icon: Calculator, title: 'Accountant', who: 'Does the paperwork', what: 'Gets a to-do list from the owner\'s decisions: debit note to a supplier, credit note or bill for a customer. Ticks each one when done in Tally. Also gets the report and one Tally file.', n: cc ? cc.accountant : state.drafts.filter((d: any) => d.status === 'pending' && d.diffId).length, nLabel: 'to do' },
   ];
 
 
@@ -29,13 +32,13 @@ export default function Home({ go, who, pick }: { go: Go; who?: string; pick?: (
         <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">LoadMatch</div>
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-950">What was sent. What arrived. What's missing.</h1>
         <p className="text-sm text-slate-600 max-w-3xl">Three people use it. <b>Staff</b> at each unit send trucks and count what arrives, with taps, photos and voice in their own language, no typing. The app compares sent and received and shows the <b>Owner</b> only what is missing, damaged or extra. The <b>Accountant</b> gets the paperwork as a to-do list. Customers and suppliers need no app: they get a WhatsApp link.</p>
-        <div className="text-xs text-slate-500">Demo: {COMPANY.name}, {COMPANY.city} · two units, two suppliers, two customers</div>
+        <div className="text-xs text-slate-500">{co ? `${PARTIES[co]?.name} · trucks from ${COMPANY.name} come in from a WhatsApp link` : `Demo: ${COMPANY.name}, ${COMPANY.city} · two units, two suppliers, two customers`}</div>
       </div>
 
       <div className="text-sm font-bold text-slate-900">Who uses LoadMatch? Tap who you are to start.</div>
       <div className="grid sm:grid-cols-3 gap-4">
         {roles.map(({ id, icon: Icon, title, who, what, n, nLabel }) => (
-          <button key={title} id={`home-${title.toLowerCase()}`} onClick={() => (pick ? pick(id) : go(id))}
+          <button key={title} id={`home-${title.toLowerCase()}`} onClick={() => (co ? (window.location.hash = `#/co/${co}/${id}`) : pick ? pick(id) : go(id))}
             className="text-left bg-white border border-slate-200 hover:border-slate-400 rounded-xl p-4 shadow-2xs space-y-2 cursor-pointer transition-colors">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2"><Icon className="w-5 h-5 text-emerald-700" /><span className="font-bold text-slate-900">{title}</span></div>
@@ -47,7 +50,7 @@ export default function Home({ go, who, pick }: { go: Go; who?: string; pick?: (
           </button>
         ))}
       </div>
-      <div id="home-setup" className="bg-white border border-dashed border-slate-300 rounded-xl p-4 sm:p-5 space-y-2">
+      {!co && <><div id="home-setup" className="bg-white border border-dashed border-slate-300 rounded-xl p-4 sm:p-5 space-y-2">
         <div className="flex items-center gap-2">
           <Settings2 className="w-5 h-5 text-emerald-700" />
           <span className="font-bold text-slate-900">Set up for your company</span>
@@ -61,7 +64,7 @@ export default function Home({ go, who, pick }: { go: Go; who?: string; pick?: (
         </ol>
         <div className="text-[11px] text-slate-500">This demo runs with sample data from a plywood business.</div>
       </div>
-      <button onClick={() => go('reports')} className="w-full bg-white border border-slate-200 rounded-xl p-3 text-xs font-bold text-slate-700 flex items-center justify-center cursor-pointer hover:bg-slate-50"><BarChart3 className="w-4 h-4 mr-1.5" />Reports: match rate, time to count, lost vs recovered</button>
+      <button onClick={() => go('reports')} className="w-full bg-white border border-slate-200 rounded-xl p-3 text-xs font-bold text-slate-700 flex items-center justify-center cursor-pointer hover:bg-slate-50"><BarChart3 className="w-4 h-4 mr-1.5" />Reports: match rate, time to count, lost vs recovered</button></>}
     </div>
   );
 }

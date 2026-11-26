@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Mic, MicOff, Camera, Lock, CheckCircle2, AlertTriangle, Minus, Plus, ChevronLeft, ChevronRight, MessageCircle, PackageCheck, Warehouse, ArrowRight, Wrench } from 'lucide-react';
-import { useStore, item, party, route, shipmentOf, diffsOf, shipmentStatus, receiverPath, countBackPath, unpackLoad, unpackCount, reducer, countedByUs, atGate, jobworkOpen, loadName, FLOW_LABEL, REPLIES, ACTIONS } from '../store.tsx';
+import { useStore, item, party, route, shipmentOf, diffsOf, shipmentStatus, receiverPath, countBackPath, unpackLoad, unpackCount, reducer, countedByUs, atGate, jobworkOpen, loadName, FLOW_LABEL, REPLIES, ACTIONS, CO_ACTIONS, coSuggest } from '../store.tsx';
+import Home from './Home.tsx';
 import { Stepper } from './Staff.tsx';
 import { TruckSheet } from './Owner.tsx';
 import { CameraButton, DateChips, dayLabel } from './sim.tsx';
@@ -186,7 +187,7 @@ export default function Receive({ id, token, payload }: { id: string; token: str
             <div className="text-sm text-sky-900">{from}</div>
             <div className="text-xs text-slate-600">{w('whenHere')}</div>
           </div>
-          {!staff && !savedCo && <button id="btn-save-company" onClick={() => { saveToCompany(s, window.location.hash); setSavedCo(true); }} className="w-full min-h-[56px] rounded-2xl bg-slate-900 text-white text-base font-bold cursor-pointer">🏢 {w('iAmOwner')}</button>}
+          {!staff && !savedCo && <button id="btn-save-company" onClick={() => { saveToCompany(s, window.location.hash, store.dispatch); setSavedCo(true); }} className="w-full min-h-[56px] rounded-2xl bg-slate-900 text-white text-base font-bold cursor-pointer">🏢 {w('iAmOwner')}</button>}
           {!staff && !savedCo && <div className="text-[11px] text-slate-500 text-center">{party(s.party)?.name}</div>}
           {savedCo && <div id="saved-company" className="rounded-xl border-2 border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-950">✅ {w('savedCo')}</div>}
           {savedCo && <a id="btn-open-store" href={`#/co/${s.party}/home`} className="w-full min-h-[52px] rounded-2xl bg-emerald-600 text-white text-base font-bold flex items-center justify-center">📦 {w('openApp')} →</a>}
@@ -316,91 +317,131 @@ function Done({ s, state, remote, lang, setLang, head, w }: { s: any; state: any
   );
 }
 
-// ---------- a customer's owner saved our truck into their company: their store sees it and counts it ----------
+// ---------- a customer who uses LoadMatch too ----------
+// Their owner saves our truck from the WhatsApp link; from then on it lives in their LoadMatch: Home, Staff, Owner, Accountant.
 const coKey = (partyId: string) => `lm-co-${partyId}`;
-export function savedTrucks(partyId: string): any[] { try { return JSON.parse(localStorage.getItem(coKey(partyId)) || '[]'); } catch { return []; } }
-function saveToCompany(s: any, hash: string) {
-  const list = savedTrucks(s.party).filter((x: any) => x.id !== s.id);
-  try { localStorage.setItem(coKey(s.party), JSON.stringify([{ id: s.id, hash, from: `${COMPANY.name}, ${route(s).split(' → ')[0].replace(' unit', '')}`, plate: s.truckNo, at: Date.now() }, ...list])); } catch { /* ignore */ }
+function savedLocal(partyId: string): any[] { try { return JSON.parse(localStorage.getItem(coKey(partyId)) || '[]'); } catch { return []; } }
+function saveToCompany(s: any, hash: string, dispatch: (a: any) => void) {
+  dispatch({ type: 'CO_SAVE', id: s.id, actor: `Owner, ${party(s.party)?.name}` });
+  try { localStorage.setItem(coKey(s.party), JSON.stringify([{ id: s.id, hash }, ...savedLocal(s.party).filter((x: any) => x.id !== s.id)])); } catch { /* ignore */ }
 }
-// ---------- the customer's own LoadMatch: the same Home, Staff and Owner as ours, for the trucks their owner saved ----------
-export function PartnerApp({ partyId, tab }: { partyId: string; tab: string }) {
-  return tab === 'staff' ? <PartnerStore partyId={partyId} /> : tab === 'owner' ? <PartnerOwner partyId={partyId} /> : <PartnerHome partyId={partyId} />;
+// the trucks this customer saved, newest first, with what the customer sees about each
+export function coTrucks(state: any, partyId: string) {
+  return state.shipments.filter((s: any) => s.flow === 'outbound' && s.party === partyId && s.coSaved && !s.cancelledAt)
+    .map((s: any) => {
+      const ds = diffsOf(state, s.id);
+      const open = ds.filter((d: any) => d.status === 'open' || d.status === 'investigating');
+      const owed = s.coDecision?.action === 'next_truck' ? ds.filter((d: any) => d.status === 'waiting') : [];
+      const came = owed.filter((d: any) => d.came);
+      const needsOwner = Boolean(s.receipt && open.length && !s.coDecision && (!s.coAsk || s.coAsk.reply)) || came.length > 0;
+      const todo = Boolean(s.coDecision && ['pay_less', 'accept'].includes(s.coDecision.action) && !s.coDecision.doneAt);
+      return { s, ds, open, owed, came, needsOwner, todo, at: s.coAsk?.reply?.at || s.receipt?.at || s.sentAt || s.coSaved.at };
+    }).sort((x: any, y: any) => y.at - x.at);
 }
-
-const partnerRows = (state: any, partyId: string) => savedTrucks(partyId).map((x: any) => {
-  const s = shipmentOf(state, x.id);
-  const tok = x.hash.split('/')[3];
-  const remote = (() => { try { return JSON.parse(localStorage.getItem(remoteKey(x.id, tok)) || 'null'); } catch { return null; } })();
-  const receipt = s?.receipt || remote;
-  const ds = s ? diffsOf(state, s.id) : [];
-  return { x, s, receipt, ds };
-});
-
-function PartnerHome({ partyId }: { partyId: string }) {
-  const { state } = useStore();
-  const p = party(partyId);
-  const rows = partnerRows(state, partyId);
-  const toCount = rows.filter((r) => !r.receipt).length;
-  const news = rows.filter((r) => r.receipt).length;
-  const roles = [
-    { id: 'staff', icon: '📦', title: 'Staff', who: 'One person at the store', what: 'Sees the trucks coming in, taps the one that arrived and counts it: All came, or Something is wrong (tap or speak). Sends trucks with photos, no typing.', n: toCount, nLabel: 'to count' },
-    { id: 'owner', icon: '🏢', title: 'Owner', who: 'Sees everything', what: 'Saves trucks that suppliers send on WhatsApp, sees every count, and sees what the supplier decided when something was missing or damaged.', n: news, nLabel: 'counted' },
-  ];
-  return (
-    <div className="space-y-4">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-950">What was sent. What arrived. What's missing.</h1>
-        <p className="text-sm text-slate-600">{p?.name} uses LoadMatch too. Trucks from {COMPANY.name} come in from a WhatsApp link: the owner saves them, the store counts them, and both owners see the same result.</p>
-      </div>
-      <div className="grid sm:grid-cols-2 gap-3">
-        {roles.map((r) => (
-          <a key={r.id} id={`co-home-${r.id}`} href={`#/co/${partyId}/${r.id}`} className="block rounded-xl border border-slate-200 bg-white p-4 space-y-2 hover:border-slate-400">
-            <div className="flex items-center justify-between"><span className="text-lg font-bold text-slate-900">{r.icon} {r.title}</span>{r.n > 0 && <span className="rounded-full bg-amber-100 text-amber-900 text-xs font-bold px-2 py-0.5">{r.n} {r.nLabel}</span>}</div>
-            <div className="text-xs font-bold text-slate-500">{r.who}</div>
-            <div className="text-sm text-slate-700">{r.what}</div>
-            <div className="text-sm font-bold text-emerald-700">Open →</div>
-          </a>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-const SUPPLIER_PLAIN: Record<string, string> = {
-  send_rest: 'They send the rest in the next truck', send_replacement: 'They send a good one in the next truck',
-  credit_note: 'You pay less (they give a credit note)', bill_extra: 'They bill you for the extra', claim: 'Their transporter pays',
-  write_off: 'They take the loss', investigate: 'They are checking it',
+export const coCounts = (state: any, partyId: string) => {
+  const t = coTrucks(state, partyId);
+  return { staff: t.filter((x: any) => !x.s.receipt).length, owner: t.filter((x: any) => x.needsOwner).length, accountant: t.filter((x: any) => x.todo).length };
 };
+const coFrom = (s: any) => `${COMPANY.name}, ${route(s).split(' → ')[0].replace(' unit', '')}`;
+const coWhat = (ds: any[]) => [['short', 'missing'], ['damaged', 'damaged'], ['excess', 'extra']].map(([k, w]) => { const n = ds.filter((d: any) => d.kind === k).reduce((a: number, d: any) => a + d.qty, 0); return n ? `${n} ${w}` : ''; }).filter(Boolean).join(', ');
+const lakh = (n: number) => (n >= 100000 ? `₹${(n / 100000).toFixed(2).replace(/\.?0+$/, '')} L` : `₹${Math.round(n).toLocaleString('en-IN')}`);
+
+export function PartnerApp({ partyId, tab }: { partyId: string; tab: string }) {
+  if (tab === 'staff') return <PartnerStore partyId={partyId} />;
+  if (tab === 'owner') return <PartnerOwner partyId={partyId} />;
+  if (tab === 'accountant') return <PartnerAccountant partyId={partyId} />;
+  return <Home go={() => {}} co={partyId} />;
+}
+
+// Their Owner: the same card as ours. Difference → ask the sender (us) → our answer → one suggested step → their accountant.
 function PartnerOwner({ partyId }: { partyId: string }) {
-  const { state } = useStore();
+  const { state, dispatch } = useStore();
   const [all, setAll] = useState(false);
   const [sheet, setSheet] = useState('');
-  const rows = partnerRows(state, partyId).map((r) => {
-    const sender = `${COMPANY.name}`;
-    if (!r.receipt) return { ...r, at: r.x.at, icon: '🚚', tone: 'border-l-sky-500', title: `${loadName(r.x.id)} from ${sender} is on the way`, sub: `Truck ${r.x.plate} · your store counts it when it arrives`, status: '' };
-    const what = r.ds.length ? [['short', 'missing'], ['damaged', 'damaged'], ['excess', 'extra']].map(([k, w]) => { const n = r.ds.filter((d: any) => d.kind === k).reduce((a: number, d: any) => a + d.qty, 0); return n ? `${n} ${w}` : ''; }).filter(Boolean).join(', ') : '';
-    const st = r.ds.map((d: any) => d.came ? `Came in ${loadName(d.came.load)}` : d.decision ? `${SUPPLIER_PLAIN[d.decision.action] || ACTIONS_LABEL(d.decision.action)}${d.decision.dueAt ? ` · by ${dayLabel(d.decision.dueAt)}` : ''}` : `${sender}'s owner is told; waiting for their answer`);
-    return { ...r, at: r.receipt.at, icon: what ? '⚠️' : '✅', tone: what ? 'border-l-amber-500' : 'border-l-emerald-500', title: what ? `${loadName(r.x.id)} · ${what}` : `${loadName(r.x.id)} · all matched`, sub: `From ${r.x.from} · counted by ${r.receipt.by} · ${when(r.receipt.at)}`, status: [...new Set(st)].join(' · ') };
-  }).sort((a: any, b: any) => b.at - a.at);
-  const shown = all ? rows : rows.slice(0, 3);
+  const [more, setMore] = useState('');
+  const [due, setDue] = useState<number | null>(null);
+  const [pick, setPick] = useState('');
+  const now = Date.now();
+  const rows = coTrucks(state, partyId);
+  const need = rows.filter((r: any) => r.needsOwner || (r.s.receipt && r.open.length && !r.s.coDecision));
+  const info = rows.filter((r: any) => !need.includes(r));
+  const shown = all ? need : need.slice(0, 3);
+  const me = `Owner, ${party(partyId)?.name}`;
+  const b = 'w-full min-h-[44px] rounded-xl text-sm font-bold cursor-pointer flex items-center justify-center px-3';
+  const decide = (id: string, action: string, dueAt?: number) => { dispatch({ type: 'CO_DECIDE', id, action, dueAt, actor: me }); setMore(''); setPick(''); };
   return (
-    <div className="space-y-3">
-      <div><h1 className="text-2xl font-bold text-slate-950">Owner</h1><p className="text-sm text-slate-600">Trucks from your suppliers: what came, what did not, and what they decided.</p></div>
-      <div className="text-lg font-bold text-slate-950">{rows.length ? `${rows.length} truck${rows.length === 1 ? '' : 's'}` : 'No trucks yet'}</div>
+    <div className="space-y-4 max-w-5xl mx-auto">
+      <div><h1 className="text-2xl font-bold text-slate-950">Owner</h1><p className="text-sm text-slate-600">You see only what is missing, damaged or extra, and what your suppliers answer.</p></div>
+      <div className="flex items-baseline justify-between"><div className="text-lg font-bold text-slate-950">{need.length ? `${need.length} need${need.length === 1 ? 's' : ''} you` : 'All clear ✓'}</div><div className="text-xs text-slate-500">Newest first</div></div>
       {!rows.length && <Note tone="go">When a supplier sends you a LoadMatch link on WhatsApp, tap “I am the owner: save it to my company”. The truck shows here and at your store.</Note>}
-      {shown.map((r: any) => (
-        <button key={r.x.id} id={`co-own-${r.x.id}`} onClick={() => r.s && setSheet(r.x.id)} className={`w-full text-left bg-white border border-slate-200 border-l-4 ${r.tone} rounded-xl p-3 flex items-start gap-3 cursor-pointer`}>
-          <span className="text-2xl leading-none">{r.icon}</span>
-          <span className="flex-1 min-w-0"><span className="block text-sm font-bold text-slate-900 underline decoration-dotted">{r.title} ›</span><span className="block text-xs text-slate-500">{r.sub}</span>{r.status && <span className="block mt-1.5 rounded-lg bg-sky-50 border border-sky-200 px-3 py-1.5 text-xs text-sky-950">💬 {r.status}</span>}</span>
-        </button>
-      ))}
-      {rows.length > 3 && <button id="co-show-all" onClick={() => setAll(!all)} className="w-full min-h-[40px] rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-700 cursor-pointer">{all ? '▲ Show only 3' : `▼ Show ${rows.length - 3} more`}</button>}
+      {shown.map(({ s, open, came, owed }: any) => {
+        const value = open.reduce((a: number, d: any) => a + d.value, 0);
+        const reply = s.coAsk?.reply;
+        const sug = coSuggest(s);
+        return (
+          <div key={s.id} id={`co-own-${s.id}`} className={`bg-white border border-slate-200 border-l-4 ${came.length ? 'border-l-emerald-500' : 'border-l-amber-500'} rounded-xl p-3 space-y-2.5`}>
+            <div className="flex items-start gap-3">
+              <span className="text-2xl leading-none">{came.length ? '📦' : '⚠️'}</span>
+              <div className="flex-1 min-w-0">
+                <button id={`co-open-${s.id}`} onClick={() => setSheet(s.id)} className="text-left text-sm font-bold text-slate-900 underline decoration-dotted cursor-pointer">{loadName(s.id)} · {coWhat(came.length ? owed : open)}{!came.length && <span className="text-rose-700"> · {lakh(value)}</span>} ›</button>
+                <div className="text-xs text-slate-500">From {coFrom(s)} · counted by {s.receipt.by} · {when(s.receipt.at, now)}</div>
+              </div>
+            </div>
+            {came.length > 0 ? <>
+              <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-700">📦 {COMPANY.name} sent them in {loadName(came[0].came.load)}. {came[0].came.by} counted them: all there.</div>
+              <button id={`co-accept-${s.id}`} onClick={() => came.forEach((d: any) => dispatch({ type: 'SETTLE', diffId: d.id, note: `Customer accepted: came in ${loadName(d.came.load)}`, actor: 'Owner' }))} className={`${b} bg-emerald-600 text-white`}>✓ Accept: it came</button>
+            </> : <>
+              {s.coAsk && !reply && <div id={`co-asked-${s.id}`} className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-700">⏳ Asked {COMPANY.name} {when(s.coAsk.at, now)}.<span className="block">🤖 Assistant reminds them if there is no reply in 2 hours.</span></div>}
+              {reply && <div id={`co-reply-${s.id}`} className="rounded-lg bg-sky-50 border border-sky-200 px-3 py-2 text-xs text-sky-950">💬 <b>{COMPANY.name}</b>, {when(reply.at, now)}: “{REPLIES[reply.kind].label}{reply.dueAt ? `, by ${dayLabel(reply.dueAt)}` : ''}”</div>}
+              {!s.coAsk && <button id={`co-ask-${s.id}`} onClick={() => dispatch({ type: 'CO_ASK', id: s.id, actor: me })} className={`${b} bg-slate-900 text-white`}>❓ Ask {COMPANY.name}</button>}
+              {!s.coAsk && <div className="text-[11px] text-slate-500 -mt-1">Their owner sees the question in LoadMatch and answers with one tap.</div>}
+              {reply && sug && <button id={`co-apply-${s.id}`} onClick={() => decide(s.id, sug, reply.dueAt || undefined)} className={`${b} bg-emerald-600 text-white`}>✓ {CO_ACTIONS[sug]}{sug === 'next_truck' && reply.dueAt ? ` · by ${dayLabel(reply.dueAt)}` : ''}</button>}
+              {reply && !sug && <div className="text-xs text-slate-600">🤖 They say they loaded it all. Compare their loading photo with your stack photo, then choose below.</div>}
+              {reply && <button id={`co-more-${s.id}`} onClick={() => { setMore(more === s.id ? '' : s.id); setPick(''); setDue(null); }} className="text-xs font-bold text-slate-500 underline cursor-pointer">{more === s.id ? '▲ Close' : '▼ Other options'}</button>}
+              {more === s.id && <div id={`co-opts-${s.id}`} className="space-y-1.5 border-t border-slate-100 pt-2">
+                {Object.keys(CO_ACTIONS).map((a) => <button key={a} id={`co-opt-${s.id}-${a}`} onClick={() => (a === 'next_truck' ? (setPick(a), setDue(null)) : decide(s.id, a))} className={`w-full text-left rounded-lg border-2 px-3 py-2 text-xs font-bold cursor-pointer ${pick === a ? 'border-slate-900 bg-slate-50' : 'border-slate-200 bg-white'}`}>{a === 'next_truck' ? '📦 ' : a === 'pay_less' ? '🧾 ' : '❌ '}{CO_ACTIONS[a]}{a !== 'next_truck' ? ` · ${lakh(value)}` : ''}</button>)}
+                {pick === 'next_truck' && <div className="space-y-2"><DateChips id={`co-due-${s.id}`} value={due} onPick={setDue} /><button id={`co-opt-ok-${s.id}`} disabled={!due} onClick={() => decide(s.id, 'next_truck', due!)} className={`${b} bg-emerald-600 text-white disabled:opacity-40`}>✓ {CO_ACTIONS.next_truck}</button></div>}
+              </div>}
+            </>}
+          </div>
+        );
+      })}
+      {need.length > 3 && <button id="co-show-all" onClick={() => setAll(!all)} className="w-full min-h-[40px] rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-700 cursor-pointer">{all ? '▲ Show only 3' : `▼ Show ${need.length - 3} more`}</button>}
+      {info.length > 0 && <div className="space-y-1">
+        <div className="text-xs font-bold text-slate-500 pt-1">Also, nothing to do</div>
+        {info.slice(0, 5).map(({ s, open, owed }: any) => {
+          const t = !s.receipt ? `🚚 ${loadName(s.id)} from ${coFrom(s)} is on the way` : !diffsOf(state, s.id).length ? `✅ ${loadName(s.id)} · all matched` : s.coDecision ? `🧾 ${loadName(s.id)} · decided: ${CO_ACTIONS[s.coDecision.action]}${s.coDecision.dueAt ? ` by ${dayLabel(s.coDecision.dueAt)}` : ''}${owed.length && !owed.some((d: any) => d.came) ? ' · waiting for the truck' : ''}` : `⏳ ${loadName(s.id)} · ${coWhat(open)} · waiting for ${COMPANY.name}'s answer`;
+          return <button key={s.id} id={`co-own-${s.id}`} onClick={() => setSheet(s.id)} className="w-full text-left bg-white border border-slate-200 hover:border-slate-400 rounded-lg px-3 py-2 text-xs flex items-center gap-2 cursor-pointer"><span className="flex-1"><b className="text-slate-800">{t}</b><span className="block text-slate-500">{when(s.coDecision?.at || s.receipt?.at || s.sentAt)}</span></span><span className="text-slate-400 font-bold">›</span></button>;
+        })}
+      </div>}
       {sheet && <TruckSheet id={sheet} onClose={() => setSheet('')} />}
     </div>
   );
 }
-const ACTIONS_LABEL = (a: string) => ACTIONS[a]?.label || a;
+
+// Their Accountant: the same to-do list as ours, from their owner's decisions
+function PartnerAccountant({ partyId }: { partyId: string }) {
+  const { state, dispatch } = useStore();
+  const rows = coTrucks(state, partyId).filter((r: any) => r.s.coDecision && ['pay_less', 'accept'].includes(r.s.coDecision.action));
+  return (
+    <div className="space-y-4 max-w-5xl mx-auto">
+      <div><h1 className="text-2xl font-bold text-slate-950">Accountant</h1><p className="text-sm text-slate-600">What the owner decided, to enter in Tally. Tick each one when it is done.</p></div>
+      <div className="text-lg font-bold text-slate-950">To do · {rows.filter((r: any) => !r.s.coDecision.doneAt).length}</div>
+      {!rows.length && <Note tone="go">Nothing to enter. When the owner decides that a supplier pays for missing goods, it shows here.</Note>}
+      {rows.map(({ s, ds }: any) => {
+        const v = ds.filter((d: any) => d.kind !== 'excess').reduce((a: number, d: any) => a + d.value, 0);
+        const done = s.coDecision.doneAt;
+        return (
+          <div key={s.id} id={`co-acc-${s.id}`} className={`bg-white border border-slate-200 border-l-4 ${done ? 'border-l-emerald-500' : 'border-l-violet-500'} rounded-xl p-3 flex items-center gap-3`}>
+            <span className="text-2xl">{done ? '✅' : '🧾'}</span>
+            <div className="flex-1 min-w-0"><div className="text-sm font-bold text-slate-900">{s.coDecision.action === 'pay_less' ? `Debit note to ${COMPANY.name}` : 'Write off (we take the loss)'} · {lakh(v)}</div><div className="text-xs text-slate-500">{loadName(s.id)} · their bill {s.ref} · {coWhat(ds)} · decided {when(s.coDecision.at)}</div></div>
+            {done ? <span className="text-xs font-bold text-emerald-700">Done in Tally</span> : <button id={`co-acc-done-${s.id}`} onClick={() => dispatch({ type: 'CO_DONE', id: s.id, actor: 'Accountant' })} className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold cursor-pointer">Done in Tally</button>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export function PartnerStore({ partyId }: { partyId: string }) {
   const { state } = useStore();
@@ -408,8 +449,8 @@ export function PartnerStore({ partyId }: { partyId: string }) {
   const setLang = (l: string) => { setLangState(l); saveLang(l); };
   const [open, setOpen] = useState<'' | 'send' | 'receive'>('receive');
   const p = party(partyId);
-  const list = savedTrucks(partyId);
-  const doneOf = (x: any) => shipmentOf(state, x.id)?.receipt || (() => { try { const tok = x.hash.split('/')[3]; return JSON.parse(localStorage.getItem(remoteKey(x.id, tok)) || 'null'); } catch { return null; } })();
+  const list = coTrucks(state, partyId).map(({ s }: any) => ({ id: s.id, hash: receiverPath(s, state.settings), from: coFrom(s), plate: s.truckNo, at: s.coSaved.at }));
+  const doneOf = (x: any) => shipmentOf(state, x.id)?.receipt;
   const coming = list.filter((x: any) => !doneOf(x));
   const counted = list.filter((x: any) => doneOf(x));
   const go = (x: any, arrive: boolean) => { try { sessionStorage.setItem('lm-as-store', partyId); if (arrive) sessionStorage.setItem('lm-arrive-now', x.id); } catch { /* ignore */ } window.location.hash = x.hash; };

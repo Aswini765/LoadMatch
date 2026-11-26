@@ -7,7 +7,7 @@ import Staff from './views/Staff.tsx';
 import Masters from './views/Masters.tsx';
 import Accountant from './views/Accountant.tsx';
 import Dispatch from './views/Dispatch.tsx';
-import Receive, { ReceiveTab, CountBack, SenderReply, PartnerApp } from './views/Receive.tsx';
+import Receive, { ReceiveTab, CountBack, SenderReply, PartnerApp, coCounts } from './views/Receive.tsx';
 import Owner, { EvidenceView } from './views/Owner.tsx';
 import { useStore, receiptOverdue, countedByUs, atGate, shipmentOf, unpackLoad } from './store.tsx';
 import { PARTIES } from './data/seed.ts';
@@ -59,7 +59,7 @@ const toTop = () => { window.scrollTo(0, 0); document.getElementById('main-topba
 // Links shared on WhatsApp open one screen directly: #/r/<truck>/<token>/<load> (receiver), #/c/<truck>/<token>/<count> (count back to sender), #/e/<diff>/<token> (evidence)
 function useHashRoute() {
   const read = () => {
-    const co = window.location.hash.match(/^#\/co\/([^/?#]+)(?:\/(home|staff|owner))?/);
+    const co = window.location.hash.match(/^#\/co\/([^/?#]+)(?:\/(home|staff|owner|accountant))?/);
     if (co) return { kind: 'co', id: co[1], token: co[2] || 'home', payload: '' };
     const m = window.location.hash.match(/^#\/(r|e|c|a)\/([^/]+)\/([^/?#]+)(?:\/([^/?#]+))?/);
     // "counting as the customer's store" lasts only while moving between their store screen and a count
@@ -91,7 +91,9 @@ export default function App() {
   const linkShip = link?.kind === 'r' ? (shipmentOf(appState, link.id) || (link.payload ? unpackLoad(link.id, link.token, link.payload)?.shipment : null)) : null;
   const partner = link?.kind === 'co' ? link.id : linkShip?.flow === 'outbound' ? linkShip.party : '';
   const ptab = link?.kind === 'co' ? link.token : asStore ? 'staff' : 'owner';
-  const pTabs: [string, string][] = [['home', 'Home'], ['staff', 'Staff'], ['owner', 'Owner']];
+  const pTabs: [string, string][] = [['home', 'Home'], ['staff', 'Staff'], ['owner', 'Owner'], ['accountant', 'Accountant']];
+  const pc = partner ? coCounts(appState, partner) : null;
+  const pBadge = (id: string) => { const n = pc ? (pc as any)[id] : 0; return n ? <span className={`ml-1.5 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full text-[10px] font-bold text-white ${id === 'owner' ? 'bg-amber-500' : id === 'staff' ? 'bg-rose-500' : 'bg-violet-500'}`}>{n}</span> : null; };
   const pGo = (t: string) => { window.location.hash = `#/co/${partner}/${t}`; setMobileOpen(false); toTop(); };
   const bare = Boolean(link) && !who && !partner;
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -127,12 +129,12 @@ export default function App() {
             </div>
           </div>
           {partner && <nav id="partner-nav" className="hidden sm:flex items-center space-x-1">
-            {pTabs.map(([id, label]) => <button key={id} id={`role-btn-${id}`} onClick={() => pGo(id)} className={`inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-md cursor-pointer ${ptab === id ? 'text-slate-950 bg-slate-100 font-bold' : 'text-slate-600 hover:text-slate-950 hover:bg-slate-50'}`}>{label}</button>)}
+            {pTabs.map(([id, label]) => <button key={id} id={`role-btn-${id}`} onClick={() => pGo(id)} className={`inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-md cursor-pointer ${ptab === id ? 'text-slate-950 bg-slate-100 font-bold' : 'text-slate-600 hover:text-slate-950 hover:bg-slate-50'}`}>{label}{pBadge(id)}</button>)}
           </nav>}
           {partner && <div className="flex items-center space-x-3 shrink-0 text-xs">
             <div className="hidden md:flex items-center space-x-1.5 text-slate-600 bg-slate-50 border border-slate-200/80 px-2.5 py-1 rounded-md"><MapPin className="w-3 h-3 text-slate-400" /><span className="font-medium text-slate-800">{PARTIES[partner]?.name}</span><span className="text-slate-300">•</span><span className="text-slate-500 font-normal">Demo Environment</span></div>
             <SyncChip />
-            {ptab !== 'home' && <span className="text-slate-700 font-semibold px-2 py-1 rounded-md bg-emerald-50 border border-emerald-200">You: {ptab === 'staff' ? 'Staff' : 'Owner'}</span>}
+            {ptab !== 'home' && <span className="text-slate-700 font-semibold px-2 py-1 rounded-md bg-emerald-50 border border-emerald-200">You: {ptab[0].toUpperCase() + ptab.slice(1)}</span>}
           </div>}
           {!bare && !partner && <nav id="role-switcher-nav" className="hidden sm:flex items-center space-x-1" aria-label="Application Role Switcher">
             {roles.map(([id, label]) => (
@@ -166,7 +168,7 @@ export default function App() {
         {mobileOpen && partner && (
           <div className="sm:hidden bg-white border-b border-slate-200 px-4 py-2 space-y-1 shadow-xs z-20">
             <div className="px-3 py-1 text-[11px] font-bold text-slate-500">{PARTIES[partner]?.name}</div>
-            {pTabs.map(([id, label]) => <button key={id} id={`m-role-${id}`} onClick={() => pGo(id)} className={`block w-full text-left px-3 py-2 text-xs font-semibold rounded-md cursor-pointer ${ptab === id ? 'text-slate-950 bg-slate-100 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>{label}</button>)}
+            {pTabs.map(([id, label]) => <button key={id} id={`m-role-${id}`} onClick={() => pGo(id)} className={`block w-full text-left px-3 py-2 text-xs font-semibold rounded-md cursor-pointer ${ptab === id ? 'text-slate-950 bg-slate-100 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>{label}{pBadge(id)}</button>)}
           </div>
         )}
         {mobileOpen && !bare && !partner && (
