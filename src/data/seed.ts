@@ -131,7 +131,7 @@ export function makeSeed(anchor: number) {
   ev.push({ type: 'SEND_TO_RECEIVER', id: 'TRK-1022', token: 'demo22k', at: at(-19), actor: 'Ramesh (staff)' });
   ev.push({ type: 'SUBMIT_RECEIPT', id: 'TRK-1022', token: 'demo22k', by: 'Ravi', at: at(-14), actor: 'Receiver', lines: { L1: { counted: 54, damaged: 0 }, L2: { counted: 40, damaged: 0 } }, photos: ['stack.jpg'] });
   ev.push({ type: 'ASK_SENDER', id: 'TRK-1022', token: 'ask22k', at: at(-13), actor: 'Owner' });
-  ev.push({ type: 'SENDER_REPLY', id: 'TRK-1022', kind: 'send_next', by: 'Ramesh', at: at(-2), actor: 'Ramesh (staff)' });
+  ev.push({ type: 'SENDER_REPLY', id: 'TRK-1022', kind: 'send_next', dueAt: at(30), by: 'Ramesh', at: at(-2), actor: 'Ramesh (staff)' });
 
   // TRK-1016: transfer that left 3 hours ago, still on the road
   ev.push({ type: 'CREATE_SHIPMENT', id: 'TRK-1016', parentId: 'TRK-1014', flow: 'transfer', fromUnit: 'MYS', toUnit: 'BLR', truckNo: 'KA 09 B 4471', ref: 'DC-0419', driver: 'Prakash', driverPhone: '9886054321', at: at(-4), actor: 'Dispatch staff', lines: [{ item: 'PLY-12', qty: 80 }, { item: 'PLY-18', qty: 45 }] });

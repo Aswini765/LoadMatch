@@ -70,6 +70,7 @@ export const DRAFT_LABEL: Record<string, string> = {
   debit_note: 'Debit Note',
   credit_note: 'Credit Note',
   sales_invoice: 'Sales Invoice',
+  match_note: 'Note on the first bill',
 };
 
 export const DRAFT_PLAIN: Record<string, string> = {
@@ -79,6 +80,7 @@ export const DRAFT_PLAIN: Record<string, string> = {
   debit_note: 'Supplier to be paid less',
   credit_note: 'Customer to be charged less',
   sales_invoice: 'Extra charged to the customer',
+  match_note: 'Late goods came: note it on the first bill',
 };
 
 export const item = (code: string) => ITEMS[code];
@@ -617,7 +619,7 @@ export function reducer(state: any, action: any): any {
         if (!d || d.status !== 'waiting') continue;
         const good = s.lines.filter((l: any) => l.item === d.item).reduce((a: number, l: any) => a + counts[l.id].counted - counts[l.id].damaged, 0);
         next = putDiff(next, good >= d.qty
-          ? { ...d, status: 'settled', settledAt: at, history: [...d.history, { at, by: 'LoadMatch', text: `Arrived on ${loadName(s.id)}: ${good} good, counted by ${receipt.by}. Closed.` }] }
+          ? { ...d, came: { load: s.id, good, at, by: receipt.by }, history: [...d.history, { at, by: 'LoadMatch', text: `Arrived on ${loadName(s.id)}: ${good} good, counted by ${receipt.by}. Waiting for the owner to accept.` }] }
           : { ...d, history: [...d.history, { at, by: 'LoadMatch', text: `Only ${good} of ${d.qty} arrived on ${loadName(s.id)}. Still waiting.` }] });
       }
       if (s.flow === 'inbound') {
@@ -646,7 +648,13 @@ export function reducer(state: any, action: any): any {
     case 'SETTLE': {
       const d = diffOf(state, action.diffId);
       if (!d || d.status !== 'waiting') return state;
-      return putDiff(state, { ...d, status: 'settled', settledAt: at, history: [...d.history, { at, by: actor, text: `Done${action.note ? `: ${action.note}` : ''}` }] });
+      let next = putDiff(state, { ...d, status: 'settled', settledAt: at, history: [...d.history, { at, by: actor, text: `Done${action.note ? `: ${action.note}` : ''}` }] });
+      // the owed goods came on a later load: the accountant ties that load to the first bill (no new stock entry)
+      const s = shipmentOf(state, d.shipmentId);
+      const via = d.came && shipmentOf(state, d.came.load);
+      if (via) next = addDraft(next, { type: 'match_note', purpose: 'decision', createdAt: at, shipmentId: s.id, diffId: d.id, party: s.party || null,
+        narration: `${d.qty} ${ITEMS[d.item].unit} ${ITEMS[d.item].name} missing from ${loadName(s.id)} (${s.ref}) came on ${loadName(via.id)} (${via.ref}). Note it against the first bill; no new bill or payment.` });
+      return next;
     }
 
     case 'ASK_SENDER': {
@@ -661,7 +669,9 @@ export function reducer(state: any, action: any): any {
       if (!s || !s.ask || s.ask.reply || !REPLIES[action.kind]) return state;
       if (action.token !== undefined && action.token !== s.ask.token) return state;
       const by = String(action.by || actor).trim();
-      return putShipment(state, audit({ ...s, ask: { ...s.ask, reply: { kind: action.kind, at, by, note: action.note || '' } } }, at, by, 'SENDER_REPLIED', `${by}: ${REPLIES[action.kind].label}.`));
+      if (action.kind === 'send_next' && !(Number(action.dueAt) > at)) return state;
+      const dueAt = action.kind === 'send_next' ? Number(action.dueAt) : null;
+      return putShipment(state, audit({ ...s, ask: { ...s.ask, reply: { kind: action.kind, at, by, dueAt, note: action.note || '' } } }, at, by, 'SENDER_REPLIED', `${by}: ${REPLIES[action.kind].label}.`));
     }
 
     // A promise was not kept (the rest did not come): back to the owner to choose again
@@ -725,7 +735,7 @@ export function reducer(state: any, action: any): any {
 }
 
 // Tally import order: stock journals first, then receipt notes, then party vouchers
-const TYPE_ORDER: Record<string, number> = { stock_journal: 0, branch_invoice: 1, receipt_note: 1, debit_note: 2, credit_note: 2, sales_invoice: 2 };
+const TYPE_ORDER: Record<string, number> = { stock_journal: 0, branch_invoice: 1, receipt_note: 1, debit_note: 2, credit_note: 2, sales_invoice: 2, match_note: 3 };
 export const importOrder = (a: any, b: any) => TYPE_ORDER[a.type] - TYPE_ORDER[b.type] || a.createdAt - b.createdAt;
 
 export function buildInitialState(anchor = Date.now()): any {

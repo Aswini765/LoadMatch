@@ -10,6 +10,7 @@ const qty = (q: number, code: string) => ` ${q} ${esc(ITEMS[code].unit)}`;
 // Goods in Transit, ...) must match the company's own masters: import into a test company first.
 // No VOUCHERNUMBER: Tally numbers vouchers in its own series.
 function voucherBody(d: any) {
+  if (d.type === 'match_note') return ''; // a note for the accountant, not a voucher
   const date = tallyDate(d.approvedAt || d.createdAt);
   let body = '';
   if (d.type === 'stock_journal') {

@@ -6,10 +6,11 @@ const SOPS: [string, string[]][] = [
     'Staff: one person at each unit. Sends and receives trucks. Never types: taps, photos and voice.',
     'Owner: one card per truck that needs a decision, with one suggested next step.',
     'Accountant: a to-do list of debit notes, credit notes and bills from the owner\'s decisions.',
-    'Customers and suppliers need no app: they get a WhatsApp link. Their owner can save the truck to their own company.',
+    'Customers and suppliers need no app: their owner gets a WhatsApp link, saves the truck to their company, and their store counts it from their own store screen.',
   ]],
   ['1 · Staff: send a truck', [
-    'Tap 📤 Send → choose where (🏭 our unit or 🏪 customer) → 📷 photo of the challan (items and numbers are read from it; fix with − +) → 📷 photo of the number plate (truck no. read, driver remembered) → 🚚 Truck left.',
+    'Tap 📤 Send → choose where (🏭 our unit or 🏪 customer) → 📷 photo of the challan (items and numbers are read from it; fix with − +) → 📷 photo of the number plate → 🧑‍✈️ driver: same as last time with this truck, or 📷 photo of the licence + 🎤 he says his phone number → 🚚 Truck left.',
+    'If we owe the receiver goods (missing last time), the send screen offers “Add what we owe”, ticked. That truck is marked as carrying them.',
     'Our other unit sees the truck at once under “Coming to you”. For a customer, the owner sends the count link.',
   ]],
   ['2 · Staff: receive a truck', [
@@ -19,12 +20,14 @@ const SOPS: [string, string[]][] = [
     'The result is one line. The driver writes the shortage on the lorry receipt and signs.',
   ]],
   ['3 · Staff: answer the owner', [
-    'When the owner asks “what happened?” about a truck you sent, tap one answer: left here (next truck), we loaded it all, or lost on the road.',
+    'When the owner asks “what happened?” about a truck you sent, tap one answer: left here (then tap the day you will send it), we loaded it all, or lost on the road.',
     '🔔 Updates shows the latest three. Problem with a truck (new truck, came back, accident)? Tap “Problem? Ask owner” on its card.',
   ]],
   ['4 · Owner: one card per truck', [
-    'Difference found → ❓ Ask the sender (our unit answers in the app; a supplier answers from a WhatsApp link).',
-    'Their answer comes back on the card with ONE suggested step, e.g. “Sending unit sends it in the next truck, by Sat”. Tap it. Other options are one tap away.',
+    'Difference found → ❓ Ask the sender. Our unit answers in the app. A supplier\'s owner answers from a WhatsApp link that only their owner can open (code to the owner\'s phone), owner to owner.',
+    'Their answer, with their own date, comes back with ONE suggested step, e.g. “Our unit sends it in the next truck · by Sun 29 Nov”. Other options: plain choices (next truck, transporter pays, supplier pays, we take the loss).',
+    'When the truck carrying the owed goods is counted, the card says so: ✓ Accept. The accountant then notes it on the first bill.',
+    'Only 3 things show at a time; “Show more” for the rest.',
     '🤖 The assistant reminds a sender who has not replied, watches the next trucks for promised goods, and reminds them when a promise is late.',
     'Extra goods and accidents get a suggestion straight away. Anything that costs money goes to the accountant.',
     'Staff requests: Yes or No, with a note. Things with nothing to do are under “Also today”.',

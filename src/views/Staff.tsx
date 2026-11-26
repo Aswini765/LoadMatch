@@ -5,6 +5,7 @@ import { getUnit, setUnit, setMeName, me } from '../lib/who.ts';
 import { PhoneFrame, savedLang, saveLang, newToken } from './ui.tsx';
 import { when } from '../lib/format.ts';
 import type { Go } from './ui.tsx';
+import { CameraButton, DateChips } from './sim.tsx';
 
 // Staff screen, made for people who read little and do not type: pictures, big buttons, photos and voice,
 // one next step per truck, their language.
@@ -56,6 +57,21 @@ const W: Record<string, Record<L, string>> = {
   send_next: { en: 'Left here. Will send in the next truck', hi: 'यहीं रह गया। अगली गाड़ी में भेजेंगे', kn: 'ಇಲ್ಲೇ ಉಳಿದಿದೆ. ಮುಂದಿನ ಲಾರಿಯಲ್ಲಿ ಕಳುಹಿಸುತ್ತೇವೆ', te: 'ఇక్కడే ఉండిపోయింది. తదుపరి లారీలో పంపుతాం' },
   sent_full: { en: 'We loaded it all (loading photo)', hi: 'हमने पूरा लोड किया (लोडिंग फोटो)', kn: 'ನಾವು ಎಲ್ಲಾ ಲೋಡ್ ಮಾಡಿದೆವು (ಫೋಟೋ)', te: 'మేము అంతా లోడ్ చేశాం (ఫోటో)' },
   transporter: { en: 'Lost or broken on the road', hi: 'रास्ते में खोया या टूटा', kn: 'ದಾರಿಯಲ್ಲಿ ಕಳೆದುಹೋಯಿತು ಅಥವಾ ಮುರಿಯಿತು', te: 'దారిలో పోయింది లేదా పగిలింది' },
+  owedAdd: { en: 'Add what we owe', hi: 'बकाया माल जोड़ें', kn: 'ಬಾಕಿ ಸರಕು ಸೇರಿಸಿ', te: 'బాకీ సరుకు చేర్చండి' },
+  owedWhy: { en: 'missing last time', hi: 'पिछली बार कम था', kn: 'ಹಿಂದಿನ ಬಾರಿ ಕಡಿಮೆ', te: 'గతసారి తక్కువ' },
+  owedIncl: { en: 'incl. owed', hi: 'बकाया सहित', kn: 'ಬಾಕಿ ಸೇರಿ', te: 'బాకీ కలిపి' },
+  whoDrives: { en: 'Who is driving?', hi: 'ड्राइवर कौन है?', kn: 'ಚಾಲಕ ಯಾರು?', te: 'డ్రైవర్ ఎవరు?' },
+  sameDriver: { en: 'same as last time', hi: 'पिछली बार वाला', kn: 'ಹಿಂದಿನವರೇ', te: 'గతసారి వారే' },
+  otherDriver: { en: 'Another driver', hi: 'दूसरा ड्राइवर', kn: 'ಬೇರೆ ಚಾಲಕ', te: 'వేరే డ్రైవర్' },
+  photoLicence: { en: "Photo of driver's licence", hi: 'ड्राइविंग लाइसेंस की फोटो', kn: 'ಚಾಲನಾ ಪರವಾನಗಿ ಫೋಟೋ', te: 'డ్రైవింగ్ లైసెన్స్ ఫోటో' },
+  licenceRead: { en: 'Name read from the licence', hi: 'लाइसेंस से नाम पढ़ा', kn: 'ಪರವಾನಗಿಯಿಂದ ಹೆಸರು ಓದಿದೆ', te: 'లైసెన్స్ నుండి పేరు చదివింది' },
+  sayPhone: { en: 'Driver says his phone number', hi: 'ड्राइवर अपना नंबर बोले', kn: 'ಚಾಲಕ ತನ್ನ ನಂಬರ್ ಹೇಳಲಿ', te: 'డ్రైవర్ తన నంబర్ చెప్పాలి' },
+  listening: { en: 'Listening…', hi: 'सुन रहे हैं…', kn: 'ಕೇಳುತ್ತಿದೆ…', te: 'వింటోంది…' },
+  newSaved: { en: 'saved for next time', hi: 'अगली बार के लिए सेव', kn: 'ಮುಂದಿನ ಬಾರಿಗೆ ಉಳಿಸಲಾಗಿದೆ', te: 'తదుపరి కోసం సేవ్' },
+  change: { en: 'Change', hi: 'बदलें', kn: 'ಬದಲಿಸಿ', te: 'మార్చండి' },
+  when: { en: 'When will it go?', hi: 'कब भेजेंगे?', kn: 'ಯಾವಾಗ ಕಳುಹಿಸುತ್ತೀರಿ?', te: 'ఎప్పుడు పంపుతారు?' },
+  sendReply: { en: 'Send answer', hi: 'जवाब भेजें', kn: 'ಉತ್ತರ ಕಳುಹಿಸಿ', te: 'సమాధానం పంపండి' },
+  more: { en: 'more', hi: 'और', kn: 'ಇನ್ನಷ್ಟು', te: 'మరిన్ని' },
   missing: { en: 'missing', hi: 'कम', kn: 'ಕಡಿಮೆ', te: 'తక్కువ' },
   damaged: { en: 'damaged', hi: 'खराब', kn: 'ಹಾಳು', te: 'పాడైనవి' },
   extra: { en: 'extra', hi: 'ज़्यादा', kn: 'ಹೆಚ್ಚು', te: 'ఎక్కువ' },
@@ -95,6 +111,9 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
   const [showOld, setShowOld] = useState(false);
   const [allNews, setAllNews] = useState(false);
   const [justSent, setJustSent] = useState<string | null>(null);
+  const [replyNext, setReplyNext] = useState('');
+  const [replyDue, setReplyDue] = useState<number | null>(null);
+  const [allComing, setAllComing] = useState(false);
   const pickUnit = (u: string) => { setUnit(u); setU(u); };
   setMeName(staffName(state));
 
@@ -104,7 +123,7 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
   // trucks coming to this unit: our other unit's trucks show as soon as they leave; supplier trucks the owner expects; goods coming back after an accident
   const receiving = live.filter((s: any) => (s.returning ? s.fromUnit === unit : s.toUnit === unit && countedByUs(s) && (s.flow !== 'transfer' || s.sentAt)));
   const old = state.shipments.filter((s: any) => (open === 'send' ? s.fromUnit === unit : open === 'receive' ? s.toUnit === unit : s.fromUnit === unit || s.toUnit === unit) && (s.receipt || s.cancelledAt))
-    .sort((a: any, b: any) => (b.receipt?.at || b.cancelledAt) - (a.receipt?.at || a.cancelledAt)).slice(0, 10);
+    .sort((a: any, b: any) => (b.receipt?.at || b.cancelledAt) - (a.receipt?.at || a.cancelledAt)).slice(0, 3);
   // the owner asked this unit what happened to a truck it sent
   const asks = state.shipments.filter((s: any) => s.ask && !s.ask.reply && senderIsUs(s) && s.fromUnit === unit);
 
@@ -116,8 +135,14 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
     const id = `TRK-${1000 + state.counters.trk + 1}`;
     const plate = `KA ${unit === 'MYS' ? '19 D' : '09 B'} ${1000 + Math.floor(Math.random() * 9000)}`;
     const ref = `${unit === 'MYS' ? 'PO' : 'DC'}-${100 + Math.floor(Math.random() * 900)}`;
+    // a supplier who promised the rest sends it with this demo truck, so "it came" can be shown
+    const covered = (d: any) => state.shipments.some((y: any) => !y.cancelledAt && (y.fulfils || []).includes(d.id));
+    const owedIn = state.diffs.find((d: any) => d.status === 'waiting' && !d.came && d.decision?.action === 'replace' && !covered(d) && state.shipments.find((x: any) => x.id === d.shipmentId)?.toUnit === 'MYS');
     if (unit === 'MYS') {
-      dispatch({ type: 'CREATE_SHIPMENT', id, flow: 'inbound', toUnit: 'MYS', party: 'coastal', truckNo: plate, ref, expectedOn: Date.now(), lines: [{ item: 'OKU-AB-91', qty: 200 }, { item: 'BRP-1136', qty: 150 }], actor: 'Owner' });
+      const sup = owedIn ? state.shipments.find((x: any) => x.id === owedIn.shipmentId).party : 'coastal';
+      const base = [{ item: 'OKU-AB-91', qty: 200 }, { item: 'BRP-1136', qty: 150 }];
+      const lines = owedIn ? (base.some((x) => x.item === owedIn.item) ? base.map((x) => (x.item === owedIn.item ? { ...x, qty: x.qty + owedIn.qty } : x)) : [...base, { item: owedIn.item, qty: owedIn.qty }]) : base;
+      dispatch({ type: 'CREATE_SHIPMENT', id, flow: 'inbound', toUnit: 'MYS', party: sup, truckNo: plate, ref, expectedOn: Date.now(), lines, fulfils: owedIn ? [owedIn.id] : [], actor: 'Owner' });
       dispatch({ type: 'SEND_TO_RECEIVER', id, token: newToken(), actor: 'Owner' });
     } else {
       dispatch({ type: 'CREATE_SHIPMENT', id, flow: 'transfer', fromUnit: 'MYS', toUnit: unit, truckNo: plate, ref, driver: 'Manju', driverPhone: '9845012345', lines: [{ item: 'PLY-12', qty: 80 }, { item: 'PLY-18', qty: 45 }], actor: 'Ramesh (staff)' });
@@ -182,7 +207,11 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
             <div className="text-base font-bold text-amber-950">❓ {w('ownerAsks')}</div>
             <div className="text-sm text-amber-950">{foundX(route(s).split(' → ')[1], whatText(diffsOf(state, s.id).filter((d: any) => d.status === 'open' || d.status === 'investigating'), w), loadName(s.id), l)}</div>
             <div className="text-xs text-slate-600">{[...new Set(diffsOf(state, s.id).filter((d: any) => d.status === 'open' || d.status === 'investigating').map((d: any) => d.item))].map((it: any) => `${itemIcon(it)} ${shortName(it)}`).join(' · ')}</div>
-            {Object.keys(REPLIES).map((k) => <button key={k} id={`reply-${s.id}-${k}`} onClick={() => dispatch({ type: 'SENDER_REPLY', id: s.id, kind: k, by: staffName(state), actor: me() })} className="w-full min-h-[48px] rounded-xl border-2 border-amber-300 bg-white px-3 text-left text-sm font-bold text-slate-900 cursor-pointer flex items-center gap-2"><span className="text-xl">{REPLIES[k].icon}</span>{w(k)}</button>)}
+            {replyNext !== s.id ? Object.keys(REPLIES).map((k) => <button key={k} id={`reply-${s.id}-${k}`} onClick={() => (k === 'send_next' ? (setReplyNext(s.id), setReplyDue(null)) : dispatch({ type: 'SENDER_REPLY', id: s.id, kind: k, by: staffName(state), actor: me() }))} className="w-full min-h-[48px] rounded-xl border-2 border-amber-300 bg-white px-3 text-left text-sm font-bold text-slate-900 cursor-pointer flex items-center gap-2"><span className="text-xl">{REPLIES[k].icon}</span>{w(k)}</button>)
+              : <div className="space-y-2"><div className="text-sm font-bold text-slate-900">📦 {w('send_next')} · {w('when')}</div>
+                  <DateChips id={`due-${s.id}`} value={replyDue} onPick={setReplyDue} />
+                  <button id={`reply-send-${s.id}`} disabled={!replyDue} onClick={() => { dispatch({ type: 'SENDER_REPLY', id: s.id, kind: 'send_next', dueAt: replyDue, by: staffName(state), actor: me() }); setReplyNext(''); }} className={`${big} bg-emerald-600 text-white disabled:opacity-40`}>📨 {w('sendReply')}</button>
+                  <button onClick={() => setReplyNext('')} className="text-xs font-bold text-slate-500 underline cursor-pointer">← {w('back')}</button></div>}
           </div>
         ))}
 
@@ -204,7 +233,7 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
           {justSent && <div id="sent-ok" className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-3 text-base font-bold text-emerald-900">✅ {loadName(justSent)} {w('sentOk')}</div>}
           <SendTruck key={justSent || 'new'} unit={unit} w={w} onSent={(id) => setJustSent(id)} />
           {sending.length > 0 && <div className="text-sm font-bold text-slate-900 pt-1">📤 {w('myTrucks')}</div>}
-          {sending.map((s: any) => {
+          {sending.slice(0, 3).map((s: any) => {
             const [, to] = route(s).split(' → ');
             return (
               <div key={s.id} id={`staff-${s.id}`} className={`rounded-2xl border-2 p-3 space-y-2 ${s.id === justSent ? 'border-emerald-400 bg-emerald-50/40' : 'border-violet-200 bg-white'}`}>
@@ -227,7 +256,7 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
         {open !== 'send' && <div id="coming" className="rounded-2xl border-2 border-sky-300 bg-sky-50 p-3 space-y-2">
           <div className="text-base font-bold text-sky-950">🚚 {w('comingToday')} · {receiving.length}</div>
           {!receiving.length && <div className="text-sm text-sky-900">{w('noneComing')}</div>}
-          {receiving.map((s: any) => {
+          {(allComing ? receiving : receiving.slice(0, 3)).map((s: any) => {
             const [from] = route(s).split(' → ');
             return (
               <button key={s.id} id={`coming-${s.id}`} onClick={() => { if (!s.arrivedAt && s.sentAt) dispatch({ type: 'ARRIVED', id: s.id, by: me(), actor: me() }); count(s); }} className="w-full text-left rounded-xl bg-white border-2 border-sky-200 hover:border-sky-500 p-3 space-y-2 cursor-pointer block">
@@ -243,14 +272,15 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
               </button>
             );
           })}
+          {receiving.length > 3 && <button id="btn-coming-all" onClick={() => setAllComing(!allComing)} className="text-xs font-bold text-sky-800 underline cursor-pointer">{allComing ? '−' : `+${receiving.length - 3} ${w('more')}`}</button>}
           {open === 'receive' && <AskAdd what="delivery" label={w('notInList')} />}
         </div>}
 
         <div id="updates" className="space-y-1.5">
           <div className="text-sm font-bold text-slate-900">🔔 {w('updates')}</div>
           {!updates.length && <div className="text-xs text-slate-500">{w('noNews')}</div>}
-          {(allNews ? updates.slice(0, 10) : updates.slice(0, 3)).map((n, i) => <div key={i} className={`rounded-xl border px-3 py-2 text-sm flex items-start gap-2 ${n.tone}`}><span className="text-lg leading-none">{n.icon}</span><span className="flex-1">{n.text}<span className="block text-[11px] text-slate-500">{when(n.at)}</span></span></div>)}
-          {updates.length > 3 && <button id="btn-news-all" onClick={() => setAllNews(!allNews)} className="text-xs font-bold text-slate-500 underline cursor-pointer">{allNews ? '−' : `+${Math.min(updates.length, 10) - 3}`}</button>}
+          {(allNews ? updates.slice(0, 6) : updates.slice(0, 3)).map((n, i) => <div key={i} className={`rounded-xl border px-3 py-2 text-sm flex items-start gap-2 ${n.tone}`}><span className="text-lg leading-none">{n.icon}</span><span className="flex-1">{n.text}<span className="block text-[11px] text-slate-500">{when(n.at)}</span></span></div>)}
+          {updates.length > 3 && <button id="btn-news-all" onClick={() => setAllNews(!allNews)} className="text-xs font-bold text-slate-500 underline cursor-pointer">{allNews ? '−' : `+${Math.min(updates.length, 6) - 3}`}</button>}
         </div>
 
         <button id="btn-old" onClick={() => setShowOld(!showOld)} className="text-sm font-bold text-slate-600 underline cursor-pointer">🗂 {w('oldTrucks')} ({old.length})</button>
@@ -265,21 +295,29 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
 }
 
 // Send a truck without typing: where to (tap), photo of the challan (items read from it), photo of the plate
-// (truck number read, driver remembered), then Truck left. Prototype: the photo reading is simulated with demo data.
+// (truck number read), the driver (same as last time? or a photo of the licence + say the phone number), then Truck left.
+// Goods we owe the receiver (missing last time) are offered as one tap. Prototype: photo and voice reading are simulated.
 const PLATES = ['KA 09 B 6138', 'KA 40 A 2541', 'KA 19 D 7724', 'KA 05 M 8812'];
+const NEW_DRIVERS = [{ name: 'Suresh K', phone: '9900112233' }, { name: 'Imran Pasha', phone: '9741556677' }, { name: 'Venkatesh', phone: '9448023456' }];
 function SendTruck({ unit, w, onSent }: { unit: string; w: (k: string) => string; onSent: (id: string) => void }) {
   const { state, dispatch } = useStore();
   const others = Object.keys(UNITS).filter((u) => u !== unit);
   const customers = Object.values(PARTIES).filter((p) => p.kind === 'customer');
   const [to, setTo] = useState(others[0]);
   const flow = UNITS[to] ? 'transfer' : 'outbound';
-  const [reading, setReading] = useState<'' | 'challan' | 'plate'>('');
+  const [reading, setReading] = useState<'' | 'challan' | 'plate' | 'licence' | 'phone'>('');
   const [lines, setLines] = useState<{ item: string; qty: number }[] | null>(null);
   const [ref, setRef] = useState('');
   const [plate, setPlate] = useState('');
+  const [driver, setDriver] = useState<{ name: string; phone: string } | null>(null);
+  const [newDriver, setNewDriver] = useState<{ name: string; phone: string } | null>(null);
+  const [owedOn, setOwedOn] = useState<Record<string, boolean>>({});
   const timer = useRef<any>(null);
   useEffect(() => () => clearTimeout(timer.current), []);
   const n = state.counters.trk + 1;
+  // goods this unit promised to send to the place it is sending to now
+  const owed = state.diffs.filter((d: any) => d.status === 'waiting' && !d.came && (() => { const x = state.shipments.find((y: any) => y.id === d.shipmentId); return x && ((d.decision.action === 'unit_sends_rest' && x.flow === 'transfer' && x.fromUnit === unit && x.toUnit === to) || (['send_rest', 'send_replacement'].includes(d.decision.action) && x.flow === 'outbound' && x.fromUnit === unit && x.party === to)); })()
+    && !state.shipments.some((y: any) => !y.cancelledAt && (y.fulfils || []).includes(d.id)));
   const readChallan = () => {
     setReading('challan');
     timer.current = setTimeout(() => {
@@ -290,13 +328,17 @@ function SendTruck({ unit, w, onSent }: { unit: string; w: (k: string) => string
   };
   const readPlate = () => { setReading('plate'); timer.current = setTimeout(() => { setPlate(PLATES[n % PLATES.length]); setReading(''); }, 900); };
   const last = state.shipments.filter((s: any) => s.truckNo === plate && s.driver).sort((a: any, b: any) => b.createdAt - a.createdAt)[0];
-  const driver = last ? { name: last.driver, phone: last.driverPhone } : { name: 'Manju', phone: '9845012345' };
-  const pick = (x: string) => { setTo(x); setLines(null); setRef(''); };
-  const ready = lines && lines.every((x) => x.qty > 0) && plate && !reading;
+  const lastDriver = last ? { name: last.driver, phone: last.driverPhone } : null;
+  const readLicence = () => { setReading('licence'); timer.current = setTimeout(() => { setNewDriver({ name: NEW_DRIVERS[n % 3].name, phone: '' }); setReading(''); }, 900); };
+  const hearPhone = () => { setReading('phone'); timer.current = setTimeout(() => { const d = { name: newDriver!.name, phone: NEW_DRIVERS[n % 3].phone }; setNewDriver(d); setDriver(d); setReading(''); }, 1200); };
+  const pick = (x: string) => { setTo(x); setLines(null); setRef(''); setOwedOn({}); };
+  const useOwed = owed.filter((d: any) => owedOn[d.id] !== false);
+  const allLines = lines ? useOwed.reduce((acc: any[], d: any) => { const i = acc.findIndex((x) => x.item === d.item); return i >= 0 ? acc.map((x, j) => (j === i ? { ...x, qty: x.qty + d.qty } : x)) : [...acc, { item: d.item, qty: d.qty }]; }, lines) : null;
+  const ready = allLines && allLines.every((x) => x.qty > 0) && plate && driver && !reading;
   const leave = () => {
     const id = `TRK-${1000 + n}`;
     const who = me();
-    dispatch({ type: 'CREATE_SHIPMENT', id, flow, fromUnit: unit, ...(flow === 'transfer' ? { toUnit: to } : { party: to }), truckNo: plate, ref, driver: driver.name, driverPhone: driver.phone, lines, actor: who });
+    dispatch({ type: 'CREATE_SHIPMENT', id, flow, fromUnit: unit, ...(flow === 'transfer' ? { toUnit: to } : { party: to }), truckNo: plate, ref, driver: driver!.name, driverPhone: driver!.phone, lines: allLines, fulfils: useOwed.map((d: any) => d.id), actor: who });
     dispatch({ type: 'LOADING', id, point: 'Dock 1', phase: 'start', actor: who });
     dispatch({ type: 'LOADING', id, phase: 'end', actor: who });
     dispatch({ type: 'SEND_TO_RECEIVER', id, token: newToken(), actor: who });
@@ -304,30 +346,55 @@ function SendTruck({ unit, w, onSent }: { unit: string; w: (k: string) => string
   };
   const chip = (x: string, icon: string, label: string) => <button key={x} id={`to-${x}`} onClick={() => pick(x)} className={`rounded-xl border-2 px-3 py-2 text-sm font-bold cursor-pointer flex items-center gap-1.5 ${to === x ? 'bg-violet-700 text-white border-violet-700' : 'bg-white text-slate-800 border-slate-300'}`}><span className="text-lg">{icon}</span>{label}</button>;
   const stepCls = (done: boolean) => `rounded-2xl border-2 p-3 space-y-2 ${done ? 'border-emerald-300 bg-emerald-50/40' : 'border-slate-200 bg-white'}`;
+  const small = 'min-h-[44px] rounded-xl border-2 text-sm font-bold cursor-pointer px-3';
   return (
     <div id="send-truck" className="space-y-3">
       <div className={stepCls(true)}>
         <div className="text-sm font-bold text-slate-900">1 · {w('whereTo')}</div>
         <div className="flex flex-wrap gap-2">{others.map((u) => chip(u, '🏭', uname(u)))}{customers.map((p) => chip(p.id, '🏪', p.name))}</div>
+        {owed.map((d: any) => (
+          <button key={d.id} id={`owed-${d.id}`} onClick={() => setOwedOn({ ...owedOn, [d.id]: owedOn[d.id] === false })} className={`w-full text-left rounded-xl border-2 p-2.5 text-sm cursor-pointer flex items-center gap-2 ${owedOn[d.id] !== false ? 'border-amber-400 bg-amber-50' : 'border-slate-200 bg-white'}`}>
+            <span className="text-xl">{owedOn[d.id] !== false ? '☑️' : '⬜'}</span>
+            <span className="flex-1"><b>{w('owedAdd')}</b>: {itemIcon(d.item)} {d.qty} {shortName(d.item)}<span className="block text-[11px] text-slate-600">{w('owedWhy')} · {loadName(d.shipmentId)}</span></span>
+          </button>
+        ))}
       </div>
       <div className={stepCls(Boolean(lines))}>
         <div className="text-sm font-bold text-slate-900">2 · {w('photoChallan')}</div>
-        {!lines && <button id="btn-photo-challan" disabled={reading === 'challan'} onClick={readChallan} className={`${big} bg-slate-900 text-white`}>{reading === 'challan' ? `⏳ ${w('reading')}` : '📷'}</button>}
+        {reading === 'challan' ? <div className="text-sm font-bold text-slate-700">⏳ {w('reading')}</div>
+          : <CameraButton id="btn-photo-challan" kind="challan" label={w('photoChallan')} done={Boolean(lines)} onShot={readChallan} text={ref || `DC-${700 + n}`} busyText={ref} />}
         {lines && <>
-          <div id="challan-read" className="text-xs text-emerald-900">🤖 {w('checkNumbers')} · {ref}</div>
-          {lines.map((x, i) => (
-            <div key={x.item} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-2">
-              <span className="text-2xl">{itemIcon(x.item)}</span>
-              <span className="flex-1 min-w-0 text-sm font-bold text-slate-900 leading-tight">{shortName(x.item)}<span className="block text-[11px] font-normal text-slate-500">{item(x.item).unit}</span></span>
-              <Stepper id={`send-qty-${x.item}`} value={x.qty} onChange={(q) => setLines(lines.map((y, j) => (j === i ? { ...y, qty: q } : y)))} />
-            </div>
-          ))}
+          <div id="challan-read" className="text-xs text-emerald-900">🤖 {w('checkNumbers')}</div>
+          {allLines!.map((x) => {
+            const own = lines.find((y) => y.item === x.item);
+            const extra = x.qty - (own?.qty || 0);
+            return (
+              <div key={x.item} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white p-2">
+                <span className="text-2xl">{itemIcon(x.item)}</span>
+                <span className="flex-1 min-w-0 text-sm font-bold text-slate-900 leading-tight">{shortName(x.item)}<span className="block text-[11px] font-normal text-slate-500">{item(x.item).unit}{extra > 0 ? ` · ${w('owedIncl')} ${extra}` : ''}</span></span>
+                {own ? <Stepper id={`send-qty-${x.item}`} value={own.qty} onChange={(q) => setLines(lines.map((y) => (y.item === x.item ? { ...y, qty: q } : y)))} /> : <span className="text-xl font-mono font-bold pr-3">{x.qty}</span>}
+              </div>
+            );
+          })}
         </>}
       </div>
-      <div className={stepCls(Boolean(plate))}>
+      <div className={stepCls(Boolean(plate && driver))}>
         <div className="text-sm font-bold text-slate-900">3 · {w('photoPlate')}</div>
-        {!plate && <button id="btn-photo-plate" disabled={reading === 'plate'} onClick={readPlate} className={`${big} bg-slate-900 text-white`}>{reading === 'plate' ? `⏳ ${w('reading')}` : '📷'}</button>}
-        {plate && <div id="plate-read" className="space-y-1"><Plate no={plate} /><div className="text-xs text-slate-600">🧑‍✈️ {driver.name} · 📞 {driver.phone} <span className="text-slate-400">({w('driverKnown')})</span></div></div>}
+        {reading === 'plate' ? <div className="text-sm font-bold text-slate-700">⏳ {w('reading')}</div>
+          : !plate ? <CameraButton id="btn-photo-plate" kind="plate" label={w('photoPlate')} done={false} onShot={readPlate} text={PLATES[n % PLATES.length]} />
+          : <div id="plate-read"><Plate no={plate} /></div>}
+        {plate && !driver && <div id="driver-step" className="space-y-2 pt-1">
+          <div className="text-sm font-bold text-slate-900">🧑‍✈️ {w('whoDrives')}</div>
+          {lastDriver && !newDriver && <div className="grid grid-cols-2 gap-2">
+            <button id="btn-same-driver" onClick={() => setDriver(lastDriver)} className={`${small} bg-emerald-600 text-white border-emerald-600`}>✓ {lastDriver.name}<span className="block text-[10px] font-normal">{w('sameDriver')}</span></button>
+            <button id="btn-other-driver" onClick={() => setNewDriver({ name: '', phone: '' })} className={`${small} bg-white text-slate-800 border-slate-300`}>🔄 {w('otherDriver')}</button>
+          </div>}
+          {(!lastDriver || newDriver) && (reading === 'licence' ? <div className="text-sm font-bold text-slate-700">⏳ {w('reading')}</div>
+            : !newDriver?.name ? <CameraButton id="btn-photo-licence" kind="licence" label={w('photoLicence')} done={false} onShot={readLicence} text={`Name: ${NEW_DRIVERS[n % 3].name}`} />
+            : <div className="space-y-2"><div className="text-xs text-emerald-900">🤖 {w('licenceRead')}: <b>{newDriver.name}</b></div>
+                <button id="btn-driver-phone" disabled={reading === 'phone'} onClick={hearPhone} className={`w-full min-h-[52px] rounded-2xl text-white text-base font-bold cursor-pointer ${reading === 'phone' ? 'bg-rose-600 animate-pulse' : 'bg-slate-900'}`}>🎤 {reading === 'phone' ? w('listening') : w('sayPhone')}</button></div>)}
+        </div>}
+        {driver && <div id="driver-read" className="text-xs text-slate-700">🧑‍✈️ <b>{driver.name}</b> · 📞 {driver.phone} {driver !== lastDriver && <span className="text-emerald-800">({w('newSaved')})</span>} <button id="btn-change-driver" onClick={() => { setDriver(null); setNewDriver({ name: '', phone: '' }); }} className="underline text-slate-500 cursor-pointer ml-1">{w('change')}</button></div>}
       </div>
       <button id="btn-truck-left" disabled={!ready} onClick={leave} className={`${big} bg-emerald-600 text-white disabled:opacity-40`}>🚚 {w('truckLeft')}</button>
     </div>

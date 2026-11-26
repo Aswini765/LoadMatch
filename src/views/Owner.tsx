@@ -9,6 +9,7 @@ import { Chain } from './Dispatch.tsx';
 import { PageHeader, Panel, StatusBadge, Note, PhotoStrip, shareWhatsApp, appLink, newToken, type Go } from './ui.tsx';
 import { inr, inr0, inrL, when, duration, dateTime, time } from '../lib/format.ts';
 import { COMPANY } from '../data/seed.ts';
+import { DateChips, dayFrom, dayLabel } from './sim.tsx';
 
 const KIND_CLS: Record<string, string> = {
   short: 'bg-amber-50 text-amber-800 border-amber-200',
@@ -104,6 +105,7 @@ function Inbox({ go, initialId }: { go: Go; initialId?: string | null }) {
   const now = Date.now();
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [showInfo, setShowInfo] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const rows: any[] = [];
   const info: any[] = [];
   for (const s of state.shipments) {
@@ -129,13 +131,14 @@ function Inbox({ go, initialId }: { go: Go; initialId?: string | null }) {
   rows.sort((a, b) => b.at - a.at);
   info.sort((a, b) => b.at - a.at);
   const btn = 'shrink-0 px-3 py-2 rounded-lg text-xs font-bold cursor-pointer';
+  const shown = showAll ? rows : rows.slice(0, 3);
   return (
     <div id="latest-from-staff" className="space-y-2">
       <div className="flex items-baseline justify-between">
         <div className="text-lg font-bold text-slate-950">{rows.length ? `${rows.length} need${rows.length === 1 ? 's' : ''} you` : 'All clear ✓'}</div>
         <div className="text-xs text-slate-500">Newest first</div>
       </div>
-      {rows.map((x) => {
+      {shown.map((x) => {
         if (x.kind === 'truck') return <TruckCard key={x.s.id} s={x.s} ds={x.openDs} startOpen={Boolean(initialId && (initialId === x.s.id || x.openDs.some((d: any) => d.id === initialId)))} />;
         if (x.kind === 'promise') return <PromiseCard key={x.d.id} d={x.d} s={x.s} />;
         if (x.kind === 'link') return (
@@ -165,6 +168,7 @@ function Inbox({ go, initialId }: { go: Go; initialId?: string | null }) {
           </div>
         );
       })}
+      {rows.length > 3 && <button id="btn-show-all" onClick={() => setShowAll(!showAll)} className="w-full min-h-[40px] rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-700 cursor-pointer">{showAll ? '▲ Show only 3' : `▼ Show ${rows.length - 3} more`}</button>}
       {!rows.length && <Note tone="go">Nothing needs you right now.</Note>}
       {info.length > 0 && <button id="btn-info" onClick={() => setShowInfo(!showInfo)} className="w-full text-left text-xs font-bold text-slate-500 py-1 cursor-pointer">{showInfo ? '▲' : '▼'} Also today, nothing to do · {info.length}</button>}
       {showInfo && <div id="info-list" className="space-y-1">{info.map((x, i) => <div key={i} className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs flex items-center gap-2"><span className="text-base">{x.icon}</span><span className="flex-1 min-w-0"><b className="text-slate-800">{x.title}</b><span className="block text-slate-500 truncate">{x.sub} · {when(x.at, now)}</span></span></div>)}</div>}
@@ -172,11 +176,26 @@ function Inbox({ go, initialId }: { go: Go; initialId?: string | null }) {
   );
 }
 
-// One truck with a difference: what happened, the one next step, and the rest behind "Other options".
+// Plain words for each choice: what happens and who pays
+const PLAIN: Record<string, string> = {
+  unit_sends_rest: '📦 Our unit sends it in the next truck',
+  replace: '📦 Supplier sends it in the next truck',
+  send_rest: '📦 We send it in the next truck',
+  send_replacement: '📦 We send a good one in the next truck',
+  claim: '🚚 Transporter pays (claim)',
+  debit_note: '🧾 Supplier pays (debit note)',
+  credit_note: '🧾 Customer pays less (credit note)',
+  write_off: '❌ We take the loss',
+};
+const plain = (a: string) => PLAIN[a] || ACTIONS[a].label;
+
+// One truck with a difference: what happened, the one next step, and a short list of other choices.
 function TruckCard({ s, ds, startOpen }: { s: any; ds: any[]; startOpen?: boolean }) {
-  const { state, dispatch } = useStore();
+  const { dispatch } = useStore();
   const now = Date.now();
   const [more, setMore] = useState(Boolean(startOpen));
+  const [pick, setPick] = useState<{ kind: string; action: string } | null>(null);
+  const [due, setDue] = useState<number | null>(null);
   const value = ds.reduce((a: number, d: any) => a + d.value, 0);
   const sender = senderName(s);
   const sugg = ds.map((d: any) => [d, suggestFor(s, d)] as [any, string | null]);
@@ -184,14 +203,22 @@ function TruckCard({ s, ds, startOpen }: { s: any; ds: any[]; startOpen?: boolea
   const needsReply = ds.some((d: any) => d.kind !== 'excess' && d.cause !== 'accident');
   const reply = s.ask?.reply;
   const checking = ds.every((d: any) => d.status === 'investigating');
-  const due = inDays(2).getTime();
-  const apply = () => ready.forEach(([d, a]) => dispatch({ type: 'DECIDE', diffId: d.id, action: a, dueAt: ACTIONS[a!].due ? due : undefined, confirm: true, note: reply ? `${sender}: ${REPLIES[reply.kind].label}` : '', actor: 'Owner' }));
+  // the date comes from the sender's answer; otherwise two days
+  const replyDue = reply?.dueAt && reply.dueAt > now ? reply.dueAt : dayFrom(2);
+  const decide = (d: any, a: string, dueAt: number) => dispatch({ type: 'DECIDE', diffId: d.id, action: a, dueAt: ACTIONS[a].due ? dueAt : undefined, confirm: true, note: reply ? `${sender}: ${REPLIES[reply.kind].label}` : '', actor: 'Owner' });
+  const apply = () => ready.forEach(([d, a]) => decide(d, a!, a === 'claim' ? dayFrom(7) : replyDue));
   const acts = [...new Set(ready.map(([, a]) => a))];
-  const label = acts.length === 1 ? `${ACTIONS[acts[0]!].label}${ACTIONS[acts[0]!].due ? ` · by ${dueText(due)}` : ''}` : `Do these ${ready.length} steps`;
+  const dueOf = (a: string) => (a === 'claim' ? dayFrom(7) : replyDue);
+  const label = acts.length === 1 ? `${plain(acts[0]!)}${ACTIONS[acts[0]!].due ? ` · by ${dayLabel(dueOf(acts[0]!))}` : ''}` : `Do these ${ready.length} steps`;
   const askToken = s.token;
-  const ask = () => { dispatch({ type: 'ASK_SENDER', id: s.id, token: askToken, actor: 'Owner' }); };
-  const askMsg = `${COMPANY.name}: we counted ${loadName(s.id)} (your bill ${s.ref}, truck ${s.truckNo}): ${qtyText(ds)}. What happened? Tap one answer:\n${appLink(`#/a/${s.id}/${askToken}`)}`;
+  const ask = () => dispatch({ type: 'ASK_SENDER', id: s.id, token: askToken, actor: 'Owner' });
+  const askMsg = `${COMPANY.name}: we counted ${loadName(s.id)} (your bill ${s.ref}, truck ${s.truckNo}): ${qtyText(ds)}. Owner to owner, what happened? Tap one answer:\n${appLink(`#/a/${s.id}/${askToken}`)}`;
   const reminded = s.ask && !reply && now - s.ask.at > REMIND_H * 3600000;
+  const byText = reply ? (reply.by.includes(sender) ? reply.by : `${reply.by} (${sender})`) : '';
+  // other choices, per kind of difference (missing / damaged / extra), applied to every item of that kind
+  const kinds = [...new Set(ds.map((d: any) => d.kind))];
+  const choices = (k: string) => [...new Set(ds.filter((d: any) => d.kind === k).flatMap((d: any) => optionsFor(s, d)))].filter((a) => a !== 'investigate' && ds.filter((d: any) => d.kind === k).every((d: any) => optionsFor(s, d).includes(a)));
+  const doPick = () => { if (!pick) return; ds.filter((d: any) => d.kind === pick.kind).forEach((d: any) => decide(d, pick.action, due || dayFrom(2))); setPick(null); };
   const b = 'w-full min-h-[44px] rounded-xl text-sm font-bold cursor-pointer flex items-center justify-center px-3';
   return (
     <div id={`own-truck-${s.id}`} className={`bg-white border border-slate-200 border-l-4 ${checking ? 'border-l-violet-500' : 'border-l-amber-500'} rounded-xl overflow-hidden`}>
@@ -205,63 +232,80 @@ function TruckCard({ s, ds, startOpen }: { s: any; ds: any[]; startOpen?: boolea
           </div>
         </div>
 
-        {/* the conversation with the sender, and what the assistant did */}
         {s.ask && !reply && <div id={`asked-${s.id}`} className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-700">⏳ Asked {sender} {when(s.ask.at, now)}.<span className="block">🤖 {reminded ? `Assistant reminded ${sender} at ${time(s.ask.at + REMIND_H * 3600000)}. Still no reply.` : `Assistant reminds ${sender} if there is no reply in ${REMIND_H} hours.`}</span></div>}
-        {reply && <div id={`reply-${s.id}`} className="rounded-lg bg-sky-50 border border-sky-200 px-3 py-2 text-xs text-sky-950">💬 <b>{reply.by}</b> ({sender}), {when(reply.at, now)}: “{REPLIES[reply.kind].label}”</div>}
-        {reply && !ready.length && <div className="text-xs text-slate-600">🤖 They say they sent it all. Compare their loading photo with your stack photo, then choose in Other options.</div>}
+        {reply && <div id={`reply-${s.id}`} className="rounded-lg bg-sky-50 border border-sky-200 px-3 py-2 text-xs text-sky-950">💬 <b>{byText}</b>, {when(reply.at, now)}: “{REPLIES[reply.kind].label}{reply.dueAt ? `, by ${dayLabel(reply.dueAt)}` : ''}”</div>}
+        {reply && !ready.length && <div className="text-xs text-slate-600">🤖 They say they sent it all. Compare their loading photo with your stack photo, then choose below.</div>}
 
-        {/* ONE next step */}
         {ready.length > 0 && (!needsReply || reply) ? (
           <div className="space-y-1.5">
-            {acts.length > 1 && <ul id={`steps-${s.id}`} className="text-xs text-slate-700 space-y-0.5">{ready.map(([d, a]) => <li key={d.id}>• {d.qty} {KIND_LABEL[d.kind].toLowerCase()}: {ACTIONS[a!].label.toLowerCase()}{ACTIONS[a!].due ? ` by ${dueText(due)}` : ''}</li>)}</ul>}
+            {acts.length > 1 && <ul id={`steps-${s.id}`} className="text-xs text-slate-700 space-y-0.5">{ready.map(([d, a]) => <li key={d.id}>• {d.qty} {KIND_LABEL[d.kind].toLowerCase()}: {plain(a!)}{ACTIONS[a!].due ? ` · by ${dayLabel(dueOf(a!))}` : ''}</li>)}</ul>}
             <button id={`apply-${s.id}`} onClick={apply} className={`${b} bg-emerald-600 text-white`}>✓ {label}</button>
           </div>
         ) : needsReply && !s.ask ? (
           senderIsUs(s)
             ? <button id={`ask-${s.id}`} onClick={ask} className={`${b} bg-slate-900 text-white`}>❓ Ask {sender}</button>
-            : <a id={`ask-${s.id}`} href={shareWhatsApp(askMsg)} target="_blank" rel="noreferrer" onClick={ask} className={`${b} bg-emerald-600 text-white`}>💬 Ask {sender} on WhatsApp</a>
+            : <a id={`ask-${s.id}`} href={shareWhatsApp(askMsg)} target="_blank" rel="noreferrer" onClick={ask} className={`${b} bg-emerald-600 text-white`}>💬 Ask the owner of {sender} on WhatsApp</a>
         ) : null}
-        {needsReply && !s.ask && senderIsUs(s) && <div className="text-[11px] text-slate-500 -mt-1">{sender} sees the question in their app and answers with one tap.</div>}
+        {needsReply && !s.ask && <div className="text-[11px] text-slate-500 -mt-1">{senderIsUs(s) ? `${sender} sees the question in their app and answers with one tap.` : `Only their owner can open it (code to the owner's phone).`}</div>}
 
-        <button id={`more-opts-${s.id}`} onClick={() => setMore(!more)} className="text-xs font-bold text-slate-500 underline cursor-pointer">{more ? '▲ Close' : '▼ Other options'}</button>
+        <button id={`more-opts-${s.id}`} onClick={() => { setMore(!more); setPick(null); }} className="text-xs font-bold text-slate-500 underline cursor-pointer">{more ? '▲ Close' : '▼ Other options'}</button>
+        {more && <div id={`opts-${s.id}`} className="space-y-2.5 border-t border-slate-100 pt-2">
+          {kinds.map((k) => (
+            <div key={k} className="space-y-1.5">
+              <div className="text-xs font-bold text-slate-700">For the {qtyText(ds.filter((d: any) => d.kind === k))}:</div>
+              {choices(k).map((a) => {
+                const loss = ACTIONS[a].loss ? ` · ${inrL(ds.filter((d: any) => d.kind === k).reduce((x: number, d: any) => x + d.value, 0))}` : '';
+                const on = pick?.kind === k && pick.action === a;
+                return <button key={a} id={`opt-${s.id}-${k}-${a}`} onClick={() => { setPick(on ? null : { kind: k, action: a }); setDue(null); }} className={`w-full text-left rounded-lg border-2 px-3 py-2 text-xs font-bold cursor-pointer ${on ? 'border-slate-900 bg-slate-50' : 'border-slate-200 bg-white'}`}>{plain(a)}{loss}</button>;
+              })}
+            </div>
+          ))}
+          {pick && (ACTIONS[pick.action].due
+            ? <div className="space-y-2"><div className="text-xs font-bold text-slate-700">By when?</div><DateChips id={`odue-${s.id}`} value={due} onPick={setDue} /><button id={`opt-ok-${s.id}`} disabled={!due} onClick={doPick} className={`${b} bg-emerald-600 text-white disabled:opacity-40`}>✓ {plain(pick.action)}</button></div>
+            : <button id={`opt-ok-${s.id}`} onClick={doPick} className={`${b} ${ACTIONS[pick.action].loss ? 'bg-rose-600' : 'bg-emerald-600'} text-white`}>✓ {plain(pick.action)}</button>)}
+          <div className="text-[11px] text-slate-500">Truck {s.truckNo}{s.driver ? ` · driver ${s.driver}${s.driverPhone ? ` (${s.driverPhone})` : ''}` : ''}{(s.receipt.photos || []).length ? ` · photos: ${(s.receipt.photos || []).join(', ')}` : ''}</div>
+        </div>}
       </div>
-      {more && (
-        <div className="border-t border-slate-100">
-          <div className="px-4 pt-2 text-[11px] text-slate-500">Truck {s.truckNo}{s.driver ? ` · driver ${s.driver}` : ''}{s.loading?.startAt ? ` · loaded ${time(s.loading.startAt)}–${time(s.loading.endAt)}` : ''}{(s.receipt.photos || []).length ? ` · ${(s.receipt.photos || []).length} photo` : ''}</div>
-          <div className="divide-y divide-slate-100">{ds.map((d: any) => <DiffCard key={d.id} d={d} s={s} startOpen={startOpen} />)}</div>
-        </div>
-      )}
     </div>
   );
 }
 
-// A promise (the rest comes in the next truck, the transporter pays…): the assistant watches the next trucks and reminds.
+// A promise (the rest comes in the next truck, the transporter pays…). The sender marks the truck that carries it;
+// when that truck is counted the owner accepts it and the accountant notes it on the first bill.
 function PromiseCard({ d, s }: { d: any; s: any }) {
   const { state, dispatch } = useStore();
   const now = Date.now();
   const late = diffOverdue(d, now);
-  const came = cameLater(state, d);
-  const sender = s.flow === 'outbound' ? 'your unit' : senderName(s);
-  const need = late || came;
+  const carrying = state.shipments.find((x: any) => !x.cancelledAt && (x.fulfils || []).includes(d.id) && !x.receipt);
+  const guess = !d.came && !carrying ? cameLater(state, d) : null;
+  const sender = s.flow === 'outbound' ? route(s).split(' → ')[0] : senderName(s);
+  const delivers = ['unit_sends_rest', 'replace', 'send_rest', 'send_replacement'].includes(d.decision.action);
   const btn = 'px-3 py-2 rounded-lg text-xs font-bold cursor-pointer';
+  const icon = d.came ? '📦' : carrying ? '🚚' : late ? '⏰' : '⏳';
   return (
-    <div id={`promise-${d.id}`} className={`bg-white border border-slate-200 border-l-4 ${late ? 'border-l-rose-500' : came ? 'border-l-emerald-500' : 'border-l-slate-400'} rounded-xl p-3 space-y-2 ${need ? '' : 'opacity-90'}`}>
+    <div id={`promise-${d.id}`} className={`bg-white border border-slate-200 border-l-4 ${d.came ? 'border-l-emerald-500' : late ? 'border-l-rose-500' : 'border-l-slate-400'} rounded-xl p-3 space-y-2`}>
       <div className="flex items-start gap-3">
-        <span className="text-2xl leading-none">{came ? '📦' : late ? '⏰' : '⏳'}</span>
+        <span className="text-2xl leading-none">{icon}</span>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-bold text-slate-900">{loadName(s.id)} · {d.qty} {shortItem(d.item)}: {ACTIONS[d.decision.action].label.toLowerCase()}</div>
-          <div className="text-xs text-slate-500">{late ? `Late: was due ${dateTime(d.decision.dueAt)}` : `Due ${dateTime(d.decision.dueAt)}`} · {route(s)}</div>
+          <div className="text-sm font-bold text-slate-900">{loadName(s.id)} · {d.qty} {shortItem(d.item)} {KIND_LABEL[d.kind].toLowerCase()} · {plain(d.decision.action).replace(/^\S+ /, '').toLowerCase()}</div>
+          <div className="text-xs text-slate-500">{late && !d.came ? `Late: was due ${dayLabel(d.decision.dueAt)}` : `Due ${dayLabel(d.decision.dueAt)}`} · {route(s)}</div>
         </div>
       </div>
-      <div id={`agent-${d.id}`} className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-700">🤖 {came
-        ? `${loadName(came.id)} (counted ${when(came.receipt.at, now)}) had ${shortItem(d.item)}. Looks like it came.`
-        : late
-          ? `Due ${dueText(d.decision.dueAt)} and no truck brought it. Assistant reminded ${sender} on WhatsApp at ${time(d.decision.dueAt)}.`
-          : `Assistant watches the next trucks from ${sender} and reminds them on ${dueText(d.decision.dueAt)} if it has not come.`}</div>
-      <div className="flex gap-2">
-        <button id={`settle-${d.id}`} onClick={() => dispatch({ type: 'SETTLE', diffId: d.id, note: came ? `Came in ${loadName(came.id)}` : 'It came', actor: 'Owner' })} className={`${btn} ${need ? 'bg-emerald-600 text-white' : 'border border-emerald-300 text-emerald-800 bg-white'}`}>✓ It came</button>
-        {(late || came) && <button id={`broken-${d.id}`} onClick={() => dispatch({ type: 'PROMISE_BROKEN', diffId: d.id, actor: 'Owner' })} className={`${btn} border border-slate-300 bg-white`}>{came ? 'Not all of it' : 'Did not come'}</button>}
-      </div>
+      <div id={`agent-${d.id}`} className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-700">{d.came
+        ? `📦 ${sender} sent the ${d.qty} in ${loadName(d.came.load)}. ${d.came.by} counted them: all there, ${when(d.came.at, now)}. Accept, and the accountant notes it on the first bill.`
+        : carrying ? `🚚 ${sender} marked ${loadName(carrying.id)} as carrying these ${d.qty}. ${carrying.sentAt ? 'On the way.' : 'Being loaded.'}`
+        : guess ? `🤖 ${loadName(guess.id)} from ${sender} had ${shortItem(d.item)}, but they did not mark it as these ${d.qty}. Is it?`
+        : late ? `🤖 Due ${dayLabel(d.decision.dueAt)} and nothing came. Assistant reminded ${sender} on WhatsApp at ${time(d.decision.dueAt)}.`
+        : delivers ? `🤖 ${sender} marks the truck that carries it. Assistant reminds them on ${dayLabel(d.decision.dueAt)} if nothing comes.`
+        : `🤖 Assistant reminds you on ${dayLabel(d.decision.dueAt)}.`}</div>
+      {(d.came || guess) && <div className="flex gap-2">
+        <button id={`settle-${d.id}`} onClick={() => dispatch({ type: 'SETTLE', diffId: d.id, note: `Came in ${loadName((d.came?.load) || guess.id)}`, actor: 'Owner' })} className={`${btn} bg-emerald-600 text-white`}>✓ Accept: it came</button>
+        {guess && <button id={`broken-${d.id}`} onClick={() => dispatch({ type: 'PROMISE_BROKEN', diffId: d.id, actor: 'Owner' })} className={`${btn} border border-slate-300 bg-white`}>No</button>}
+      </div>}
+      {!d.came && !guess && !carrying && (late || !delivers) && <div className="flex gap-2">
+        {!delivers && <button id={`settle-${d.id}`} onClick={() => dispatch({ type: 'SETTLE', diffId: d.id, note: 'Done', actor: 'Owner' })} className={`${btn} bg-emerald-600 text-white`}>✓ Done</button>}
+        {late && <button id={`broken-${d.id}`} onClick={() => dispatch({ type: 'PROMISE_BROKEN', diffId: d.id, actor: 'Owner' })} className={`${btn} border border-slate-300 bg-white`}>Did not come: choose again</button>}
+      </div>}
     </div>
   );
 }

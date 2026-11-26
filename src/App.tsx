@@ -7,7 +7,7 @@ import Staff from './views/Staff.tsx';
 import Masters from './views/Masters.tsx';
 import Accountant from './views/Accountant.tsx';
 import Dispatch from './views/Dispatch.tsx';
-import Receive, { ReceiveTab, CountBack, SenderReply } from './views/Receive.tsx';
+import Receive, { ReceiveTab, CountBack, SenderReply, PartnerStore } from './views/Receive.tsx';
 import Owner, { EvidenceView } from './views/Owner.tsx';
 import { useStore, receiptOverdue, countedByUs, atGate } from './store.tsx';
 import Reports from './views/Reports.tsx';
@@ -57,7 +57,14 @@ const toTop = () => { window.scrollTo(0, 0); document.getElementById('main-topba
 
 // Links shared on WhatsApp open one screen directly: #/r/<truck>/<token>/<load> (receiver), #/c/<truck>/<token>/<count> (count back to sender), #/e/<diff>/<token> (evidence)
 function useHashRoute() {
-  const read = () => { const m = window.location.hash.match(/^#\/(r|e|c|a)\/([^/]+)\/([^/?#]+)(?:\/([^/?#]+))?/); return m ? { kind: m[1], id: decodeURIComponent(m[2]), token: m[3], payload: m[4] || '' } : null; };
+  const read = () => {
+    const co = window.location.hash.match(/^#\/co\/([^/?#]+)/);
+    if (co) return { kind: 'co', id: co[1], token: '', payload: '' };
+    const m = window.location.hash.match(/^#\/(r|e|c|a)\/([^/]+)\/([^/?#]+)(?:\/([^/?#]+))?/);
+    // "counting as the customer's store" lasts only while moving between their store screen and a count
+    if (!m || m[1] !== 'r') { try { sessionStorage.removeItem('lm-as-store'); } catch { /* ignore */ } }
+    return m ? { kind: m[1], id: decodeURIComponent(m[2]), token: m[3], payload: m[4] || '' } : null;
+  };
   const [r, setR] = useState(read);
   // every new screen starts at the top
   useEffect(() => { const on = () => { setR(read()); toTop(); }; window.addEventListener('hashchange', on); return () => window.removeEventListener('hashchange', on); }, []);
@@ -151,6 +158,7 @@ export default function App() {
         <main className="flex-1 p-4 sm:p-6 md:p-8 max-w-full overflow-x-hidden">
           {link?.kind === 'r' && <Receive id={link.id} token={link.token} payload={link.payload} key={`${link.id}-${link.token}`} />}
           {link?.kind === 'c' && <CountBack id={link.id} token={link.token} payload={link.payload} onOpen={(id) => go('dispatch', { id })} />}
+          {link?.kind === 'co' && <PartnerStore partyId={link.id} />}
           {link?.kind === 'a' && <SenderReply id={link.id} token={link.token} />}
           {link?.kind === 'e' && <EvidenceView id={link.id} token={link.token} />}
           {!link && <>

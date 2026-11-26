@@ -365,7 +365,13 @@ test('a promised replacement closes itself when it arrives on a later truck', ()
   s = run(s, { type: 'CREATE_SHIPMENT', flow: 'inbound', toUnit: 'MYS', party: 'lakshmi', truckNo: 'KA 7', ref: 'SB-0991', fulfils: [promise.id], lines: [{ item: promise.item, qty: 10 }] });
   id = lastShip(s).id;
   s = run(s, { type: 'SEND_TO_RECEIVER', id, token: 'tokr222' }, { type: 'SUBMIT_RECEIPT', id, token: 'tokr222', by: 'Gate', lines: { L1: { counted: 10, damaged: 0 } } });
+  assert.equal(diffOf(s, promise.id).status, 'waiting', 'arrived, but the owner accepts it');
+  assert.equal(diffOf(s, promise.id).came.load, id);
+  const nDrafts = s.drafts.length;
+  s = run(s, { type: 'SETTLE', diffId: promise.id, actor: 'Owner' });
   assert.equal(diffOf(s, promise.id).status, 'settled');
+  assert.equal(s.drafts.at(-1).type, 'match_note', 'accountant notes it on the first bill');
+  assert.equal(s.drafts.length, nDrafts + 1);
   // a load cannot claim a promise for an item it does not carry
   s = run(buildInitialState(), { type: 'CREATE_SHIPMENT', flow: 'inbound', toUnit: 'MYS', party: 'lakshmi', truckNo: 'KA 8', ref: 'SB-1', fulfils: [promise.id], lines: [{ item: 'PLY-12', qty: 1 }] });
   assert.deepEqual(lastShip(s).fulfils, []);
@@ -557,7 +563,9 @@ test('ask the sender: owner asks, sender answers once, the answer picks the sugg
   assert.ok(shipmentOf(s, 'TRK-1013').ask);
   assert.equal(run(s, { type: 'SENDER_REPLY', id: 'TRK-1013', kind: 'nonsense', by: 'Ramesh' }), s);
   assert.equal(run(s, { type: 'SENDER_REPLY', id: 'TRK-1013', kind: 'send_next', token: 'wrong', by: 'x' }), s, 'link reply needs the right token');
-  s = run(s, { type: 'SENDER_REPLY', id: 'TRK-1013', kind: 'send_next', by: 'Ramesh' });
+  assert.equal(run(s, { type: 'SENDER_REPLY', id: 'TRK-1013', kind: 'send_next', by: 'Ramesh' }), s, '"next truck" needs a date');
+  s = run(s, { type: 'SENDER_REPLY', id: 'TRK-1013', kind: 'send_next', dueAt: Date.now() + 86400000, by: 'Ramesh' });
+  assert.ok(shipmentOf(s, 'TRK-1013').ask.reply.dueAt);
   assert.equal(suggestFor(shipmentOf(s, 'TRK-1013'), d), 'unit_sends_rest');
   assert.equal(run(s, { type: 'SENDER_REPLY', id: 'TRK-1013', kind: 'transporter', by: 'Ramesh' }), s, 'answers once');
   // seeded: TRK-1022 already answered "left here"

@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Mic, MicOff, Camera, Lock, CheckCircle2, AlertTriangle, Minus, Plus, ChevronLeft, ChevronRight, MessageCircle, PackageCheck, Warehouse, ArrowRight, Wrench } from 'lucide-react';
 import { useStore, item, party, route, shipmentOf, diffsOf, shipmentStatus, receiverPath, countBackPath, unpackLoad, unpackCount, reducer, countedByUs, atGate, jobworkOpen, loadName, FLOW_LABEL, REPLIES } from '../store.tsx';
 import { Stepper } from './Staff.tsx';
-import { LOADING_POINTS } from '../data/seed.ts';
+import { CameraButton, DateChips, dayLabel } from './sim.tsx';
+import { LOADING_POINTS, COMPANY } from '../data/seed.ts';
 import { t, fill, unitWord } from '../i18n.ts';
 import { useVoice, parseCount } from '../lib/voice.ts';
 import { PhoneFrame, Note, PhotoStrip, savedLang, saveLang, shareWhatsApp, newToken, appLink } from './ui.tsx';
@@ -83,6 +84,8 @@ const R: Record<string, Record<RL, string>> = {
   iAmOwner: { en: 'I am the owner: save it to my company', hi: 'मैं मालिक हूँ: अपनी कंपनी में जोड़ें', kn: 'ನಾನು ಮಾಲೀಕ: ನನ್ನ ಕಂಪನಿಗೆ ಸೇರಿಸಿ', te: 'నేను యజమాని: నా కంపెనీలో చేర్చండి' },
   iAmStore: { en: 'I am at the store:', hi: 'मैं स्टोर पर हूँ:', kn: 'ನಾನು ಸ್ಟೋರ್‌ನಲ್ಲಿದ್ದೇನೆ:', te: 'నేను స్టోర్‌లో ఉన్నాను:' },
   savedCo: { en: 'Saved to your company. Your store staff now see it under “Coming to you” and count it when it arrives.', hi: 'आपकी कंपनी में जुड़ गया। स्टोर स्टाफ इसे “आपके पास आ रही हैं” में देखेंगे और आने पर गिनेंगे।', kn: 'ನಿಮ್ಮ ಕಂಪನಿಗೆ ಸೇರಿಸಲಾಗಿದೆ. ಸ್ಟೋರ್ ಸಿಬ್ಬಂದಿ ಇದನ್ನು “ನಿಮಗೆ ಬರುತ್ತಿವೆ” ಅಡಿ ನೋಡಿ, ಬಂದಾಗ ಎಣಿಸುತ್ತಾರೆ.', te: 'మీ కంపెనీలో చేర్చబడింది. స్టోర్ సిబ్బంది దీన్ని “మీకు వస్తున్నవి”లో చూసి, వచ్చాక లెక్కిస్తారు.' },
+  openApp: { en: 'Open the store screen', hi: 'स्टोर स्क्रीन खोलें', kn: 'ಸ್ಟೋರ್ ಪರದೆ ತೆರೆಯಿರಿ', te: 'స్టోర్ స్క్రీన్ తెరవండి' },
+  backStore: { en: 'Back to the store screen', hi: 'स्टोर स्क्रीन पर वापस', kn: 'ಸ್ಟೋರ್ ಪರದೆಗೆ ಹಿಂದೆ', te: 'స్టోర్ స్క్రీన్‌కు వెనక్కి' },
   sent: { en: 'Sent', hi: 'भेजा', kn: 'ಕಳುಹಿಸಿದ್ದು', te: 'పంపినవి' },
   allCame: { en: 'All came', hi: 'सब आ गया', kn: 'ಎಲ್ಲಾ ಬಂತು', te: 'అన్నీ వచ్చాయి' },
   wrong: { en: 'Something is wrong', hi: 'कुछ गड़बड़ है', kn: 'ಏನೋ ಸರಿಯಿಲ್ಲ', te: 'ఏదో సరిగా లేదు' },
@@ -139,9 +142,10 @@ export default function Receive({ id, token, payload }: { id: string; token: str
   };
   const s = sameLoad ? mine : remote ? shipmentOf(state, id) : null;
   const ok = s && s.token && s.token === token && !s.cancelledAt;
-  const staff = Boolean(getWho());
+  const asStore = (() => { try { return sessionStorage.getItem('lm-as-store') || ''; } catch { return ''; } })();
+  const staff = Boolean(getWho()) || Boolean(asStore);
   // our staff: their own name; an outside receiver: the last name used on this phone
-  const [by, setBy] = useState(() => (staff ? me().replace(' (staff)', '') : (() => { try { return localStorage.getItem('loadmatch-name') || (s?.party ? `${party(s.party)?.name.split(' ')[0]} stores` : 'Store person'); } catch { return 'Store person'; } })()));
+  const [by, setBy] = useState(() => (asStore ? `${party(s?.party)?.name.split(' ')[0] || 'Customer'} stores` : staff ? me().replace(' (staff)', '') : (() => { try { return localStorage.getItem('loadmatch-name') || (s?.party ? `${party(s.party)?.name.split(' ')[0]} stores` : 'Store person'); } catch { return 'Store person'; } })()));
   const [arrivedHere, setArrivedHere] = useState(false);
   const [savedCo, setSavedCo] = useState(false);
   const [mode, setMode] = useState<'' | 'ok' | 'wrong'>('');
@@ -181,10 +185,11 @@ export default function Receive({ id, token, payload }: { id: string; token: str
             <div className="text-sm text-sky-900">{from}</div>
             <div className="text-xs text-slate-600">{w('whenHere')}</div>
           </div>
-          {!staff && !savedCo && <button id="btn-save-company" onClick={() => setSavedCo(true)} className="w-full min-h-[52px] rounded-2xl border-2 border-slate-900 bg-white text-slate-900 text-sm font-bold cursor-pointer">🏢 {w('iAmOwner')}</button>}
+          {!staff && !savedCo && <button id="btn-save-company" onClick={() => { saveToCompany(s, window.location.hash); setSavedCo(true); }} className="w-full min-h-[56px] rounded-2xl bg-slate-900 text-white text-base font-bold cursor-pointer">🏢 {w('iAmOwner')}</button>}
+          {!staff && !savedCo && <div className="text-[11px] text-slate-500 text-center">{party(s.party)?.name}</div>}
           {savedCo && <div id="saved-company" className="rounded-xl border-2 border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-950">✅ {w('savedCo')}</div>}
-          {!staff && <div className="text-xs font-bold text-slate-600">📦 {w('iAmStore')}</div>}
-          <button id="btn-arrived" onClick={() => { if (!remote) store.dispatch({ type: 'ARRIVED', id: s.id, by: me(), actor: me() }); setArrivedHere(true); }} className="w-full min-h-[56px] rounded-2xl bg-emerald-600 text-white text-base font-bold cursor-pointer">📍 {w('arrivedCount')}</button>
+          {savedCo && <a id="btn-open-store" href={`#/co/${s.party}`} className="w-full min-h-[52px] rounded-2xl bg-emerald-600 text-white text-base font-bold flex items-center justify-center">📦 {w('openApp')} →</a>}
+          {staff && <button id="btn-arrived" onClick={() => { if (!remote) store.dispatch({ type: 'ARRIVED', id: s.id, by: me(), actor: me() }); setArrivedHere(true); }} className="w-full min-h-[56px] rounded-2xl bg-emerald-600 text-white text-base font-bold cursor-pointer">📍 {w('arrivedCount')}</button>}
         </div>
       </PhoneFrame>
     );
@@ -249,9 +254,8 @@ export default function Receive({ id, token, payload }: { id: string; token: str
           {!blind && <div className="text-[11px] text-slate-500 text-center">{w('orTap')}</div>}
         </div>}
 
-        {mode === 'ok' && <button id="btn-photo-stack" disabled={busy === 'photo' || photos.includes('stack.jpg')} onClick={() => photo('stack.jpg')} className={`w-full min-h-[52px] rounded-2xl text-base font-bold cursor-pointer border-2 ${photos.includes('stack.jpg') ? 'border-emerald-300 bg-emerald-50 text-emerald-900' : 'border-slate-900 bg-white text-slate-900'}`}>{photos.includes('stack.jpg') ? `✅ ${w('photoOk')}` : busy === 'photo' ? '⏳' : `📷 ${w('stackPhoto')}`}</button>}
-        {mode === 'wrong' && s.lines.some((l: any) => m(l.id).damaged) && <button id="btn-photo-damage" disabled={busy === 'photo' || photos.includes('damage.jpg')} onClick={() => photo('damage.jpg')} className={`w-full min-h-[48px] rounded-2xl text-sm font-bold cursor-pointer border-2 ${photos.includes('damage.jpg') ? 'border-emerald-300 bg-emerald-50 text-emerald-900' : 'border-slate-400 bg-white text-slate-800'}`}>{photos.includes('damage.jpg') ? `✅ ${w('photoOk')}` : `📷 ${w('damagePhoto')}`}</button>}
-
+        {mode === 'ok' && <CameraButton id="btn-photo-stack" kind="stack" label={w('stackPhoto')} done={photos.includes('stack.jpg')} onShot={() => setPhotos((p) => [...p, 'stack.jpg'])} busyText={w('photoOk')} />}
+        {mode === 'wrong' && s.lines.some((l: any) => m(l.id).damaged) && <CameraButton id="btn-photo-damage" kind="damage" label={w('damagePhoto')} done={photos.includes('damage.jpg')} onShot={() => setPhotos((p) => [...p, 'damage.jpg'])} busyText={w('photoOk')} />}
         {!staff && (mode || blind) && <label className="block text-[11px] font-bold text-slate-700">{w('yourName')}<input id="r-name" value={by} onChange={(e) => setBy(e.target.value)} className="mt-1 w-full p-2.5 rounded-lg border border-slate-300 text-sm" /></label>}
         {mode === 'wrong' && !anyMark && <div id="r-missing" className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-2">{w('nothingMarked')}</div>}
         {(mode || blind) && <button id="btn-submit-count" disabled={!ready} onClick={submit} className="w-full min-h-[56px] rounded-2xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-base font-bold cursor-pointer">📨 {w('sendOwner')}</button>}
@@ -304,7 +308,45 @@ function Done({ s, state, remote, lang, setLang, head, w }: { s: any; state: any
             );
           })}
         </div>}
+        {(() => { try { return sessionStorage.getItem('lm-as-store'); } catch { return null; } })() && <a id="btn-back-store" href={`#/co/${sessionStorage.getItem('lm-as-store')}`} className="block text-sm font-bold text-emerald-800 underline">← {w('backStore')}</a>}
         <div className="text-[11px] text-slate-500 flex items-center"><Lock className="w-3.5 h-3.5 mr-1" />{w('lockedBy')} {s.receipt.by}, {when(s.receipt.at)}</div>
+      </div>
+    </PhoneFrame>
+  );
+}
+
+// ---------- a customer's owner saved our truck into their company: their store sees it and counts it ----------
+const coKey = (partyId: string) => `lm-co-${partyId}`;
+export function savedTrucks(partyId: string): any[] { try { return JSON.parse(localStorage.getItem(coKey(partyId)) || '[]'); } catch { return []; } }
+function saveToCompany(s: any, hash: string) {
+  const list = savedTrucks(s.party).filter((x: any) => x.id !== s.id);
+  try { localStorage.setItem(coKey(s.party), JSON.stringify([{ id: s.id, hash, from: route(s).split(' → ')[0], plate: s.truckNo, at: Date.now() }, ...list])); } catch { /* ignore */ }
+}
+export function PartnerStore({ partyId }: { partyId: string }) {
+  const { state } = useStore();
+  const [lang, setLangState] = useState(savedLang);
+  const setLang = (l: string) => { setLangState(l); saveLang(l); };
+  const p = party(partyId);
+  const list = savedTrucks(partyId);
+  const done = (x: any) => Boolean(shipmentOf(state, x.id)?.receipt) || (() => { try { const [, , , tok] = x.hash.split('/'); return Boolean(localStorage.getItem(remoteKey(x.id, tok))); } catch { return false; } })();
+  const coming = list.filter((x: any) => !done(x));
+  const old = list.filter(done).slice(0, 3);
+  const open = (x: any) => { try { sessionStorage.setItem('lm-as-store', partyId); } catch { /* ignore */ } window.location.hash = x.hash; };
+  return (
+    <PhoneFrame title={`${p?.name || 'Customer'} · Store`} sub="LoadMatch" lang={lang} setLang={setLang}>
+      <div className="space-y-3">
+        <div className="text-[11px] text-slate-500">Demo: this is the customer's own LoadMatch. Trucks their owner saved from a WhatsApp link show here.</div>
+        <div id="co-coming" className="rounded-2xl border-2 border-sky-300 bg-sky-50 p-3 space-y-2">
+          <div className="text-base font-bold text-sky-950">🚚 Coming to you · {coming.length}</div>
+          {!coming.length && <div className="text-sm text-sky-900">No truck coming now</div>}
+          {coming.slice(0, 3).map((x: any) => (
+            <button key={x.id} id={`co-${x.id}`} onClick={() => open(x)} className="w-full text-left rounded-xl bg-white border-2 border-sky-200 p-3 space-y-2 cursor-pointer block">
+              <span className="flex items-center gap-3"><span className="text-3xl">🚚</span><span className="flex-1"><span className="block text-base font-bold text-slate-900">From {x.from}</span><span className="inline-block px-2 py-0.5 rounded-md border-2 border-slate-800 bg-amber-50 font-mono font-bold text-sm">{x.plate}</span><span className="block text-xs text-slate-600">{loadName(x.id)}</span></span></span>
+              <span className="w-full min-h-[48px] rounded-xl bg-emerald-600 text-white text-base font-bold flex items-center justify-center">📍 Truck arrived → 🔢 Count</span>
+            </button>
+          ))}
+        </div>
+        {old.length > 0 && <div className="space-y-1.5"><div className="text-sm font-bold text-slate-900">🗂 Counted</div>{old.map((x: any) => <button key={x.id} id={`co-old-${x.id}`} onClick={() => open(x)} className="w-full text-left rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm cursor-pointer">✅ From {x.from} · {loadName(x.id)}</button>)}</div>}
       </div>
     </PhoneFrame>
   );
@@ -315,23 +357,51 @@ export function SenderReply({ id, token }: { id: string; token: string }) {
   const { state, dispatch } = useStore();
   const [lang, setLangState] = useState(savedLang);
   const setLang = (l: string) => { setLangState(l); saveLang(l); };
+  const [step, setStep] = useState<'lock' | 'code' | 'open'>('lock');
+  const [pickNext, setPickNext] = useState(false);
+  const [due, setDue] = useState<number | null>(null);
   const s = shipmentOf(state, id);
   const valid = s && s.ask && s.ask.token === token;
   const ds = valid ? diffsOf(state, s.id).filter((d: any) => d.kind !== 'excess') : [];
+  const p = valid ? party(s.party) : null;
+  const phone = String(p?.phone || '9845004321').slice(-4);
+  const answer = (k: string, dueAt?: number) => dispatch({ type: 'SENDER_REPLY', id: s.id, token, kind: k, dueAt, by: `Owner, ${p?.name}`, actor: p?.name });
+  const b = 'w-full min-h-[52px] rounded-xl text-sm font-bold cursor-pointer flex items-center gap-2 px-3';
   return (
     <PhoneFrame title="LoadMatch" sub={s ? loadName(s.id) : id} lang={lang} setLang={setLang}>
-      {!valid ? <Note tone="stop">{t('invalidLink', lang)}</Note> : (
+      {!valid ? <Note tone="stop">{t('invalidLink', lang)}</Note> : step !== 'open' && !s.ask.reply ? (
+        // owner to owner only: the link opens after a code sent to the owner's own phone (simulated)
+        <div className="space-y-3">
+          <div className="rounded-2xl border-2 border-slate-300 bg-slate-50 p-4 text-center space-y-2">
+            <div className="text-4xl">🔒</div>
+            <div className="text-base font-bold text-slate-900">For the owner of {p?.name} only</div>
+            <div className="text-xs text-slate-600">{COMPANY.name} is asking about {loadName(s.id)} (your bill {s.ref}). To keep it between owners, we send a code to the owner's phone ••••{phone}.</div>
+          </div>
+          {step === 'lock' && <button id="btn-send-code" onClick={() => setStep('code')} className={`${b} justify-center bg-slate-900 text-white`}>📲 Send code to ••••{phone}</button>}
+          {step === 'code' && <>
+            <div id="code-box" className="flex justify-center gap-2">{['4', '8', '2', '1'].map((x, i) => <span key={i} className="w-11 h-12 rounded-lg border-2 border-slate-400 bg-white flex items-center justify-center text-xl font-mono font-bold">{x}</span>)}</div>
+            <div className="text-[11px] text-slate-500 text-center">Code filled in from the SMS (demo)</div>
+            <button id="btn-open-reply" onClick={() => setStep('open')} className={`${b} justify-center bg-emerald-600 text-white`}>Open</button>
+          </>}
+        </div>
+      ) : (
         <div className="space-y-3">
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs space-y-1">
             <div className="font-bold text-slate-900 text-sm">{route(s)} · {loadName(s.id)}</div>
-            <div className="text-slate-600">Bill {s.ref} · truck {s.truckNo}</div>
+            <div className="text-slate-600">Your bill {s.ref} · truck {s.truckNo}</div>
           </div>
           <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-3 space-y-1">
-            <div className="text-base font-bold text-amber-950">❓ The buyer counted less than your bill. What happened?</div>
+            <div className="text-base font-bold text-amber-950">❓ {COMPANY.name} counted less than your bill. What happened?</div>
             {ds.map((d: any) => <div key={d.id} className="text-sm text-amber-950">{itemIco(d.item)} {shortN(d.item)}: {d.qty} {d.kind === 'short' ? 'missing' : 'damaged'}</div>)}
           </div>
-          {s.ask.reply ? <div id="reply-done" className="rounded-xl border-2 border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-950">✅ Sent: {REPLIES[s.ask.reply.kind].label}. Thank you.</div>
-            : Object.keys(REPLIES).map((k) => <button key={k} id={`sreply-${k}`} onClick={() => dispatch({ type: 'SENDER_REPLY', id: s.id, token, kind: k, by: `${party(s.party)?.name}`, actor: party(s.party)?.name })} className="w-full min-h-[52px] rounded-xl border-2 border-slate-300 bg-white px-3 text-left text-sm font-bold text-slate-900 cursor-pointer flex items-center gap-2"><span className="text-xl">{REPLIES[k].icon}</span>{REPLIES[k].label}</button>)}
+          {s.ask.reply ? <div id="reply-done" className="rounded-xl border-2 border-emerald-300 bg-emerald-50 p-3 text-sm font-bold text-emerald-950">✅ Sent: {REPLIES[s.ask.reply.kind].label}{s.ask.reply.dueAt ? ` by ${dayLabel(s.ask.reply.dueAt)}` : ''}. Thank you.</div>
+            : pickNext ? <div className="space-y-2">
+                <div className="text-sm font-bold text-slate-900">📦 When will you send it?</div>
+                <DateChips id="sdue" value={due} onPick={setDue} />
+                <button id="sreply-send" disabled={!due} onClick={() => answer('send_next', due!)} className={`${b} justify-center bg-emerald-600 text-white disabled:opacity-40`}>📨 Send answer</button>
+                <button onClick={() => setPickNext(false)} className="text-xs font-bold text-slate-500 underline cursor-pointer">← Back</button>
+              </div>
+            : Object.keys(REPLIES).map((k) => <button key={k} id={`sreply-${k}`} onClick={() => (k === 'send_next' ? setPickNext(true) : answer(k))} className={`${b} border-2 border-slate-300 bg-white text-slate-900 text-left`}><span className="text-xl">{REPLIES[k].icon}</span>{REPLIES[k].label}</button>)}
         </div>
       )}
     </PhoneFrame>
