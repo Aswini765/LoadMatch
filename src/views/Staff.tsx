@@ -164,7 +164,7 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
     window.location.hash = `#/r/${s.id}/${token}`;
   };
   const startLoading = (s: any) => dispatch({ type: 'LOADING', id: s.id, point: 'Dock 1', phase: 'start', actor: me() });
-  const loaded = (s: any) => { dispatch({ type: 'ATTACH_DOC', id: s.id, docs: [{ id: newToken(), name: `${s.id}-loaded.jpg`, kind: 'loaded truck photo' }], actor: me() }); dispatch({ type: 'LOADING', id: s.id, phase: 'end', actor: me() }); };
+  const loaded = (s: any) => dispatch({ type: 'LOADING', id: s.id, phase: 'end', actor: me() });
   const leave = (s: any) => dispatch({ type: 'SEND_TO_RECEIVER', id: s.id, token: newToken(), actor: me() });
 
   // Updates: short lines with a picture, newest first
@@ -234,9 +234,12 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
 
         {open === 'send' && <>
           {justSent && <div id="sent-ok" className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-3 text-base font-bold text-emerald-900">{(() => { const j = state.shipments.find((x: any) => x.id === justSent); return j?.sentAt ? `✅ ${loadName(justSent)} ${w('sentOk')}` : `📦 ${loadName(justSent)}: ${w('loadingStarted')}`; })()}</div>}
-          <SendTruck key={justSent || 'new'} unit={unit} w={w} onSent={(id) => setJustSent(id)} />
-          {sending.length > 0 && <div className="text-sm font-bold text-slate-900 pt-1">📤 {w('myTrucks')}</div>}
-          {sending.slice(0, 3).map((s: any) => {
+          {['loading'].map((part) => {
+            const list = sending.filter((s: any) => (part === 'loading' ? !s.sentAt : s.sentAt)).slice(0, 3);
+            if (!list.length) return null;
+            return <div key={part} id={part === 'loading' ? 'loading-now' : 'trucks-sent'} className="space-y-3">
+          <div className="text-sm font-bold text-slate-900 pt-1">{part === 'loading' ? `📦 ${w('loadingNow')}` : `📤 ${w('myTrucks')}`}</div>
+          {list.map((s: any) => {
             const [, to] = route(s).split(' → ');
             return (
               <div key={s.id} id={`staff-${s.id}`} className={`rounded-2xl border-2 p-3 space-y-2 ${s.id === justSent ? 'border-emerald-400 bg-emerald-50/40' : 'border-violet-200 bg-white'}`}>
@@ -250,12 +253,43 @@ export default function Staff({ go, initialId = null }: { go: Go; initialId?: st
                 </div>
                 {!s.sentAt && <div className="flex items-center gap-1 text-[11px] font-bold text-slate-500">{[['📦', w('startLoading'), Boolean(s.loading)], ['✅', w('loadingDone'), Boolean(s.loading?.endAt)], ['🚚', w('truckLeft'), false]].map(([i, t, d]: any, k) => <span key={k} className={`flex-1 text-center rounded-md py-1 ${d ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100'}`}>{d ? '✓' : i} {t}</span>)}</div>}
                 {!s.sentAt && !s.loading && <button id={`step-${s.id}`} onClick={() => startLoading(s)} className={`${big} bg-violet-700 text-white`}>📦 {w('startLoading')}</button>}
-                {!s.sentAt && s.loading && !s.loading.endAt && <CameraButton id={`step-${s.id}`} kind="loading" label={w('loadingDonePhoto')} done={false} onShot={() => loaded(s)} text={s.ref} />}
+                {!s.sentAt && s.loading && !s.loading.endAt && <button id={`step-${s.id}`} onClick={() => loaded(s)} className={`${big} bg-sky-600 text-white`}>✅ {w('loadingDone')}</button>}
                 {!s.sentAt && s.loading?.endAt && <button id={`step-${s.id}`} onClick={() => leave(s)} className={`${big} bg-emerald-600 text-white`}>🚚 {w('truckLeft')}</button>}
                 {s.sentAt && s.flow === 'outbound' && !s.linkSentAt && <div id={`owner-link-${s.id}`} className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">💬 {w('ownerSends')}</div>}
                 <button id={`open-${s.id}`} onClick={() => go('dispatch', { id: s.id })} className="text-[12px] font-semibold text-slate-500 underline cursor-pointer">{w('problem')}</button>
               </div>
             );
+          })}
+            </div>;
+          })}
+          <SendTruck key={justSent || 'new'} unit={unit} w={w} onSent={(id) => setJustSent(id)} />
+          {['sent'].map((part) => {
+            const list = sending.filter((s: any) => (part === 'loading' ? !s.sentAt : s.sentAt)).slice(0, 3);
+            if (!list.length) return null;
+            return <div key={part} id={part === 'loading' ? 'loading-now' : 'trucks-sent'} className="space-y-3">
+          <div className="text-sm font-bold text-slate-900 pt-1">{part === 'loading' ? `📦 ${w('loadingNow')}` : `📤 ${w('myTrucks')}`}</div>
+          {list.map((s: any) => {
+            const [, to] = route(s).split(' → ');
+            return (
+              <div key={s.id} id={`staff-${s.id}`} className={`rounded-2xl border-2 p-3 space-y-2 ${s.id === justSent ? 'border-emerald-400 bg-emerald-50/40' : 'border-violet-200 bg-white'}`}>
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl leading-none">{!s.sentAt ? (s.loading?.endAt ? '✅' : '📦') : s.arrivedAt ? '📍' : '🚚'}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-base font-bold text-slate-900 truncate">{toX(to, l)}</div>
+                    {s.truckNo && <Plate no={s.truckNo} />}
+                    <div className="text-xs text-slate-600">{!s.sentAt ? (s.loading?.endAt ? w('loadingDone') : s.loading ? w('loadingNow') : w('notLeft')) : s.arrivedAt ? w('reached') : w('onTheWay')} · {loadName(s.id)}</div>
+                  </div>
+                </div>
+                {!s.sentAt && <div className="flex items-center gap-1 text-[11px] font-bold text-slate-500">{[['📦', w('startLoading'), Boolean(s.loading)], ['✅', w('loadingDone'), Boolean(s.loading?.endAt)], ['🚚', w('truckLeft'), false]].map(([i, t, d]: any, k) => <span key={k} className={`flex-1 text-center rounded-md py-1 ${d ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100'}`}>{d ? '✓' : i} {t}</span>)}</div>}
+                {!s.sentAt && !s.loading && <button id={`step-${s.id}`} onClick={() => startLoading(s)} className={`${big} bg-violet-700 text-white`}>📦 {w('startLoading')}</button>}
+                {!s.sentAt && s.loading && !s.loading.endAt && <button id={`step-${s.id}`} onClick={() => loaded(s)} className={`${big} bg-sky-600 text-white`}>✅ {w('loadingDone')}</button>}
+                {!s.sentAt && s.loading?.endAt && <button id={`step-${s.id}`} onClick={() => leave(s)} className={`${big} bg-emerald-600 text-white`}>🚚 {w('truckLeft')}</button>}
+                {s.sentAt && s.flow === 'outbound' && !s.linkSentAt && <div id={`owner-link-${s.id}`} className="text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">💬 {w('ownerSends')}</div>}
+                <button id={`open-${s.id}`} onClick={() => go('dispatch', { id: s.id })} className="text-[12px] font-semibold text-slate-500 underline cursor-pointer">{w('problem')}</button>
+              </div>
+            );
+          })}
+            </div>;
           })}
         </>}
 

@@ -325,18 +325,7 @@ function saveToCompany(s: any, hash: string) {
 }
 // ---------- the customer's own LoadMatch: the same Home, Staff and Owner as ours, for the trucks their owner saved ----------
 export function PartnerApp({ partyId, tab }: { partyId: string; tab: string }) {
-  const p = party(partyId);
-  const tabs: [string, string][] = [['home', 'Home'], ['staff', 'Staff'], ['owner', 'Owner']];
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
-        <span className="text-sm font-bold text-slate-900 mr-2">🏢 {p?.name}</span>
-        {tabs.map(([k, label]) => <a key={k} id={`co-tab-${k}`} href={`#/co/${partyId}/${k}`} className={`px-3 py-1.5 rounded-lg text-sm font-bold ${tab === k ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'}`}>{label}</a>)}
-        <span className="ml-auto text-[11px] text-slate-500">Their own LoadMatch (demo)</span>
-      </div>
-      {tab === 'staff' ? <PartnerStore partyId={partyId} /> : tab === 'owner' ? <PartnerOwner partyId={partyId} /> : <PartnerHome partyId={partyId} />}
-    </div>
-  );
+  return tab === 'staff' ? <PartnerStore partyId={partyId} /> : tab === 'owner' ? <PartnerOwner partyId={partyId} /> : <PartnerHome partyId={partyId} />;
 }
 
 const partnerRows = (state: any, partyId: string) => savedTrucks(partyId).map((x: any) => {

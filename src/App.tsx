@@ -9,7 +9,8 @@ import Accountant from './views/Accountant.tsx';
 import Dispatch from './views/Dispatch.tsx';
 import Receive, { ReceiveTab, CountBack, SenderReply, PartnerApp } from './views/Receive.tsx';
 import Owner, { EvidenceView } from './views/Owner.tsx';
-import { useStore, receiptOverdue, countedByUs, atGate } from './store.tsx';
+import { useStore, receiptOverdue, countedByUs, atGate, shipmentOf, unpackLoad } from './store.tsx';
+import { PARTIES } from './data/seed.ts';
 import Reports from './views/Reports.tsx';
 import SopModal from './views/SopModal.tsx';
 import SettingsModal from './views/SettingsModal.tsx';
@@ -84,7 +85,15 @@ export default function App() {
   const [openId, setOpenId] = useState<string | null>(null);
   const link = useHashRoute();
   // the menu is hidden only for outsiders who opened a WhatsApp link; own staff (a role is picked) keep it
-  const bare = Boolean(link) && !who;
+  // A customer who opens our link gets the same LoadMatch, as their own company: Home, Staff, Owner
+  const { state: appState } = useStore();
+  const asStore = (() => { try { return sessionStorage.getItem('lm-as-store') || ''; } catch { return ''; } })();
+  const linkShip = link?.kind === 'r' ? (shipmentOf(appState, link.id) || (link.payload ? unpackLoad(link.id, link.token, link.payload)?.shipment : null)) : null;
+  const partner = link?.kind === 'co' ? link.id : linkShip?.flow === 'outbound' ? linkShip.party : '';
+  const ptab = link?.kind === 'co' ? link.token : asStore ? 'staff' : 'owner';
+  const pTabs: [string, string][] = [['home', 'Home'], ['staff', 'Staff'], ['owner', 'Owner']];
+  const pGo = (t: string) => { window.location.hash = `#/co/${partner}/${t}`; setMobileOpen(false); toTop(); };
+  const bare = Boolean(link) && !who && !partner;
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sopOpen, setSopOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -106,18 +115,26 @@ export default function App() {
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto overflow-x-hidden">
         <header id="main-topbar" className="h-14 bg-white border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between shrink-0 z-30 shadow-2xs sticky top-0">
           <div className="flex items-center space-x-3 shrink-0">
-            {!bare && <button id="btn-toggle-mobile-menu" onClick={() => setMobileOpen((o) => !o)} className="p-1.5 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 sm:hidden cursor-pointer" aria-label="Open Navigation Menu">
+            {(!bare || partner) && <button id="btn-toggle-mobile-menu" onClick={() => setMobileOpen((o) => !o)} className="p-1.5 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 sm:hidden cursor-pointer" aria-label="Open Navigation Menu">
               {mobileOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
             </button>}
-            <div className={`flex items-center space-x-2.5 select-none ${bare ? '' : 'cursor-pointer'}`} onClick={() => !bare && go('home')}>
+            <div className={`flex items-center space-x-2.5 select-none ${bare ? '' : 'cursor-pointer'}`} onClick={() => (partner ? pGo('home') : !bare && go('home'))}>
               <div className="w-7 h-7 rounded-md bg-slate-900 text-white font-bold text-xs flex items-center justify-center tracking-tight">LM</div>
               <div className="flex flex-col">
                 <span className="font-bold text-sm tracking-tight text-slate-950 leading-tight">LoadMatch</span>
-                <span className="text-[11px] font-medium text-slate-500 leading-none">Every load, counted at both ends</span>
+                <span className="text-[11px] font-medium text-slate-500 leading-none">{partner ? `🏢 ${PARTIES[partner]?.name}` : 'Every load, counted at both ends'}</span>
               </div>
             </div>
           </div>
-          {!bare && <nav id="role-switcher-nav" className="hidden sm:flex items-center space-x-1" aria-label="Application Role Switcher">
+          {partner && <nav id="partner-nav" className="hidden sm:flex items-center space-x-1">
+            {pTabs.map(([id, label]) => <button key={id} id={`role-btn-${id}`} onClick={() => pGo(id)} className={`inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-md cursor-pointer ${ptab === id ? 'text-slate-950 bg-slate-100 font-bold' : 'text-slate-600 hover:text-slate-950 hover:bg-slate-50'}`}>{label}</button>)}
+          </nav>}
+          {partner && <div className="flex items-center space-x-3 shrink-0 text-xs">
+            <div className="hidden md:flex items-center space-x-1.5 text-slate-600 bg-slate-50 border border-slate-200/80 px-2.5 py-1 rounded-md"><MapPin className="w-3 h-3 text-slate-400" /><span className="font-medium text-slate-800">{PARTIES[partner]?.name}</span><span className="text-slate-300">•</span><span className="text-slate-500 font-normal">Demo Environment</span></div>
+            <SyncChip />
+            {ptab !== 'home' && <span className="text-slate-700 font-semibold px-2 py-1 rounded-md bg-emerald-50 border border-emerald-200">You: {ptab === 'staff' ? 'Staff' : 'Owner'}</span>}
+          </div>}
+          {!bare && !partner && <nav id="role-switcher-nav" className="hidden sm:flex items-center space-x-1" aria-label="Application Role Switcher">
             {roles.map(([id, label]) => (
               <button key={id} id={`role-btn-${id}`} onClick={() => openTab(id)}
                 className={`inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${!bare && view === id ? 'text-slate-950 bg-slate-100 font-bold' : 'text-slate-600 hover:text-slate-950 hover:bg-slate-50'}`}>
@@ -126,7 +143,7 @@ export default function App() {
               </button>
             ))}
           </nav>}
-          {!bare && <div className="flex items-center space-x-3 shrink-0 text-xs">
+          {!bare && !partner && <div className="flex items-center space-x-3 shrink-0 text-xs">
             <div className="hidden lg:flex items-center space-x-1.5 text-slate-600 bg-slate-50 border border-slate-200/80 px-2.5 py-1 rounded-md">
               <MapPin className="w-3 h-3 text-slate-400" />
               <span className="font-medium text-slate-800">{COMPANY.name}, {COMPANY.city}</span>
@@ -146,7 +163,13 @@ export default function App() {
           </div>}
         </header>
 
-        {mobileOpen && !bare && (
+        {mobileOpen && partner && (
+          <div className="sm:hidden bg-white border-b border-slate-200 px-4 py-2 space-y-1 shadow-xs z-20">
+            <div className="px-3 py-1 text-[11px] font-bold text-slate-500">{PARTIES[partner]?.name}</div>
+            {pTabs.map(([id, label]) => <button key={id} id={`m-role-${id}`} onClick={() => pGo(id)} className={`block w-full text-left px-3 py-2 text-xs font-semibold rounded-md cursor-pointer ${ptab === id ? 'text-slate-950 bg-slate-100 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>{label}</button>)}
+          </div>
+        )}
+        {mobileOpen && !bare && !partner && (
           <div className="sm:hidden bg-white border-b border-slate-200 px-4 py-2 space-y-1 shadow-xs z-20">
             {roles.map(([id, label]) => (
               <button key={id} id={`m-role-${id}`} onClick={() => openTab(id)} className={`block w-full text-left px-3 py-2 text-xs font-semibold rounded-md cursor-pointer ${view === id ? 'text-slate-950 bg-slate-100 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}>{label}{badges[id] && <span className={`ml-1.5 inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full text-[10px] font-bold text-white ${badges[id]!.cls}`}>{badges[id]!.n}</span>}</button>

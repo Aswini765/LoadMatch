@@ -9,7 +9,7 @@ const SOPS: [string, string[]][] = [
     'Customers and suppliers need no app: their owner gets a WhatsApp link, saves the truck to their company, and their store counts it from their own store screen (Send / Receive / Updates, like our staff).',
   ]],
   ['1 · Staff: send a truck', [
-    'Tap 📤 Send → choose where (🏭 our unit or 🏪 customer) → 📷 photo of the challan (items and numbers are read from it; fix with − +) → 📷 photo of the number plate → 🧑‍✈️ driver: same as last time with this truck, or 📷 photo of the licence + 🎤 he says his phone number → 📦 Start loading. Then on the truck card: 📷 Loading done (photo of the loaded truck) → 🚚 Truck left.',
+    'Tap 📤 Send → choose where (🏭 our unit or 🏪 customer) → 📷 photo of the challan (items and numbers are read from it; fix with − +) → 📷 photo of the number plate → 🧑‍✈️ driver: same as last time with this truck, or 📷 photo of the licence + 🎤 he says his phone number → 📦 Start loading. Then on the truck card: ✅ Loading done → 🚚 Truck left. A truck shows under “Trucks I sent” only after it leaves.',
     'If we owe the receiver goods (missing last time), the send screen offers “Add what we owe”, ticked. That truck is marked as carrying them.',
     'Our other unit sees the truck at once under “Coming to you”. For a customer, the owner sends the count link.',
   ]],
